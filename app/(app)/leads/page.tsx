@@ -89,6 +89,13 @@ function normalizeRow(row: Record<string, string>) {
   }
 }
 
+interface ImportResult {
+  created: number
+  updated: number
+  skipped: number
+  errors: string[]
+}
+
 interface ImportState {
   step: 'idle' | 'preview' | 'importing' | 'done'
   file: File | null
@@ -96,8 +103,16 @@ interface ImportState {
   preview: Array<{ nome: string; telefone: string; site: string; cidade: string; email: string }>
   nicho: string
   origem: string
-  result: { created: number; updated: number; skipped: number; errors: string[] } | null
+  result: ImportResult | null
+  // Batch progress
+  totalRows: number
+  processedRows: number
+  currentBatch: number
+  totalBatches: number
+  batchErrors: number // batches that failed entirely
 }
+
+const BATCH_SIZE = 100
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
@@ -113,8 +128,10 @@ export default function LeadsPage() {
     origem: '', observacaoPerfil: ''
   })
   const [imp, setImp] = useState<ImportState>({
-    step: 'idle', file: null, rawRows: [], preview: [], nicho: '', origem: 'Importação CSV', result: null
+    step: 'idle', file: null, rawRows: [], preview: [], nicho: '', origem: 'Importação CSV', result: null,
+    totalRows: 0, processedRows: 0, currentBatch: 0, totalBatches: 0, batchErrors: 0,
   })
+  const abortRef = useRef(false)
   const [isFirstLoad, setIsFirstLoad] = useState(true)
   const [initialLoading, setInitialLoading] = useState(true)
   const [loadingDemo, setLoadingDemo] = useState(false)
@@ -168,21 +185,86 @@ const load = useCallback(() => {
   }
 
   const handleImport = async () => {
-    setImp(prev => ({ ...prev, step: 'importing' }))
-    const rows = imp.rawRows.map(normalizeRow)
-    const res = await fetch('/api/leads/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows, nicho: imp.nicho || undefined, origem: imp.origem }),
-    })
-    const result = await res.json()
-    setImp(prev => ({ ...prev, step: 'done', result }))
+    const allRows = imp.rawRows.map(normalizeRow)
+    const totalRows = allRows.length
+    const totalBatches = Math.ceil(totalRows / BATCH_SIZE)
+
+    abortRef.current = false
+    setImp(prev => ({
+      ...prev,
+      step: 'importing',
+      totalRows,
+      processedRows: 0,
+      currentBatch: 0,
+      totalBatches,
+      batchErrors: 0,
+      result: { created: 0, updated: 0, skipped: 0, errors: [] },
+    }))
+
+    const accumulated: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] }
+    let batchErrors = 0
+
+    for (let i = 0; i < totalBatches; i++) {
+      if (abortRef.current) break
+
+      const start = i * BATCH_SIZE
+      const batchRows = allRows.slice(start, start + BATCH_SIZE)
+
+      try {
+        const res = await fetch('/api/leads/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rows: batchRows,
+            nicho: imp.nicho || undefined,
+            origem: imp.origem,
+          }),
+        })
+
+        if (!res.ok) {
+          batchErrors++
+          accumulated.errors.push(`Batch ${i + 1}: Erro HTTP ${res.status}`)
+        } else {
+          const data = await res.json()
+          accumulated.created += data.created || 0
+          accumulated.updated += data.updated || 0
+          accumulated.skipped += data.skipped || 0
+          if (data.errors?.length) {
+            accumulated.errors.push(...data.errors.slice(0, 5))
+          }
+        }
+      } catch (err) {
+        batchErrors++
+        accumulated.errors.push(`Batch ${i + 1}: Erro de rede`)
+      }
+
+      const processed = Math.min(start + batchRows.length, totalRows)
+      setImp(prev => ({
+        ...prev,
+        processedRows: processed,
+        currentBatch: i + 1,
+        batchErrors,
+        result: { ...accumulated, errors: [...accumulated.errors] },
+      }))
+    }
+
+    setImp(prev => ({
+      ...prev,
+      step: 'done',
+      processedRows: totalRows,
+      currentBatch: totalBatches,
+      result: { ...accumulated, errors: accumulated.errors.slice(0, 20) },
+    }))
     load()
   }
 
   const closeImport = () => {
+    abortRef.current = true
     setShowImport(false)
-    setImp({ step: 'idle', file: null, rawRows: [], preview: [], nicho: '', origem: 'Importação CSV', result: null })
+    setImp({
+      step: 'idle', file: null, rawRows: [], preview: [], nicho: '', origem: 'Importação CSV', result: null,
+      totalRows: 0, processedRows: 0, currentBatch: 0, totalBatches: 0, batchErrors: 0,
+    })
   }
 
   const onDrop = (e: React.DragEvent) => {
@@ -492,12 +574,68 @@ const load = useCallback(() => {
                 </>
               )}
 
-              {/* IMPORTING */}
+              {/* IMPORTING — batch progress */}
               {imp.step === 'importing' && (
-                <div className="py-12 text-center">
-                  <Loader2 className="w-12 h-12 text-[#8B5CF6] mx-auto mb-4 animate-spin" />
-                  <div className="text-lg font-bold text-[#F0F0F3] mb-1">A importar {imp.rawRows.length} leads...</div>
-                  <div className="text-sm text-[#71717A]">A detectar duplicados, calcular scores e organizar dados</div>
+                <div className="py-6 space-y-5">
+                  {/* Header with spinner */}
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="w-6 h-6 text-[#8B5CF6] animate-spin flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="text-base font-bold text-[#F0F0F3]">
+                        A importar {imp.processedRows.toLocaleString('pt-PT')} de {imp.totalRows.toLocaleString('pt-PT')} leads...
+                      </div>
+                      <div className="text-xs text-[#71717A]">
+                        Batch {imp.currentBatch} de {imp.totalBatches} · Deduplicação e scoring automáticos
+                      </div>
+                    </div>
+                    <span className="text-2xl font-black text-[#8B5CF6]">
+                      {imp.totalRows > 0 ? Math.round((imp.processedRows / imp.totalRows) * 100) : 0}%
+                    </span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="h-2.5 bg-[#27272A] rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-[#8B5CF6] to-[#A78BFA] rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${imp.totalRows > 0 ? (imp.processedRows / imp.totalRows) * 100 : 0}%` }}
+                    />
+                  </div>
+
+                  {/* Live counters */}
+                  {imp.result && (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
+                        <div className="text-xl font-black text-green-400">{imp.result.created}</div>
+                        <div className="text-[10px] text-green-400/80 font-semibold uppercase">Criados</div>
+                      </div>
+                      <div className="bg-[rgba(139,92,246,0.1)] border border-[rgba(139,92,246,0.2)] rounded-lg p-3 text-center">
+                        <div className="text-xl font-black text-[#8B5CF6]">{imp.result.updated}</div>
+                        <div className="text-[10px] text-[#8B5CF6]/80 font-semibold uppercase">Atualizados</div>
+                      </div>
+                      <div className="bg-[#16161A] border border-[#27272A] rounded-lg p-3 text-center">
+                        <div className="text-xl font-black text-[#71717A]">{imp.result.skipped}</div>
+                        <div className="text-[10px] text-[#52525B] font-semibold uppercase">Ignorados</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Batch errors warning */}
+                  {imp.batchErrors > 0 && (
+                    <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                      <span className="text-xs text-amber-300">
+                        {imp.batchErrors} batch(es) com erro — o processo continua com os restantes
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Cancel button */}
+                  <button
+                    onClick={() => { abortRef.current = true }}
+                    className="w-full py-2 rounded-lg border border-[#27272A] text-sm text-[#71717A] hover:border-red-500/50 hover:text-red-400 transition-colors"
+                  >
+                    Cancelar importação
+                  </button>
                 </div>
               )}
 
@@ -505,8 +643,19 @@ const load = useCallback(() => {
               {imp.step === 'done' && imp.result && (
                 <div className="py-4">
                   <div className="flex items-center justify-center mb-6">
-                    <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center">
-                      <CheckCircle className="w-9 h-9 text-green-400" />
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center ${imp.batchErrors > 0 && imp.result.created === 0 ? 'bg-red-500/10' : 'bg-green-500/10'}`}>
+                      {imp.batchErrors > 0 && imp.result.created === 0
+                        ? <AlertCircle className="w-9 h-9 text-red-400" />
+                        : <CheckCircle className="w-9 h-9 text-green-400" />
+                      }
+                    </div>
+                  </div>
+
+                  {/* Summary line */}
+                  <div className="text-center mb-5">
+                    <div className="text-sm text-[#71717A]">
+                      {imp.totalRows.toLocaleString('pt-PT')} leads processados em {imp.totalBatches} batches
+                      {imp.batchErrors > 0 && <span className="text-amber-400"> · {imp.batchErrors} com erro</span>}
                     </div>
                   </div>
 

@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { cleanPhoneForStorage, cleanNameForStorage } from '@/lib/lead-utils'
 
+// Vercel serverless: allow up to 60s per batch request
+export const maxDuration = 60
+
 function calcOppScore(data: {
   temSite: boolean
   siteFraco: boolean
