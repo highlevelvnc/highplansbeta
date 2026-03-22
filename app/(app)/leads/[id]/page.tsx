@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Phone, Mail, Globe, Save, Plus, Trash2, MessageCircle, Send, X, Check, Clock, AlertCircle, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/components/Toast'
+import { getWhatsAppNumber, buildWhatsAppUrl } from '@/lib/lead-utils'
 
 const PIPELINE_STAGES = ['NEW','CONTACTED','INTERESTED','PROPOSAL_SENT','NEGOTIATION','CLOSED','LOST']
 const PIPELINE_LABELS: Record<string,string> = { NEW:'Novo', CONTACTED:'Contactado', INTERESTED:'Interessado', PROPOSAL_SENT:'Proposta Enviada', NEGOTIATION:'Negociação', CLOSED:'Fechado', LOST:'Perdido' }
@@ -142,10 +143,9 @@ export default function LeadDetailPage() {
       } else if (data.error?.includes('não configurad')) {
         // Fallback to manual
         if (showSendModal === 'WHATSAPP') {
-          const num = (lead.whatsapp || lead.telefone || '').replace(/\D/g, '')
-          if (num) {
-            const finalNum = num.startsWith('351') ? num : '351' + num
-            window.open(`https://wa.me/${finalNum}?text=${encodeURIComponent(msgText)}`, '_blank')
+          const waUrl = buildWhatsAppUrl(lead, msgText)
+          if (waUrl) {
+            window.open(waUrl, '_blank')
             toast('WhatsApp aberto (modo manual)', 'info')
           }
         } else {

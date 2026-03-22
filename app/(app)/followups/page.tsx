@@ -1,8 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Phone, MessageSquare, Mail, Plus, Check, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Phone, MessageSquare, Mail, Plus, Check, AlertTriangle, RefreshCw, Calendar } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/Toast'
+import { EmptyState } from '@/components/EmptyState'
+import { buildWhatsAppUrl } from '@/lib/lead-utils'
 
 const FILTERS = [
   { id: 'atrasados', label: 'Atrasados' },
@@ -25,6 +28,7 @@ export default function FollowUpsPage() {
   const [showNew, setShowNew] = useState(false)
   const [leads, setLeads] = useState<any[]>([])
   const [form, setForm] = useState({ leadId:'', tipo:'WHATSAPP', mensagem:'', agendadoPara:'' })
+  const router = useRouter()
   const { toast } = useToast()
 
   const load = async () => {
@@ -164,7 +168,7 @@ export default function FollowUpsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                {fu.lead?.whatsapp&&<a href={`https://wa.me/${fu.lead.whatsapp.replace(/\D/g,'')}`} target="_blank"
+                {fu.lead && buildWhatsAppUrl(fu.lead) && <a href={buildWhatsAppUrl(fu.lead)} target="_blank"
                   className="px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 text-xs hover:bg-green-500/20 transition-colors">WhatsApp</a>}
                 <button onClick={()=>markDone(fu.id)}
                   className="p-1.5 rounded-lg bg-[#8B5CF6]/10 text-[#8B5CF6] hover:bg-[#8B5CF6]/20 transition-colors">
@@ -174,8 +178,26 @@ export default function FollowUpsPage() {
             </div>
           )
         })}
-        {followups.length===0&&(
-          <div className="text-center py-12 text-[#71717A]">Nenhum follow-up para esta vista</div>
+        {followups.length===0 && !loading && (
+          leads.length === 0 ? (
+            <EmptyState
+              icon={Calendar}
+              title="Sem follow-ups"
+              description="Agende follow-ups para nunca perder o contacto com os seus leads. Importe leads primeiro e depois agende os seus contactos."
+              actions={[
+                { label: 'Importar Leads', icon: Plus, onClick: () => router.push('/leads'), primary: true },
+              ]}
+            />
+          ) : (
+            <EmptyState
+              icon={Calendar}
+              title="Nenhum follow-up agendado"
+              description="Agende follow-ups para nunca perder o contacto com os seus leads. Defina datas, mensagens e o sistema lembra-o."
+              actions={[
+                { label: 'Agendar Follow-up', icon: Plus, onClick: () => setShowNew(true), primary: true },
+              ]}
+            />
+          )
         )}
       </div>}
 

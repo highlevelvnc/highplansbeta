@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { TrendingUp, Users, Zap, AlertTriangle, CheckSquare, Euro, Target, BarChart2, RefreshCw } from 'lucide-react'
+import { TrendingUp, Users, Zap, AlertTriangle, CheckSquare, Euro, Target, BarChart2, RefreshCw, Upload, Plus, ArrowRight } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import Link from 'next/link'
 
 interface DashData {
   receitaAtiva: number
@@ -116,6 +117,65 @@ export default function DashboardPage() {
   )
 
   if (!data) return null
+
+  // Dashboard empty state — no leads yet
+  if (data.totalLeads === 0) {
+    return (
+      <div className="p-4 md:p-6 max-w-7xl">
+        <div className="mb-6">
+          <h1 className="text-2xl font-black text-[#F0F0F3] tracking-tight">Dashboard</h1>
+          <p className="text-sm text-[#71717A] mt-0.5">Inteligência comercial em tempo real</p>
+        </div>
+
+        {/* Empty hero */}
+        <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-[rgba(139,92,246,0.08)] border border-[rgba(139,92,246,0.15)] flex items-center justify-center mb-5">
+            <BarChart2 className="w-7 h-7 text-[#8B5CF6]/60" />
+          </div>
+          <h3 className="text-lg font-bold text-[#F0F0F3] mb-2">Dashboard sem dados</h3>
+          <p className="text-sm text-[#71717A] max-w-md mb-8 leading-relaxed">
+            O dashboard mostra métricas, receita e oportunidades assim que importar os seus primeiros leads.
+          </p>
+
+          {/* Next steps */}
+          <div className="w-full max-w-lg space-y-2">
+            <div className="text-[10px] text-[#52525B] uppercase tracking-widest font-bold mb-3">Próximos passos</div>
+            <Link href="/leads" className="group flex items-center gap-4 bg-[#0F0F12] border border-[#27272A] hover:border-[#8B5CF6]/50 rounded-xl p-4 transition-all text-left">
+              <div className="w-10 h-10 rounded-xl bg-[rgba(139,92,246,0.12)] flex items-center justify-center flex-shrink-0">
+                <Upload className="w-5 h-5 text-[#8B5CF6]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-[#F0F0F3]">Importar leads via CSV</div>
+                <div className="text-xs text-[#71717A]">Carregue os seus contactos e o sistema calcula os scores</div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-[#52525B] group-hover:text-[#8B5CF6] transition-colors flex-shrink-0" />
+            </Link>
+            <Link href="/leads" className="group flex items-center gap-4 bg-[#0F0F12] border border-[#27272A] hover:border-[#8B5CF6]/50 rounded-xl p-4 transition-all text-left">
+              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                <Plus className="w-5 h-5 text-green-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-[#F0F0F3]">Criar o primeiro lead</div>
+                <div className="text-xs text-[#71717A]">Adicione um contacto manualmente para começar</div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-[#52525B] group-hover:text-[#8B5CF6] transition-colors flex-shrink-0" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Placeholder cards — show what will appear */}
+        <div className="mt-8">
+          <div className="text-[10px] text-[#52525B] uppercase tracking-widest font-bold mb-3 text-center">O que vai ver aqui</div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 opacity-40">
+            <StatCard icon={Euro} label="Receita Ativa / Mês" value="€0" />
+            <StatCard icon={Target} label="Receita Potencial" value="€0" color="#8B5CF6" />
+            <StatCard icon={TrendingUp} label="Receita Futura" value="€0" color="#10B981" />
+            <StatCard icon={Users} label="Total de Leads" value="0" />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const nichoData = Object.entries(data.receitaPorNicho).map(([name, value]) => ({ name, value }))
   const pipelineData = Object.entries(data.pipeline).map(([status, count]) => ({

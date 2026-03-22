@@ -2,6 +2,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Plus, Search, Upload, ExternalLink, Phone, Mail, X, CheckCircle, AlertCircle, ChevronDown, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { Onboarding } from '@/components/Onboarding'
+import { displayName, getWhatsAppNumber, buildWhatsAppUrl } from '@/lib/lead-utils'
 
 interface Lead {
   id: string; nome: string; empresa?: string; nicho?: string; cidade?: string
@@ -113,6 +115,9 @@ export default function LeadsPage() {
   const [imp, setImp] = useState<ImportState>({
     step: 'idle', file: null, rawRows: [], preview: [], nicho: '', origem: 'Importação CSV', result: null
   })
+  const [isFirstLoad, setIsFirstLoad] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [loadingDemo, setLoadingDemo] = useState(false)
 
 const load = useCallback(() => {
   const params = new URLSearchParams()
@@ -126,13 +131,16 @@ const load = useCallback(() => {
       return data
     })
     .then((data) => {
-      setLeads(Array.isArray(data?.leads) ? data.leads : [])
-      // se você tiver paginação:
-      // setTotal(data?.total ?? 0)
+      const list = Array.isArray(data?.leads) ? data.leads : []
+      setLeads(list)
+      if (list.length > 0) setIsFirstLoad(false)
     })
     .catch((err) => {
       console.error(err)
       setLeads([])
+    })
+    .finally(() => {
+      setInitialLoading(false)
     })
 }, [search, scoreFilter])
 
@@ -181,6 +189,45 @@ const load = useCallback(() => {
     e.preventDefault(); setDragOver(false)
     const file = e.dataTransfer.files[0]
     if (file && (file.name.endsWith('.csv') || file.type === 'text/csv')) handleFile(file)
+  }
+
+  const handleDemo = async () => {
+    setLoadingDemo(true)
+    const demoLeads = [
+      { nome: 'Restaurante Solar do Minho', empresa: 'Solar do Minho Lda', nicho: 'Restaurantes', cidade: 'Braga', telefone: '253123456', email: 'geral@solarminho.pt', temSite: false, siteFraco: false, instagramAtivo: true, gmbOtimizado: false, anunciosAtivos: false, origem: 'Demo', observacaoPerfil: 'Sem presença web - grande oportunidade' },
+      { nome: 'Clínica Dra. Santos', empresa: 'Clínica Santos Saúde', nicho: 'Saúde', cidade: 'Lisboa', telefone: '211234567', email: 'info@clinicasantos.pt', temSite: true, siteFraco: true, instagramAtivo: false, gmbOtimizado: false, anunciosAtivos: false, origem: 'Demo', observacaoPerfil: 'Site em Wix - propor redesign' },
+      { nome: 'SolarTech Energias', empresa: 'SolarTech Lda', nicho: 'Energia Solar', cidade: 'Porto', telefone: '912345678', email: 'comercial@solartech.pt', temSite: true, siteFraco: false, instagramAtivo: true, gmbOtimizado: true, anunciosAtivos: false, origem: 'Demo', observacaoPerfil: 'Bom site mas sem anúncios - propor Google Ads' },
+      { nome: 'Advogados Silva & Pereira', empresa: 'Silva & Pereira Associados', nicho: 'Advocacia', cidade: 'Coimbra', telefone: '239876543', email: 'escritorio@silvapereiria.pt', temSite: true, siteFraco: false, instagramAtivo: false, gmbOtimizado: false, anunciosAtivos: true, origem: 'Demo', observacaoPerfil: 'Já investe em ads - potencial para gestão completa' },
+      { nome: 'Beleza Pura Studio', empresa: 'Beleza Pura', nicho: 'Beleza & Estética', cidade: 'Faro', telefone: '916789012', email: '', temSite: false, siteFraco: false, instagramAtivo: true, gmbOtimizado: false, anunciosAtivos: false, origem: 'Demo', observacaoPerfil: 'Só Instagram - excelente oportunidade' },
+    ]
+    for (const lead of demoLeads) {
+      await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lead) }).catch(() => {})
+    }
+    setLoadingDemo(false)
+    setIsFirstLoad(false)
+    load()
+  }
+
+  // Onboarding: first access with no leads (wait for initial fetch to complete)
+  if (isFirstLoad && !initialLoading && leads.length === 0 && !search && !scoreFilter) {
+    return (
+      <div className="p-4 md:p-6">
+        {loadingDemo ? (
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <Loader2 className="w-10 h-10 text-[#8B5CF6] animate-spin mb-4" />
+            <div className="text-sm text-[#71717A]">A criar leads de demonstração...</div>
+          </div>
+        ) : (
+          <Onboarding
+            onImport={() => fileRef.current?.click()}
+            onCreateLead={() => { setIsFirstLoad(false); setShowNew(true) }}
+            onDemo={handleDemo}
+          />
+        )}
+        <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) { setIsFirstLoad(false); handleFile(f) }; e.target.value = '' }} />
+      </div>
+    )
   }
 
   return (
@@ -248,11 +295,12 @@ const load = useCallback(() => {
           <tbody>
             {leads.map(lead => {
               const ss = SCORE_STYLES[lead.score] || SCORE_STYLES.COLD
+              const leadName = displayName(lead)
+              const waUrl = buildWhatsAppUrl(lead)
               return (
                 <tr key={lead.id} className="border-b border-[#16161A] hover:bg-[#16161A]/50 transition-colors">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-[#F0F0F3]">{lead.nome}</div>
-                    {lead.empresa && lead.empresa !== lead.nome && <div className="text-xs text-[#71717A]">{lead.empresa}</div>}
+                    <div className="font-medium text-[#F0F0F3]">{leadName}</div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="text-[#F0F0F3]">{lead.nicho || '—'}</div>
@@ -280,8 +328,8 @@ const load = useCallback(() => {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
-                      {lead.whatsapp && (
-                        <a href={`https://wa.me/${lead.whatsapp.replace(/\D/g, '')}`} target="_blank"
+                      {waUrl && (
+                        <a href={waUrl} target="_blank"
                           className="text-[#71717A] hover:text-green-400 transition-colors">
                           <Phone className="w-3.5 h-3.5" />
                         </a>
@@ -300,7 +348,15 @@ const load = useCallback(() => {
               )
             })}
             {leads.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-12 text-[#71717A]">Nenhum lead encontrado</td></tr>
+              <tr><td colSpan={7} className="text-center py-12">
+                <Search className="w-6 h-6 text-[#27272A] mx-auto mb-2" />
+                <div className="text-sm text-[#71717A] mb-1">Nenhum lead encontrado</div>
+                {(search || scoreFilter) && (
+                  <button onClick={() => { setSearch(''); setScoreFilter('') }} className="text-xs text-[#8B5CF6] hover:text-[#A78BFA]">
+                    Limpar filtros
+                  </button>
+                )}
+              </td></tr>
             )}
           </tbody>
         </table>

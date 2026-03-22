@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { TrendingUp, Users, Euro, AlertTriangle, Phone, Mail, ExternalLink, ArrowUpRight, Calendar, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
+import { buildWhatsAppUrl } from '@/lib/lead-utils'
 
 const PLAN_COLORS: Record<string, string> = {
   'Presença Profissional': '#6366F1',
@@ -208,8 +209,8 @@ export default function ClientesPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
-                      {client.whatsapp && (
-                        <a href={`https://wa.me/${(client.whatsapp || '').replace(/\D/g, '')}`} target="_blank"
+                      {buildWhatsAppUrl(client) && (
+                        <a href={buildWhatsAppUrl(client)} target="_blank"
                           className="text-[#71717A] hover:text-green-400 transition-colors">
                           <Phone className="w-3.5 h-3.5" />
                         </a>

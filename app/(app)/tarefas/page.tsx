@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Plus, Check, Trash2, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Plus, Check, Trash2, AlertTriangle, RefreshCw, CheckSquare } from 'lucide-react'
 import { useToast } from '@/components/Toast'
+import { EmptyState } from '@/components/EmptyState'
 
 const PRIO_STYLES: Record<string,{label:string,bg:string,text:string}> = {
   HIGH:{label:'Alta',bg:'bg-red-500/10',text:'text-red-400'},
@@ -162,7 +163,16 @@ export default function TarefasPage() {
         </div>
       )}
 
-      {tasks.length===0&&<div className="text-center py-12 text-[#71717A]">Nenhuma tarefa criada</div>}
+      {tasks.length===0 && !loading && !error && (
+        <EmptyState
+          icon={CheckSquare}
+          title="Sem tarefas"
+          description="Crie tarefas para organizar o seu trabalho diário. Defina prioridades, prazos e mantenha tudo sob controlo."
+          actions={[
+            { label: 'Nova Tarefa', icon: Plus, onClick: () => setShowNew(true), primary: true },
+          ]}
+        />
+      )}
 
       {showNew&&(
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={e=>e.target===e.currentTarget&&setShowNew(false)}>

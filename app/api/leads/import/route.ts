@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { cleanPhoneForStorage, cleanNameForStorage } from '@/lib/lead-utils'
 
 function calcOppScore(data: {
   temSite: boolean
@@ -245,8 +246,8 @@ export async function POST(req: Request) {
 
     for (const row of rows) {
       // Support both lowercase and capitalized keys
-      const nome = (row.nome || row.Nome || '').trim()
-      if (!nome) { skipped++; continue }
+      const nomeRaw = (row.nome || row.Nome || '').trim()
+      if (!nomeRaw) { skipped++; continue }
 
       try {
         const telefoneRaw = row.telefone || row.Telefone || ''
@@ -254,7 +255,11 @@ export async function POST(req: Request) {
         const cidadeRaw = row.cidade || row.Cidade || ''
         const emailRaw = (row.email || row.Email || '').trim().toLowerCase()
 
-        const telefone = cleanPhone(telefoneRaw)
+        // Clean name: strip phone numbers, URLs, garbage from nome field
+        const nome = cleanNameForStorage(nomeRaw) || nomeRaw.substring(0, 200)
+
+        // Clean phone: extract first valid number, strip garbage
+        const telefone = cleanPhoneForStorage(telefoneRaw)
         const siteInfo = detectSiteInfo(siteRaw)
         const nicho = detectNicho(nome, nichoOverride)
 
@@ -287,12 +292,12 @@ export async function POST(req: Request) {
         else if (siteVal) obs = `Site: ${siteVal.substring(0, 120)}`
 
         const newLeadData = {
-          nome: nome.substring(0, 200),
-          empresa: nome.substring(0, 200),
+          nome: nome,
+          empresa: nome,
           nicho,
           cidade: cidadeRaw.trim() || 'Portugal',
-          telefone: telefone.substring(0, 30),
-          whatsapp: telefone.substring(0, 30),
+          telefone: telefone,
+          whatsapp: telefone,
           email: emailRaw.substring(0, 100) || undefined,
           temSite: diagData.temSite,
           siteFraco: diagData.siteFraco,
@@ -311,9 +316,9 @@ export async function POST(req: Request) {
         const match = await findExistingLead({
           email: emailRaw,
           telefone: telefone,
-          whatsapp: telefone, // import always sets whatsapp = telefone
-          nome: nome.substring(0, 200),
-          empresa: nome.substring(0, 200),
+          whatsapp: telefone,
+          nome: nome,
+          empresa: nome,
         }, index)
 
         if (match) {
@@ -354,12 +359,12 @@ export async function POST(req: Request) {
             index.byTelefone.set(normPhone, created_lead.id)
             index.byWhatsapp.set(normPhone, created_lead.id)
           }
-          const nameKey = `${nome.substring(0, 200).toLowerCase()}||${nome.substring(0, 200).toLowerCase()}`
+          const nameKey = `${nome.toLowerCase()}||${nome.toLowerCase()}`
           index.byNomeEmpresa.set(nameKey, created_lead.id)
           created++
         }
       } catch (e: any) {
-        errors.push(`${nome}: ${e.message}`)
+        errors.push(`${nomeRaw}: ${e.message}`)
         skipped++
       }
     }

@@ -1,8 +1,11 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
-import { MessageCircle, ExternalLink, Mail, Phone, ChevronDown, X, Send, Copy, Check, AlertTriangle, RefreshCw } from 'lucide-react'
+import { MessageCircle, ExternalLink, Mail, Phone, ChevronDown, X, Send, Copy, Check, AlertTriangle, RefreshCw, GitBranch, Upload } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/Toast'
+import { EmptyState } from '@/components/EmptyState'
+import { displayName, getWhatsAppNumber, getCallNumber, buildWhatsAppUrl } from '@/lib/lead-utils'
 
 const STAGES = [
   { id: 'NEW', label: 'Novos', color: '#71717A' },
@@ -50,6 +53,7 @@ export default function PipelinePage() {
   const [copied, setCopied] = useState(false)
   const [sending, setSending] = useState(false)
   const [integrationStatus, setIntegrationStatus] = useState<{ whatsapp: { configured: boolean }; email: { configured: boolean } } | null>(null)
+  const router = useRouter()
   const { toast } = useToast()
 
   const load = async () => {
@@ -112,8 +116,8 @@ export default function PipelinePage() {
 
   const sendWhatsApp = async () => {
     if (!contact) return
-    const num = (contact.lead.whatsapp || contact.lead.telefone || '').replace(/\D/g, '')
-    if (!num) { toast('Lead sem número de WhatsApp', 'error'); return }
+    const num = getWhatsAppNumber(contact.lead)
+    if (!num) { toast('Lead sem número de WhatsApp válido', 'error'); return }
 
     // Se Evolution API está configurada, enviar via API
     if (integrationStatus?.whatsapp?.configured) {
@@ -137,8 +141,8 @@ export default function PipelinePage() {
       }
     } else {
       // Fallback: abrir wa.me
-      const url = `https://wa.me/${num.startsWith('351') ? num : '351' + num}?text=${encodeURIComponent(msgText)}`
-      window.open(url, '_blank')
+      const url = buildWhatsAppUrl(contact.lead, msgText)
+      if (url) window.open(url, '_blank')
       // Registar na BD mesmo sem API
       fetch('/api/messages/send', {
         method: 'POST',
@@ -198,9 +202,9 @@ export default function PipelinePage() {
   }
 
   const callPhone = (lead: any) => {
-    const num = (lead.telefone || lead.whatsapp || '').replace(/\D/g, '')
+    const num = getCallNumber(lead)
     if (!num) { toast('Lead sem número de telefone', 'error'); return }
-    window.open(`tel:+${num.startsWith('351') ? num : '351' + num}`, '_blank')
+    window.open(`tel:+${num}`, '_blank')
   }
 
   if (loading) return (
@@ -224,6 +228,22 @@ export default function PipelinePage() {
           </div>
         ))}
       </div>
+    </div>
+  )
+
+  if (!loading && !error && leads.length === 0) return (
+    <div className="p-4 md:p-6 h-full flex flex-col">
+      <div className="mb-5">
+        <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Pipeline Kanban</h1>
+      </div>
+      <EmptyState
+        icon={GitBranch}
+        title="Pipeline vazio"
+        description="O pipeline mostra os seus leads organizados por etapa comercial. Importe ou crie leads para começar a gerir o funil."
+        actions={[
+          { label: 'Importar Leads', icon: Upload, onClick: () => router.push('/leads'), primary: true },
+        ]}
+      />
     </div>
   )
 
@@ -287,7 +307,10 @@ export default function PipelinePage() {
                 }}>
                 {stageLeads.map(lead => {
                   const ss = SCORE_STYLES[lead.score] || SCORE_STYLES.COLD
-                  const hasWA = !!(lead.whatsapp || lead.telefone)
+                  const leadName = displayName(lead)
+                  const waNum = getWhatsAppNumber(lead)
+                  const callNum = getCallNumber(lead)
+                  const hasWA = !!waNum
                   const hasEmail = !!lead.email
                   return (
                     <div key={lead.id}
@@ -302,7 +325,7 @@ export default function PipelinePage() {
                       {/* Lead info */}
                       <div className="flex items-start justify-between gap-1 mb-2">
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-semibold text-[#F0F0F3] leading-snug truncate">{lead.nome}</div>
+                          <div className="text-xs font-semibold text-[#F0F0F3] leading-snug truncate">{leadName}</div>
                           {lead.cidade && <div className="text-[10px] text-[#71717A]">{lead.cidade}</div>}
                         </div>
                         <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0 ${ss.bg} ${ss.text}`}>
@@ -432,7 +455,7 @@ export default function PipelinePage() {
                 <div className="bg-[#09090B] rounded-xl px-4 py-3 flex items-center gap-3">
                   <MessageCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
                   <div className="flex-1">
-                    <div className="text-xs font-medium text-[#F0F0F3]">{(contact.lead.whatsapp || contact.lead.telefone || 'Sem número')}</div>
+                    <div className="text-xs font-medium text-[#F0F0F3]">{getWhatsAppNumber(contact.lead) ? `+${getWhatsAppNumber(contact.lead)}` : 'Sem número válido'}</div>
                     <div className="text-[10px] text-[#71717A]">
                       {integrationStatus?.whatsapp?.configured
                         ? 'Envio direto via Evolution API'

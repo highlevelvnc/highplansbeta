@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { MessageCircle, Mail, Phone, Search, Filter, Send, Copy, Check, Plus, X, Edit2, Trash2, Zap, Users, Calendar, ChevronRight, AlertTriangle, RefreshCw } from 'lucide-react'
 import { useToast } from '@/components/Toast'
+import { getWhatsAppNumber, buildWhatsAppUrl } from '@/lib/lead-utils'
 
 const DEFAULT_WA_TEMPLATES = [
   { id: 'wa1', nome: 'Prospeção Inicial', canal: 'WHATSAPP', categoria: 'Prospeção', corpo: 'Olá {nome}, boa tarde! 👋\n\nVi o seu negócio *{empresa}* em {cidade}. Trabalho com marketing digital e encontrei algumas oportunidades para captar mais clientes online.\n\nTem 5 minutos para uma conversa rápida esta semana?' },
@@ -145,10 +146,9 @@ export default function ContactosPage() {
       // Fallback manual
       const msg = fillTemplate(sendModal.template, lead)
       if (canal === 'WHATSAPP') {
-        const num = (lead.whatsapp || lead.telefone || '').replace(/\D/g, '')
-        if (!num) { toast(`${lead.nome} não tem número de WhatsApp`, 'error'); return }
-        const finalNum = num.startsWith('351') ? num : '351' + num
-        window.open(`https://wa.me/${finalNum}?text=${encodeURIComponent(msg)}`, '_blank')
+        const waUrl = buildWhatsAppUrl(lead, msg)
+        if (!waUrl) { toast(`${lead.nome} não tem número de WhatsApp válido`, 'error'); return }
+        window.open(waUrl, '_blank')
       } else {
         window.open(`mailto:${lead.email || ''}?subject=${encodeURIComponent(assunto || '')}&body=${encodeURIComponent(msg)}`, '_blank')
       }
