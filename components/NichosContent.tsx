@@ -16,7 +16,7 @@ export default function NichosContent({ ranking }: { ranking: NichoData[] }) {
       <div className="card-dark overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-[rgba(255,106,0,0.08)]">
+            <tr className="border-b border-[rgba(139,92,246,0.08)]">
               <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase">#</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase">Nicho</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-[#6B7280] uppercase">Total Leads</th>
@@ -28,7 +28,7 @@ export default function NichosContent({ ranking }: { ranking: NichoData[] }) {
           </thead>
           <tbody>
             {ranking.map((row, i) => (
-              <tr key={row.nicho} className="border-b border-[rgba(255,106,0,0.05)] hover:bg-[#1A1A1F]">
+              <tr key={row.nicho} className="border-b border-[rgba(139,92,246,0.05)] hover:bg-[#16161A]">
                 <td className="px-4 py-4">
                   {i < 3 ? (
                     <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
@@ -42,19 +42,19 @@ export default function NichosContent({ ranking }: { ranking: NichoData[] }) {
                 <td className="px-4 py-4">
                   <div className="font-medium text-white">{row.nicho}</div>
                 </td>
-                <td className="px-4 py-4 text-sm text-[#9CA3AF]">{row.total}</td>
-                <td className="px-4 py-4 text-sm text-[#9CA3AF]">{row.fechados}</td>
+                <td className="px-4 py-4 text-sm text-[#A1A1AA]">{row.total}</td>
+                <td className="px-4 py-4 text-sm text-[#A1A1AA]">{row.fechados}</td>
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-[#1A1A1F] rounded-full overflow-hidden w-16">
-                      <div className="h-full bg-[#FF6A00] rounded-full" style={{ width: `${row.conversao}%` }} />
+                    <div className="flex-1 h-1.5 bg-[#16161A] rounded-full overflow-hidden w-16">
+                      <div className="h-full bg-[#8B5CF6] rounded-full" style={{ width: `${row.conversao}%` }} />
                     </div>
                     <span className="text-sm text-white">{row.conversao}%</span>
                   </div>
                 </td>
-                <td className="px-4 py-4 text-sm text-[#9CA3AF]">{row.ticketMedio > 0 ? formatCurrency(row.ticketMedio) : '—'}</td>
+                <td className="px-4 py-4 text-sm text-[#A1A1AA]">{row.ticketMedio > 0 ? formatCurrency(row.ticketMedio) : '—'}</td>
                 <td className="px-4 py-4">
-                  <span className="text-sm font-bold text-[#FF6A00]">{row.receita > 0 ? formatCurrency(row.receita) : '—'}</span>
+                  <span className="text-sm font-bold text-[#8B5CF6]">{row.receita > 0 ? formatCurrency(row.receita) : '—'}</span>
                 </td>
               </tr>
             ))}

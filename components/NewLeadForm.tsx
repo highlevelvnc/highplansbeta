@@ -52,7 +52,7 @@ export default function NewLeadForm() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Basic Info */}
         <div className="card-dark p-6 space-y-4">
-          <h3 className="text-sm font-semibold text-[#FF6A00] uppercase tracking-wider">Informação Básica</h3>
+          <h3 className="text-sm font-semibold text-[#8B5CF6] uppercase tracking-wider">Informação Básica</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs text-[#6B7280] mb-1.5">Nome *</label>
@@ -90,7 +90,7 @@ export default function NewLeadForm() {
 
         {/* Digital Presence */}
         <div className="card-dark p-6 space-y-4">
-          <h3 className="text-sm font-semibold text-[#FF6A00] uppercase tracking-wider">Presença Digital (Opportunity Score)</h3>
+          <h3 className="text-sm font-semibold text-[#8B5CF6] uppercase tracking-wider">Presença Digital (Opportunity Score)</h3>
           <div className="grid grid-cols-2 gap-3">
             {[
               { key: 'temSite', label: 'Tem site?', score: '+30 se Não' },
@@ -99,12 +99,12 @@ export default function NewLeadForm() {
               { key: 'gmbOtimizado', label: 'GMB otimizado?', score: '+20 se Não' },
               { key: 'anunciosAtivos', label: 'Anúncios ativos?', score: '+25 se Não' },
             ].map(({ key, label, score }) => (
-              <label key={key} className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${(form as any)[key] ? 'bg-[rgba(255,106,0,0.1)] border-[rgba(255,106,0,0.2)]' : 'bg-[#1A1A1F] border-transparent'}`}>
+              <label key={key} className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${(form as any)[key] ? 'bg-[rgba(139,92,246,0.1)] border-[rgba(139,92,246,0.2)]' : 'bg-[#16161A] border-transparent'}`}>
                 <div>
                   <div className="text-sm text-white">{label}</div>
                   <div className="text-xs text-[#6B7280]">{score}</div>
                 </div>
-                <input type="checkbox" checked={(form as any)[key]} onChange={e => set(key, e.target.checked)} className="w-4 h-4 accent-[#FF6A00]" />
+                <input type="checkbox" checked={(form as any)[key]} onChange={e => set(key, e.target.checked)} className="w-4 h-4 accent-[#8B5CF6]" />
               </label>
             ))}
           </div>
@@ -112,7 +112,7 @@ export default function NewLeadForm() {
 
         {/* Commercial */}
         <div className="card-dark p-6 space-y-4">
-          <h3 className="text-sm font-semibold text-[#FF6A00] uppercase tracking-wider">Dados Comerciais</h3>
+          <h3 className="text-sm font-semibold text-[#8B5CF6] uppercase tracking-wider">Dados Comerciais</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs text-[#6B7280] mb-1.5">Plano Atual</label>
@@ -148,10 +148,10 @@ export default function NewLeadForm() {
         </div>
 
         <div className="flex gap-3">
-          <Link href="/leads" className="flex-1 flex items-center justify-center gap-2 bg-[#1A1A1F] hover:bg-[#2D2D35] text-white py-3 rounded-lg text-sm font-medium transition-colors">
+          <Link href="/leads" className="flex-1 flex items-center justify-center gap-2 bg-[#16161A] hover:bg-[#2D2D35] text-white py-3 rounded-lg text-sm font-medium transition-colors">
             Cancelar
           </Link>
-          <button type="submit" disabled={loading} className="flex-1 flex items-center justify-center gap-2 bg-[#FF6A00] hover:bg-[#FF7F1A] disabled:opacity-50 text-white py-3 rounded-lg text-sm font-medium transition-colors">
+          <button type="submit" disabled={loading} className="flex-1 flex items-center justify-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] disabled:opacity-50 text-white py-3 rounded-lg text-sm font-medium transition-colors">
             <Save size={16} />
             {loading ? 'A guardar...' : 'Guardar Lead'}
           </button>

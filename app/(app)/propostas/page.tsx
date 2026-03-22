@@ -171,13 +171,13 @@ export default function PropostasPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-black text-[#F5F5F7]">Propostas</h1>
-          <p className="text-sm text-[#6B6B7B]">{proposals.length} propostas criadas</p>
+          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Propostas</h1>
+          <p className="text-sm text-[#71717A]">{proposals.length} propostas criadas</p>
         </div>
-        <button onClick={()=>setShowNew(true)} className="flex items-center gap-2 bg-[#FF6A00] hover:bg-[#FF7F1A] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+        <button onClick={()=>setShowNew(true)} className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <Plus className="w-4 h-4"/> Nova Proposta
         </button>
       </div>
@@ -187,7 +187,7 @@ export default function PropostasPage() {
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-5 flex items-center gap-3">
           <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
           <span className="text-sm text-red-300 flex-1">{error}</span>
-          <button onClick={load} className="text-xs text-[#FF6A00] hover:text-[#FF7F1A] font-medium flex items-center gap-1">
+          <button onClick={load} className="text-xs text-[#8B5CF6] hover:text-[#A78BFA] font-medium flex items-center gap-1">
             <RefreshCw className="w-3 h-3" /> Recarregar
           </button>
         </div>
@@ -197,11 +197,11 @@ export default function PropostasPage() {
       {loading && proposals.length === 0 && !error && (
         <div className="space-y-3 mb-5">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4 animate-pulse flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-[#2A2A32]" />
+            <div key={i} className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 animate-pulse flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-[#27272A]" />
               <div className="flex-1">
-                <div className="h-4 w-48 bg-[#2A2A32] rounded mb-2" />
-                <div className="h-3 w-32 bg-[#1A1A1F] rounded" />
+                <div className="h-4 w-48 bg-[#27272A] rounded mb-2" />
+                <div className="h-3 w-32 bg-[#16161A] rounded" />
               </div>
             </div>
           ))}
@@ -212,68 +212,68 @@ export default function PropostasPage() {
         {proposals.map(p => {
           const ss = STATUS_STYLES[p.status] || STATUS_STYLES.DRAFT
           return (
-            <div key={p.id} className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4 flex items-center gap-4 hover:border-[#FF6A00]/20 transition-all">
-              <div className="w-10 h-10 rounded-lg bg-[#FF6A00]/10 flex items-center justify-center flex-shrink-0">
-                <FileText className="w-5 h-5 text-[#FF6A00]"/>
+            <div key={p.id} className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 flex items-center gap-4 hover:border-[#8B5CF6]/20 transition-all">
+              <div className="w-10 h-10 rounded-lg bg-[#8B5CF6]/10 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-5 h-5 text-[#8B5CF6]"/>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-[#F5F5F7] text-sm">{p.titulo}</div>
-                <div className="text-xs text-[#6B6B7B]">{p.lead?.nome} · {p.plano} · {new Date(p.createdAt).toLocaleDateString('pt-PT')}</div>
+                <div className="font-medium text-[#F0F0F3] text-sm">{p.titulo}</div>
+                <div className="text-xs text-[#71717A]">{p.lead?.nome} · {p.plano} · {new Date(p.createdAt).toLocaleDateString('pt-PT')}</div>
               </div>
               <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${ss.bg} ${ss.text}`}>{p.status}</span>
               <div className="flex gap-2">
-                <button onClick={()=>exportMd(p)} className="p-2 rounded-lg bg-[#1A1A1F] text-[#6B6B7B] hover:text-[#FF6A00] transition-colors">
+                <button onClick={()=>exportMd(p)} className="p-2 rounded-lg bg-[#16161A] text-[#71717A] hover:text-[#8B5CF6] transition-colors">
                   <Download className="w-4 h-4"/>
                 </button>
-                <button onClick={()=>setPreview(p)} className="p-2 rounded-lg bg-[#1A1A1F] text-[#6B6B7B] hover:text-[#F5F5F7] transition-colors">
+                <button onClick={()=>setPreview(p)} className="p-2 rounded-lg bg-[#16161A] text-[#71717A] hover:text-[#F0F0F3] transition-colors">
                   <ExternalLink className="w-4 h-4"/>
                 </button>
               </div>
             </div>
           )
         })}
-        {proposals.length===0&&<div className="text-center py-12 text-[#6B6B7B]">Nenhuma proposta criada</div>}
+        {proposals.length===0&&<div className="text-center py-12 text-[#71717A]">Nenhuma proposta criada</div>}
       </div>
 
       {/* New Proposal Modal */}
       {showNew&&(
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={e=>e.target===e.currentTarget&&setShowNew(false)}>
-          <div className="bg-[#111114] border border-[#2A2A32] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="font-bold text-lg text-[#F5F5F7] mb-4">Nova Proposta</h2>
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="font-bold text-lg text-[#F0F0F3] mb-4">Nova Proposta</h2>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-[#6B6B7B] mb-1 block">Lead</label>
+                <label className="text-xs text-[#71717A] mb-1 block">Lead</label>
                 <select value={form.leadId} onChange={e=>setForm({...form,leadId:e.target.value})}
-                  className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]">
+                  className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]">
                   <option value="">Selecionar lead...</option>
                   {leads.map(l=><option key={l.id} value={l.id}>{l.nome} · {l.empresa}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-[#6B6B7B] mb-2 block">Plano (gera proposta automática)</label>
+                <label className="text-xs text-[#71717A] mb-2 block">Plano (gera proposta automática)</label>
                 <div className="grid grid-cols-2 gap-2">
                   {['Presença Profissional','Leads & Movimento','Crescimento Local','Programa Aceleração Digital'].map(p=>(
                     <button key={p} onClick={()=>selectPlan(p)}
-                      className={`py-2 px-3 rounded-lg text-xs text-left transition-all ${form.plano===p?'bg-[#FF6A00] text-white':'bg-[#1A1A1F] text-[#6B6B7B] hover:text-[#F5F5F7] border border-[#2A2A32]'}`}>
+                      className={`py-2 px-3 rounded-lg text-xs text-left transition-all ${form.plano===p?'bg-[#8B5CF6] text-white':'bg-[#16161A] text-[#71717A] hover:text-[#F0F0F3] border border-[#27272A]'}`}>
                       {p}
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="text-xs text-[#6B6B7B] mb-1 block">Título</label>
+                <label className="text-xs text-[#71717A] mb-1 block">Título</label>
                 <input value={form.titulo} onChange={e=>setForm({...form,titulo:e.target.value})}
-                  className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]"/>
+                  className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]"/>
               </div>
               <div>
-                <label className="text-xs text-[#6B6B7B] mb-1 block">Conteúdo (Markdown)</label>
+                <label className="text-xs text-[#71717A] mb-1 block">Conteúdo (Markdown)</label>
                 <textarea value={form.conteudo} onChange={e=>setForm({...form,conteudo:e.target.value})} rows={12}
-                  className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00] resize-none font-mono"/>
+                  className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] resize-none font-mono"/>
               </div>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={()=>setShowNew(false)} className="flex-1 py-2 rounded-lg border border-[#2A2A32] text-sm text-[#6B6B7B]">Cancelar</button>
-              <button onClick={create} className="flex-1 py-2 rounded-lg bg-[#FF6A00] hover:bg-[#FF7F1A] text-white text-sm font-medium transition-colors">Guardar Proposta</button>
+              <button onClick={()=>setShowNew(false)} className="flex-1 py-2 rounded-lg border border-[#27272A] text-sm text-[#71717A]">Cancelar</button>
+              <button onClick={create} className="flex-1 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors">Guardar Proposta</button>
             </div>
           </div>
         </div>
@@ -282,17 +282,17 @@ export default function PropostasPage() {
       {/* Preview Modal */}
       {preview&&(
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={e=>e.target===e.currentTarget&&setPreview(null)}>
-          <div className="bg-[#111114] border border-[#2A2A32] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-[#F5F5F7]">{preview.titulo}</h2>
+              <h2 className="font-bold text-[#F0F0F3]">{preview.titulo}</h2>
               <div className="flex gap-2">
-                <button onClick={()=>exportMd(preview)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FF6A00]/10 text-[#FF6A00] text-xs hover:bg-[#FF6A00]/20 transition-colors">
+                <button onClick={()=>exportMd(preview)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#8B5CF6]/10 text-[#8B5CF6] text-xs hover:bg-[#8B5CF6]/20 transition-colors">
                   <Download className="w-3.5 h-3.5"/> Exportar MD
                 </button>
-                <button onClick={()=>setPreview(null)} className="text-[#6B6B7B] hover:text-[#F5F5F7] text-sm">✕</button>
+                <button onClick={()=>setPreview(null)} className="text-[#71717A] hover:text-[#F0F0F3] text-sm">✕</button>
               </div>
             </div>
-            <pre className="text-sm text-[#F5F5F7] whitespace-pre-wrap font-sans leading-relaxed">{preview.conteudo}</pre>
+            <pre className="text-sm text-[#F0F0F3] whitespace-pre-wrap font-sans leading-relaxed">{preview.conteudo}</pre>
           </div>
         </div>
       )}

@@ -173,7 +173,7 @@ export default function ImportarLeadsPage() {
     : 0
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link href="/leads" className="text-gray-500 hover:text-white transition-colors">
@@ -185,7 +185,7 @@ export default function ImportarLeadsPage() {
         </div>
         <button
           onClick={loadHistory}
-          className="ml-auto flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-[#2A2A32] hover:border-[#FF6A00] px-3 py-2 rounded-lg transition-all"
+          className="ml-auto flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-[#27272A] hover:border-[#8B5CF6] px-3 py-2 rounded-lg transition-all"
         >
           <Clock className="w-4 h-4" />
           Histórico
@@ -200,7 +200,7 @@ export default function ImportarLeadsPage() {
           onDrop={onDrop}
           onClick={() => inputRef.current?.click()}
           className={`relative border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all
-            ${isDragging ? 'border-[#FF6A00] bg-[#FF6A00]/5' : 'border-[#2A2A32] hover:border-[#FF6A00]/50 hover:bg-[#111114]'}
+            ${isDragging ? 'border-[#8B5CF6] bg-[#8B5CF6]/5' : 'border-[#27272A] hover:border-[#8B5CF6]/50 hover:bg-[#0F0F12]'}
           `}
         >
           <input
@@ -210,11 +210,11 @@ export default function ImportarLeadsPage() {
             className="hidden"
             onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]) }}
           />
-          <Upload className="w-10 h-10 text-[#FF6A00] mx-auto mb-3" />
+          <Upload className="w-10 h-10 text-[#8B5CF6] mx-auto mb-3" />
           <p className="text-white font-medium text-lg">Arrasta o CSV aqui</p>
           <p className="text-gray-400 text-sm mt-1">ou clica para seleccionar · máx. 100MB</p>
           {file && (
-            <div className="mt-4 inline-flex items-center gap-2 bg-[#1A1A1F] px-4 py-2 rounded-lg text-sm text-[#FF6A00]">
+            <div className="mt-4 inline-flex items-center gap-2 bg-[#16161A] px-4 py-2 rounded-lg text-sm text-[#8B5CF6]">
               <FileText className="w-4 h-4" />
               {file.name} — {(file.size / 1024 / 1024).toFixed(2)} MB
             </div>
@@ -231,14 +231,14 @@ export default function ImportarLeadsPage() {
 
       {/* Preview */}
       {preview && !jobId && (
-        <div className="bg-[#111114] border border-[#2A2A32] rounded-xl overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#2A2A32]">
+        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[#27272A]">
             <p className="text-sm text-gray-400">
-              Pré-visualização — <span className="text-white">{preview.rows.length} linhas</span> · Colunas detectadas: <span className="text-[#FF6A00]">{preview.headers.join(', ')}</span>
+              Pré-visualização — <span className="text-white">{preview.rows.length} linhas</span> · Colunas detectadas: <span className="text-[#8B5CF6]">{preview.headers.join(', ')}</span>
             </p>
             <button
               onClick={startImport}
-              className="flex items-center gap-2 bg-[#FF6A00] hover:bg-[#FF7F1A] text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+              className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
             >
               <Upload className="w-4 h-4" />
               Importar agora
@@ -246,10 +246,10 @@ export default function ImportarLeadsPage() {
           </div>
           <div className="overflow-x-auto max-h-80">
             <table className="text-xs w-full">
-              <thead className="sticky top-0 bg-[#0B0B0D]">
+              <thead className="sticky top-0 bg-[#09090B]">
                 <tr>
                   {preview.headers.map(h => (
-                    <th key={h} className="text-left px-3 py-2 text-gray-500 font-medium whitespace-nowrap border-b border-[#2A2A32]">
+                    <th key={h} className="text-left px-3 py-2 text-gray-500 font-medium whitespace-nowrap border-b border-[#27272A]">
                       {h}
                     </th>
                   ))}
@@ -257,7 +257,7 @@ export default function ImportarLeadsPage() {
               </thead>
               <tbody>
                 {preview.rows.map((row, i) => (
-                  <tr key={i} className="border-b border-[#2A2A32]/50 hover:bg-[#1A1A1F]">
+                  <tr key={i} className="border-b border-[#27272A]/50 hover:bg-[#16161A]">
                     {preview.headers.map(h => (
                       <td key={h} className="px-3 py-2 text-gray-300 max-w-[200px] truncate whitespace-nowrap">
                         {row[h] || <span className="text-gray-600 italic">—</span>}
@@ -273,10 +273,10 @@ export default function ImportarLeadsPage() {
 
       {/* Progress / Result */}
       {jobStatus && (
-        <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-6 space-y-5">
+        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-6 space-y-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {jobStatus.status === 'running' && <RefreshCw className="w-5 h-5 text-[#FF6A00] animate-spin" />}
+              {jobStatus.status === 'running' && <RefreshCw className="w-5 h-5 text-[#8B5CF6] animate-spin" />}
               {jobStatus.status === 'done' && <CheckCircle className="w-5 h-5 text-green-400" />}
               {jobStatus.status === 'failed' && <XCircle className="w-5 h-5 text-red-400" />}
               <div>
@@ -288,13 +288,13 @@ export default function ImportarLeadsPage() {
                 </p>
               </div>
             </div>
-            <span className="text-2xl font-bold text-[#FF6A00]">{pct}%</span>
+            <span className="text-2xl font-bold text-[#8B5CF6]">{pct}%</span>
           </div>
 
           {/* Progress bar */}
-          <div className="h-2 bg-[#2A2A32] rounded-full overflow-hidden">
+          <div className="h-2 bg-[#27272A] rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#FF6A00] rounded-full transition-all duration-500"
+              className="h-full bg-[#8B5CF6] rounded-full transition-all duration-500"
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -317,9 +317,9 @@ export default function ImportarLeadsPage() {
 
           {/* Resumo de limpeza (quando done) */}
           {jobStatus.status === 'done' && (
-            <div className="border border-[#2A2A32] rounded-lg p-4 space-y-2">
+            <div className="border border-[#27272A] rounded-lg p-4 space-y-2">
               <p className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-[#FF6A00]" />
+                <AlertCircle className="w-4 h-4 text-[#8B5CF6]" />
                 Resumo de Limpeza
               </p>
               <div className="grid grid-cols-2 gap-2 text-sm">
@@ -332,7 +332,7 @@ export default function ImportarLeadsPage() {
                 <div className="text-gray-400">Inválidos ignorados</div>
                 <div className="text-red-400 font-medium">{jobStatus.invalid}</div>
                 <div className="text-gray-400">Taxa de sucesso</div>
-                <div className="text-[#FF6A00] font-medium">
+                <div className="text-[#8B5CF6] font-medium">
                   {jobStatus.totalRows > 0
                     ? Math.round((jobStatus.imported / jobStatus.totalRows) * 100)
                     : 0}%
@@ -352,13 +352,13 @@ export default function ImportarLeadsPage() {
               <div className="flex gap-3 pt-2">
                 <Link
                   href="/leads"
-                  className="flex-1 text-center bg-[#FF6A00] hover:bg-[#FF7F1A] text-white text-sm font-semibold py-2 rounded-lg transition-colors"
+                  className="flex-1 text-center bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-semibold py-2 rounded-lg transition-colors"
                 >
                   Ver Leads CRM →
                 </Link>
                 <button
                   onClick={() => { setFile(null); setPreview(null); setJobId(null); setJobStatus(null) }}
-                  className="flex-1 border border-[#2A2A32] hover:border-[#FF6A00] text-gray-400 hover:text-white text-sm py-2 rounded-lg transition-all"
+                  className="flex-1 border border-[#27272A] hover:border-[#8B5CF6] text-gray-400 hover:text-white text-sm py-2 rounded-lg transition-all"
                 >
                   Nova Importação
                 </button>
@@ -370,16 +370,16 @@ export default function ImportarLeadsPage() {
 
       {/* Histórico */}
       {showHistory && history.length > 0 && (
-        <div className="bg-[#111114] border border-[#2A2A32] rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-[#2A2A32]">
+        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-[#27272A]">
             <p className="text-sm font-semibold text-white">Histórico de Importações</p>
           </div>
-          <div className="divide-y divide-[#2A2A32]">
+          <div className="divide-y divide-[#27272A]">
             {history.map(j => (
               <div key={j.id} className="flex items-center justify-between px-4 py-3 text-sm">
                 <div className="flex items-center gap-3">
                   {j.status === 'done' && <CheckCircle className="w-4 h-4 text-green-400" />}
-                  {j.status === 'running' && <RefreshCw className="w-4 h-4 text-[#FF6A00] animate-spin" />}
+                  {j.status === 'running' && <RefreshCw className="w-4 h-4 text-[#8B5CF6] animate-spin" />}
                   {j.status === 'failed' && <XCircle className="w-4 h-4 text-red-400" />}
                   <div>
                     <p className="text-white">{j.filename}</p>

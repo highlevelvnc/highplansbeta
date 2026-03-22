@@ -21,18 +21,18 @@ interface DashData {
   topOpportunities: Array<{ id: string; nome: string; empresa: string; score: number; nicho: string }>
 }
 
-function StatCard({ label, value, sub, icon: Icon, color = '#FF6A00', alert = false }: any) {
+function StatCard({ label, value, sub, icon: Icon, color = '#8B5CF6', alert = false }: any) {
   return (
-    <div className={`bg-[#111114] border rounded-xl p-4 transition-all duration-200 hover:border-[#FF6A00]/30 ${alert ? 'border-red-500/30' : 'border-[#2A2A32]'}`}>
+    <div className={`bg-[#0F0F12] border rounded-xl p-4 transition-all duration-200 hover:border-[#8B5CF6]/30 ${alert ? 'border-red-500/30' : 'border-[#27272A]'}`}>
       <div className="flex items-start justify-between mb-3">
         <div className={`w-9 h-9 rounded-lg flex items-center justify-center`} style={{ background: `${color}20` }}>
           <Icon className="w-4.5 h-4.5" style={{ color }} />
         </div>
         {alert && <span className="text-[10px] text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">Atenção</span>}
       </div>
-      <div className="text-2xl font-black text-[#F5F5F7] mb-0.5">{value}</div>
-      <div className="text-xs text-[#6B6B7B]">{label}</div>
-      {sub && <div className="text-[10px] text-[#4A4A5A] mt-1">{sub}</div>}
+      <div className="text-2xl font-black text-[#F0F0F3] mb-0.5">{value}</div>
+      <div className="text-xs text-[#71717A]">{label}</div>
+      {sub && <div className="text-[10px] text-[#52525B] mt-1">{sub}</div>}
     </div>
   )
 }
@@ -43,16 +43,16 @@ const PIPELINE_LABELS: Record<string, string> = {
 }
 
 const PIPELINE_COLORS: Record<string, string> = {
-  NEW: '#6B6B7B', CONTACTED: '#3B82F6', INTERESTED: '#8B5CF6',
-  PROPOSAL_SENT: '#F59E0B', NEGOTIATION: '#FF6A00', CLOSED: '#10B981', LOST: '#EF4444'
+  NEW: '#71717A', CONTACTED: '#3B82F6', INTERESTED: '#8B5CF6',
+  PROPOSAL_SENT: '#F59E0B', NEGOTIATION: '#A78BFA', CLOSED: '#10B981', LOST: '#EF4444'
 }
 
 function SkeletonCard() {
   return (
-    <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4 animate-pulse">
-      <div className="w-9 h-9 rounded-lg bg-[#2A2A32] mb-3" />
-      <div className="h-7 w-20 bg-[#2A2A32] rounded mb-1" />
-      <div className="h-3 w-28 bg-[#1A1A1F] rounded" />
+    <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 animate-pulse">
+      <div className="w-9 h-9 rounded-lg bg-[#27272A] mb-3" />
+      <div className="h-7 w-20 bg-[#27272A] rounded mb-1" />
+      <div className="h-3 w-28 bg-[#16161A] rounded" />
     </div>
   )
 }
@@ -83,10 +83,10 @@ export default function DashboardPage() {
   useEffect(() => { loadData() }, [])
 
   if (loading && !data) return (
-    <div className="p-6 max-w-7xl">
+    <div className="p-4 md:p-6 max-w-7xl">
       <div className="mb-6">
-        <div className="h-7 w-36 bg-[#2A2A32] rounded animate-pulse mb-1" />
-        <div className="h-4 w-56 bg-[#1A1A1F] rounded animate-pulse" />
+        <div className="h-7 w-36 bg-[#27272A] rounded animate-pulse mb-1" />
+        <div className="h-4 w-56 bg-[#16161A] rounded animate-pulse" />
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
@@ -98,17 +98,17 @@ export default function DashboardPage() {
   )
 
   if (error) return (
-    <div className="p-6 max-w-7xl">
+    <div className="p-4 md:p-6 max-w-7xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-black text-[#F5F5F7] tracking-tight">Dashboard</h1>
-        <p className="text-sm text-[#6B6B7B] mt-0.5">Inteligência comercial em tempo real</p>
+        <h1 className="text-2xl font-black text-[#F0F0F3] tracking-tight">Dashboard</h1>
+        <p className="text-sm text-[#71717A] mt-0.5">Inteligência comercial em tempo real</p>
       </div>
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-3" />
         <p className="text-red-300 text-sm mb-1">Não foi possível carregar o dashboard</p>
-        <p className="text-[#6B6B7B] text-xs mb-4">{error}</p>
+        <p className="text-[#71717A] text-xs mb-4">{error}</p>
         <button onClick={loadData}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#FF6A00] hover:bg-[#FF7F1A] text-white text-sm font-medium transition-colors">
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors">
           <RefreshCw className="w-4 h-4" /> Tentar novamente
         </button>
       </div>
@@ -125,11 +125,11 @@ export default function DashboardPage() {
   }))
 
   return (
-    <div className="p-6 max-w-7xl">
+    <div className="p-4 md:p-6 max-w-7xl">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-black text-[#F5F5F7] tracking-tight">Dashboard</h1>
-        <p className="text-sm text-[#6B6B7B] mt-0.5">Inteligência comercial em tempo real</p>
+        <h1 className="text-2xl font-black text-[#F0F0F3] tracking-tight">Dashboard</h1>
+        <p className="text-sm text-[#71717A] mt-0.5">Inteligência comercial em tempo real</p>
       </div>
 
       {/* Revenue Cards */}
@@ -150,18 +150,18 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         {/* Pipeline Chart */}
-        <div className="lg:col-span-2 bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
+        <div className="lg:col-span-2 bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-[#F5F5F7] text-sm">Pipeline Comercial</h2>
-            <span className="text-xs text-[#6B6B7B]">{data.totalLeads} leads total</span>
+            <h2 className="font-semibold text-[#F0F0F3] text-sm">Pipeline Comercial</h2>
+            <span className="text-xs text-[#71717A]">{data.totalLeads} leads total</span>
           </div>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={pipelineData} barSize={32}>
-              <XAxis dataKey="name" tick={{ fill: '#6B6B7B', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="name" tick={{ fill: '#71717A', fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis hide />
               <Tooltip
-                contentStyle={{ background: '#1A1A1F', border: '1px solid #2A2A32', borderRadius: 8, color: '#F5F5F7', fontSize: 12 }}
-                cursor={{ fill: 'rgba(255,106,0,0.05)' }}
+                contentStyle={{ background: '#16161A', border: '1px solid #27272A', borderRadius: 8, color: '#F0F0F3', fontSize: 12 }}
+                cursor={{ fill: 'rgba(139,92,246,0.05)' }}
               />
               <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                 {pipelineData.map((entry, i) => (
@@ -173,19 +173,19 @@ export default function DashboardPage() {
         </div>
 
         {/* Receita por Nicho */}
-        <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
-          <h2 className="font-semibold text-[#F5F5F7] text-sm mb-4">Receita por Nicho</h2>
+        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+          <h2 className="font-semibold text-[#F0F0F3] text-sm mb-4">Receita por Nicho</h2>
           {nichoData.length === 0 ? (
-            <div className="text-[#6B6B7B] text-sm text-center py-8">Sem dados de nicho</div>
+            <div className="text-[#71717A] text-sm text-center py-8">Sem dados de nicho</div>
           ) : (
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie data={nichoData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value" paddingAngle={3}>
                   {nichoData.map((_, i) => (
-                    <Cell key={i} fill={['#FF6A00', '#FF7F1A', '#F59E0B', '#8B5CF6', '#3B82F6'][i % 5]} />
+                    <Cell key={i} fill={['#8B5CF6', '#A78BFA', '#6D28D9', '#C4B5FD', '#3B82F6'][i % 5]} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ background: '#1A1A1F', border: '1px solid #2A2A32', borderRadius: 8, color: '#F5F5F7', fontSize: 12 }}
+                <Tooltip contentStyle={{ background: '#16161A', border: '1px solid #27272A', borderRadius: 8, color: '#F0F0F3', fontSize: 12 }}
                   formatter={(v: any) => [`€${v}`, 'Receita']} />
               </PieChart>
             </ResponsiveContainer>
@@ -194,10 +194,10 @@ export default function DashboardPage() {
             {nichoData.slice(0, 3).map(({ name, value }, i) => (
               <div key={name} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ background: ['#FF6A00', '#FF7F1A', '#F59E0B'][i] }} />
-                  <span className="text-[#6B6B7B]">{name}</span>
+                  <div className="w-2 h-2 rounded-full" style={{ background: ['#8B5CF6', '#A78BFA', '#6D28D9'][i] }} />
+                  <span className="text-[#71717A]">{name}</span>
                 </div>
-                <span className="text-[#F5F5F7] font-medium">€{value}</span>
+                <span className="text-[#F0F0F3] font-medium">€{value}</span>
               </div>
             ))}
           </div>
@@ -206,21 +206,21 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Top Opportunities */}
-        <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
-          <h2 className="font-semibold text-[#F5F5F7] text-sm mb-3">Top Oportunidades</h2>
+        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+          <h2 className="font-semibold text-[#F0F0F3] text-sm mb-3">Top Oportunidades</h2>
           {data.topOpportunities.length === 0 ? (
-            <div className="text-[#6B6B7B] text-sm text-center py-8">Sem oportunidades de momento</div>
+            <div className="text-[#71717A] text-sm text-center py-8">Sem oportunidades de momento</div>
           ) : (
             <div className="space-y-2">
               {data.topOpportunities.map((lead, i) => (
-                <div key={lead.id} className="flex items-center gap-3 py-2 border-b border-[#1A1A1F] last:border-0">
-                  <span className="text-[#6B6B7B] text-xs w-4">{i + 1}</span>
+                <div key={lead.id} className="flex items-center gap-3 py-2 border-b border-[#16161A] last:border-0">
+                  <span className="text-[#71717A] text-xs w-4">{i + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-[#F5F5F7] truncate">{lead.empresa || lead.nome}</div>
-                    <div className="text-xs text-[#6B6B7B]">{lead.nicho}</div>
+                    <div className="text-sm font-medium text-[#F0F0F3] truncate">{lead.empresa || lead.nome}</div>
+                    <div className="text-xs text-[#71717A]">{lead.nicho}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-black" style={{ color: lead.score >= 60 ? '#FF6A00' : lead.score >= 30 ? '#F59E0B' : '#6B6B7B' }}>
+                    <div className="text-sm font-black" style={{ color: lead.score >= 60 ? '#8B5CF6' : lead.score >= 30 ? '#F59E0B' : '#71717A' }}>
                       {lead.score}pts
                     </div>
                   </div>
@@ -231,16 +231,16 @@ export default function DashboardPage() {
         </div>
 
         {/* Tasks Overview */}
-        <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
-          <h2 className="font-semibold text-[#F5F5F7] text-sm mb-3">Tarefas</h2>
+        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+          <h2 className="font-semibold text-[#F0F0F3] text-sm mb-3">Tarefas</h2>
           <div className="space-y-3">
             {[
-              { label: 'Pendentes', value: data.tasksPendentes, color: '#6B6B7B' },
+              { label: 'Pendentes', value: data.tasksPendentes, color: '#71717A' },
               { label: 'Atrasadas', value: data.tasksAtrasadas, color: '#EF4444', alert: true },
               { label: 'Alta Prioridade', value: data.tasksAltaPrioridade, color: '#F59E0B' },
             ].map(({ label, value, color, alert }) => (
               <div key={label} className="flex items-center justify-between">
-                <span className="text-sm text-[#6B6B7B]">{label}</span>
+                <span className="text-sm text-[#71717A]">{label}</span>
                 <span className={`text-sm font-bold px-2.5 py-0.5 rounded-full`} style={{ color, background: `${color}15` }}>
                   {value}
                 </span>
@@ -248,8 +248,8 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <div className="mt-4 pt-4 border-t border-[#1A1A1F]">
-            <h3 className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-2">Pipeline Resumo</h3>
+          <div className="mt-4 pt-4 border-t border-[#16161A]">
+            <h3 className="text-xs text-[#71717A] uppercase tracking-wider mb-2">Pipeline Resumo</h3>
             <div className="flex flex-wrap gap-1.5">
               {Object.entries(data.pipeline).map(([status, count]) => count > 0 && (
                 <div key={status} className="text-[10px] px-2 py-0.5 rounded-full border" style={{ borderColor: `${PIPELINE_COLORS[status]}40`, color: PIPELINE_COLORS[status], background: `${PIPELINE_COLORS[status]}10` }}>

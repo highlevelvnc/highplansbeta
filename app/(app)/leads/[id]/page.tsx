@@ -165,22 +165,22 @@ export default function LeadDetailPage() {
     }
   }
 
-  if (!lead) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-[#FF6A00] border-t-transparent rounded-full animate-spin" /></div>
+  if (!lead) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-[#8B5CF6] border-t-transparent rounded-full animate-spin" /></div>
 
   const ss = SCORE_STYLES[lead.score] || SCORE_STYLES.COLD
 
   return (
-    <div className="p-6 max-w-4xl">
+    <div className="p-4 md:p-6 max-w-4xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/leads" className="p-2 rounded-lg hover:bg-[#1A1A1F] text-[#6B6B7B] hover:text-[#F5F5F7] transition-colors">
+        <Link href="/leads" className="p-2 rounded-lg hover:bg-[#16161A] text-[#71717A] hover:text-[#F0F0F3] transition-colors">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex-1">
-          <h1 className="text-xl font-black text-[#F5F5F7]">{lead.nome}</h1>
-          {lead.empresa && <p className="text-sm text-[#6B6B7B]">{lead.empresa}</p>}
+          <h1 className="text-xl font-black text-[#F0F0F3]">{lead.nome}</h1>
+          {lead.empresa && <p className="text-sm text-[#71717A]">{lead.empresa}</p>}
         </div>
         <span className={`text-xs font-bold px-3 py-1 rounded-full border ${ss.bg} ${ss.text} ${ss.border}`}>{lead.score}</span>
-        <div className="text-sm font-black text-[#FF6A00]">{lead.opportunityScore}pts</div>
+        <div className="text-sm font-black text-[#8B5CF6]">{lead.opportunityScore}pts</div>
         <div className="flex gap-2">
           {(lead.whatsapp || lead.telefone) && (
             <button onClick={() => openSend('WHATSAPP')} className="p-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors" title="Enviar WhatsApp">
@@ -192,7 +192,7 @@ export default function LeadDetailPage() {
               <Mail className="w-4 h-4"/>
             </button>
           )}
-          <button onClick={save} disabled={saving} className="flex items-center gap-2 bg-[#FF6A00] hover:bg-[#FF7F1A] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+          <button onClick={save} disabled={saving} className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
             <Save className="w-4 h-4"/> {saving ? 'A guardar...' : 'Guardar'}
           </button>
           <button onClick={del} className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"><Trash2 className="w-4 h-4"/></button>
@@ -200,12 +200,12 @@ export default function LeadDetailPage() {
       </div>
 
       {/* Pipeline */}
-      <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4 mb-4">
-        <div className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-3">Pipeline</div>
+      <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 mb-4">
+        <div className="text-xs text-[#71717A] uppercase tracking-wider mb-3">Pipeline</div>
         <div className="flex gap-1 flex-wrap">
           {PIPELINE_STAGES.map(s => (
             <button key={s} onClick={() => setLead({...lead, pipelineStatus: s})}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${lead.pipelineStatus === s ? 'bg-[#FF6A00] text-white' : 'bg-[#1A1A1F] text-[#6B6B7B] hover:text-[#F5F5F7]'}`}>
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${lead.pipelineStatus === s ? 'bg-[#8B5CF6] text-white' : 'bg-[#16161A] text-[#71717A] hover:text-[#F0F0F3]'}`}>
               {PIPELINE_LABELS[s]}
             </button>
           ))}
@@ -213,16 +213,16 @@ export default function LeadDetailPage() {
       </div>
 
       {/* Tabs: Info / Mensagens */}
-      <div className="flex gap-1 mb-4 bg-[#111114] border border-[#2A2A32] rounded-lg p-1 w-fit">
+      <div className="flex gap-1 mb-4 bg-[#0F0F12] border border-[#27272A] rounded-lg p-1 w-fit">
         <button onClick={() => setActiveTab('info')}
-          className={`px-4 py-1.5 rounded-md text-sm transition-all ${activeTab === 'info' ? 'bg-[#FF6A00] text-white font-medium' : 'text-[#6B6B7B] hover:text-[#F5F5F7]'}`}>
+          className={`px-4 py-1.5 rounded-md text-sm transition-all ${activeTab === 'info' ? 'bg-[#8B5CF6] text-white font-medium' : 'text-[#71717A] hover:text-[#F0F0F3]'}`}>
           Informações
         </button>
         <button onClick={() => setActiveTab('messages')}
-          className={`px-4 py-1.5 rounded-md text-sm transition-all flex items-center gap-1.5 ${activeTab === 'messages' ? 'bg-[#FF6A00] text-white font-medium' : 'text-[#6B6B7B] hover:text-[#F5F5F7]'}`}>
+          className={`px-4 py-1.5 rounded-md text-sm transition-all flex items-center gap-1.5 ${activeTab === 'messages' ? 'bg-[#8B5CF6] text-white font-medium' : 'text-[#71717A] hover:text-[#F0F0F3]'}`}>
           Mensagens
           {messages.length > 0 && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === 'messages' ? 'bg-white/20' : 'bg-[#FF6A00]/20 text-[#FF6A00]'}`}>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === 'messages' ? 'bg-white/20' : 'bg-[#8B5CF6]/20 text-[#8B5CF6]'}`}>
               {messages.length}
             </span>
           )}
@@ -233,8 +233,8 @@ export default function LeadDetailPage() {
         <>
           <div className="grid grid-cols-2 gap-4 mb-4">
             {/* Basic Info */}
-            <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
-              <div className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-3">Informações</div>
+            <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+              <div className="text-xs text-[#71717A] uppercase tracking-wider mb-3">Informações</div>
               <div className="grid grid-cols-2 gap-3">
                 {[
                   {k:'nome',l:'Nome'},{k:'empresa',l:'Empresa'},{k:'nicho',l:'Nicho'},{k:'cidade',l:'Cidade'},
@@ -242,9 +242,9 @@ export default function LeadDetailPage() {
                   {k:'verbaAnuncios',l:'Verba Anúncios',type:'number'}
                 ].map(({k,l,type}) => (
                   <div key={k} className={k==='email'||k==='nome' ? 'col-span-2' : ''}>
-                    <label className="text-[10px] text-[#6B6B7B] mb-1 block">{l}</label>
+                    <label className="text-[10px] text-[#71717A] mb-1 block">{l}</label>
                     <input value={lead[k]||''} type={type||'text'} onChange={e=>setLead({...lead,[k]:type==='number'?parseFloat(e.target.value)||0:e.target.value})}
-                      className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-2.5 py-1.5 text-xs text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]"/>
+                      className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-2.5 py-1.5 text-xs text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]"/>
                   </div>
                 ))}
               </div>
@@ -252,48 +252,48 @@ export default function LeadDetailPage() {
 
             {/* Digital Diagnosis */}
             <div className="space-y-4">
-              <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
-                <div className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-3">Diagnóstico Digital</div>
+              <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+                <div className="text-xs text-[#71717A] uppercase tracking-wider mb-3">Diagnóstico Digital</div>
                 <div className="space-y-2.5">
                   {[
                     {k:'temSite',l:'Tem site'},{k:'siteFraco',l:'Site fraco'},{k:'instagramAtivo',l:'Instagram ativo'},
                     {k:'gmbOtimizado',l:'GMB otimizado'},{k:'anunciosAtivos',l:'Anúncios ativos'}
                   ].map(({k,l}) => (
                     <label key={k} className="flex items-center justify-between cursor-pointer">
-                      <span className="text-sm text-[#F5F5F7]">{l}</span>
+                      <span className="text-sm text-[#F0F0F3]">{l}</span>
                       <div onClick={()=>setLead({...lead,[k]:!lead[k]})}
-                        className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${lead[k]?'bg-[#FF6A00]':'bg-[#2A2A32]'}`}>
+                        className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${lead[k]?'bg-[#8B5CF6]':'bg-[#27272A]'}`}>
                         <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${lead[k]?'translate-x-4':'translate-x-0.5'}`}/>
                       </div>
                     </label>
                   ))}
                 </div>
-                <div className="mt-3 pt-3 border-t border-[#2A2A32]">
-                  <div className="text-xs text-[#6B6B7B] mb-1">Score de Oportunidade</div>
+                <div className="mt-3 pt-3 border-t border-[#27272A]">
+                  <div className="text-xs text-[#71717A] mb-1">Score de Oportunidade</div>
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 h-2 bg-[#2A2A32] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{width:`${Math.min(lead.opportunityScore,100)}%`,background:lead.opportunityScore>=60?'#FF6A00':lead.opportunityScore>=30?'#F59E0B':'#6B6B7B'}}/>
+                    <div className="flex-1 h-2 bg-[#27272A] rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{width:`${Math.min(lead.opportunityScore,100)}%`,background:lead.opportunityScore>=60?'#8B5CF6':lead.opportunityScore>=30?'#F59E0B':'#71717A'}}/>
                     </div>
-                    <span className="text-sm font-black text-[#FF6A00]">{lead.opportunityScore}pts</span>
+                    <span className="text-sm font-black text-[#8B5CF6]">{lead.opportunityScore}pts</span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
-                <div className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-3">Planos</div>
+              <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+                <div className="text-xs text-[#71717A] uppercase tracking-wider mb-3">Planos</div>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-[10px] text-[#6B6B7B] mb-1 block">Plano Atual</label>
+                    <label className="text-[10px] text-[#71717A] mb-1 block">Plano Atual</label>
                     <select value={lead.planoAtual||''} onChange={e=>setLead({...lead,planoAtual:e.target.value||null})}
-                      className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-2.5 py-1.5 text-xs text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]">
+                      className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-2.5 py-1.5 text-xs text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]">
                       <option value="">Sem plano</option>
                       {PLANS.map(p=><option key={p}>{p}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] text-[#6B6B7B] mb-1 block">Plano Alvo (Upgrade)</label>
+                    <label className="text-[10px] text-[#71717A] mb-1 block">Plano Alvo (Upgrade)</label>
                     <select value={lead.planoAlvoUpgrade||''} onChange={e=>setLead({...lead,planoAlvoUpgrade:e.target.value||null})}
-                      className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-2.5 py-1.5 text-xs text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]">
+                      className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-2.5 py-1.5 text-xs text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]">
                       <option value="">—</option>
                       {PLANS.map(p=><option key={p}>{p}</option>)}
                     </select>
@@ -305,29 +305,29 @@ export default function LeadDetailPage() {
 
           {/* Obs + Motivo */}
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
-              <label className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-2 block">Observações</label>
+            <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+              <label className="text-xs text-[#71717A] uppercase tracking-wider mb-2 block">Observações</label>
               <textarea value={lead.observacaoPerfil||''} onChange={e=>setLead({...lead,observacaoPerfil:e.target.value})}
-                rows={3} className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00] resize-none"/>
+                rows={3} className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] resize-none"/>
             </div>
-            <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
-              <label className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-2 block">Motivo do Score</label>
+            <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+              <label className="text-xs text-[#71717A] uppercase tracking-wider mb-2 block">Motivo do Score</label>
               <textarea value={lead.motivoScore||''} onChange={e=>setLead({...lead,motivoScore:e.target.value})}
-                rows={3} className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00] resize-none"/>
+                rows={3} className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] resize-none"/>
             </div>
           </div>
 
           {/* Activities */}
           {lead.activities?.length > 0 && (
-            <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
-              <div className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-3">Actividade Recente</div>
+            <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+              <div className="text-xs text-[#71717A] uppercase tracking-wider mb-3">Actividade Recente</div>
               <div className="space-y-2">
                 {lead.activities.slice(0, 10).map((a: any) => (
-                  <div key={a.id} className="flex items-start gap-3 py-2 border-b border-[#1A1A1F] last:border-0">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#FF6A00] mt-1.5 flex-shrink-0"/>
+                  <div key={a.id} className="flex items-start gap-3 py-2 border-b border-[#16161A] last:border-0">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6] mt-1.5 flex-shrink-0"/>
                     <div className="flex-1">
-                      <div className="text-sm text-[#F5F5F7]">{a.descricao}</div>
-                      <div className="text-[10px] text-[#6B6B7B]">{new Date(a.createdAt).toLocaleDateString('pt-PT')} · {a.tipo}</div>
+                      <div className="text-sm text-[#F0F0F3]">{a.descricao}</div>
+                      <div className="text-[10px] text-[#71717A]">{new Date(a.createdAt).toLocaleDateString('pt-PT')} · {a.tipo}</div>
                     </div>
                   </div>
                 ))}
@@ -357,10 +357,10 @@ export default function LeadDetailPage() {
           </div>
 
           {/* Message History */}
-          <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
             <div className="flex items-center justify-between mb-4">
-              <div className="text-xs text-[#6B6B7B] uppercase tracking-wider">Histórico de Mensagens</div>
-              <button onClick={loadMessages} className="text-xs text-[#6B6B7B] hover:text-[#FF6A00] flex items-center gap-1">
+              <div className="text-xs text-[#71717A] uppercase tracking-wider">Histórico de Mensagens</div>
+              <button onClick={loadMessages} className="text-xs text-[#71717A] hover:text-[#8B5CF6] flex items-center gap-1">
                 <RefreshCw className="w-3 h-3" /> Atualizar
               </button>
             </div>
@@ -368,11 +368,11 @@ export default function LeadDetailPage() {
             {messagesLoading && messages.length === 0 && (
               <div className="space-y-3">
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="animate-pulse flex gap-3 p-3 bg-[#0B0B0D] rounded-lg">
-                    <div className="w-8 h-8 rounded-lg bg-[#2A2A32]" />
+                  <div key={i} className="animate-pulse flex gap-3 p-3 bg-[#09090B] rounded-lg">
+                    <div className="w-8 h-8 rounded-lg bg-[#27272A]" />
                     <div className="flex-1">
-                      <div className="h-3 w-24 bg-[#2A2A32] rounded mb-2" />
-                      <div className="h-3 w-48 bg-[#1A1A1F] rounded" />
+                      <div className="h-3 w-24 bg-[#27272A] rounded mb-2" />
+                      <div className="h-3 w-48 bg-[#16161A] rounded" />
                     </div>
                   </div>
                 ))}
@@ -380,10 +380,10 @@ export default function LeadDetailPage() {
             )}
 
             {!messagesLoading && messages.length === 0 && (
-              <div className="text-center py-8 text-[#6B6B7B]">
+              <div className="text-center py-8 text-[#71717A]">
                 <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">Nenhuma mensagem enviada</p>
-                <p className="text-xs text-[#4A4A5A] mt-1">Use os botões acima para enviar a primeira mensagem</p>
+                <p className="text-xs text-[#52525B] mt-1">Use os botões acima para enviar a primeira mensagem</p>
               </div>
             )}
 
@@ -393,30 +393,30 @@ export default function LeadDetailPage() {
                 const StatusIcon = statusStyle.icon
                 const isWA = msg.canal === 'WHATSAPP'
                 return (
-                  <div key={msg.id} className="bg-[#0B0B0D] rounded-lg p-3 border border-[#1A1A1F]">
+                  <div key={msg.id} className="bg-[#09090B] rounded-lg p-3 border border-[#16161A]">
                     <div className="flex items-start gap-3">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isWA ? 'bg-green-500/10' : 'bg-blue-500/10'}`}>
                         {isWA ? <MessageCircle className="w-4 h-4 text-green-400" /> : <Mail className="w-4 h-4 text-blue-400" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-medium text-[#F5F5F7]">
+                          <span className="text-xs font-medium text-[#F0F0F3]">
                             {isWA ? 'WhatsApp' : 'Email'}
                           </span>
-                          <span className="text-[10px] text-[#6B6B7B]">{msg.destinatario}</span>
+                          <span className="text-[10px] text-[#71717A]">{msg.destinatario}</span>
                           <div className="flex items-center gap-1 ml-auto">
                             <StatusIcon className={`w-3 h-3 ${statusStyle.color}`} />
                             <span className={`text-[10px] font-medium ${statusStyle.color}`}>{statusStyle.label}</span>
                           </div>
                         </div>
                         {msg.assunto && (
-                          <div className="text-xs text-[#FF6A00] mb-1">Assunto: {msg.assunto}</div>
+                          <div className="text-xs text-[#8B5CF6] mb-1">Assunto: {msg.assunto}</div>
                         )}
-                        <p className="text-xs text-[#6B6B7B] line-clamp-2 whitespace-pre-wrap">{msg.corpo}</p>
+                        <p className="text-xs text-[#71717A] line-clamp-2 whitespace-pre-wrap">{msg.corpo}</p>
                         {msg.erro && (
                           <p className="text-[10px] text-red-400 mt-1">Erro: {msg.erro}</p>
                         )}
-                        <div className="text-[10px] text-[#4A4A5A] mt-1.5">
+                        <div className="text-[10px] text-[#52525B] mt-1.5">
                           {new Date(msg.createdAt).toLocaleDateString('pt-PT')} às {new Date(msg.createdAt).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
@@ -433,15 +433,15 @@ export default function LeadDetailPage() {
       {showSendModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
           onClick={e => { if (e.target === e.currentTarget) setShowSendModal(null) }}>
-          <div className="bg-[#111114] border border-[#2A2A32] rounded-2xl w-full max-w-lg shadow-2xl">
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#2A2A32]">
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#27272A]">
               <div className="flex items-center gap-3">
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${showSendModal === 'WHATSAPP' ? 'bg-green-500/15' : 'bg-blue-500/15'}`}>
                   {showSendModal === 'WHATSAPP' ? <MessageCircle className="w-4.5 h-4.5 text-green-400" /> : <Mail className="w-4.5 h-4.5 text-blue-400" />}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-[#F5F5F7] text-sm">
+                    <span className="font-bold text-[#F0F0F3] text-sm">
                       {showSendModal === 'WHATSAPP' ? 'Enviar WhatsApp' : 'Enviar Email'}
                     </span>
                     <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
@@ -451,10 +451,10 @@ export default function LeadDetailPage() {
                       {(showSendModal === 'WHATSAPP' ? integrationStatus?.whatsapp?.configured : integrationStatus?.email?.configured) ? 'API' : 'MANUAL'}
                     </span>
                   </div>
-                  <div className="text-xs text-[#6B6B7B]">{lead.nome} · {showSendModal === 'WHATSAPP' ? (lead.whatsapp || lead.telefone) : lead.email}</div>
+                  <div className="text-xs text-[#71717A]">{lead.nome} · {showSendModal === 'WHATSAPP' ? (lead.whatsapp || lead.telefone) : lead.email}</div>
                 </div>
               </div>
-              <button onClick={() => setShowSendModal(null)} className="text-[#6B6B7B] hover:text-[#F5F5F7]">
+              <button onClick={() => setShowSendModal(null)} className="text-[#71717A] hover:text-[#F0F0F3]">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -462,7 +462,7 @@ export default function LeadDetailPage() {
             <div className="p-5 space-y-4">
               {/* Quick templates */}
               <div>
-                <div className="text-xs text-[#6B6B7B] mb-2 font-medium">Templates Rápidos</div>
+                <div className="text-xs text-[#71717A] mb-2 font-medium">Templates Rápidos</div>
                 <div className="flex flex-wrap gap-1.5">
                   {QUICK_TEMPLATES.filter(t => t.canal === showSendModal).map((t, i) => (
                     <button key={i} onClick={() => {
@@ -474,7 +474,7 @@ export default function LeadDetailPage() {
                         .replace(/{nome}/g, lead.nome?.split(' ')[0] || lead.nome)
                         .replace(/{empresa}/g, lead.empresa || lead.nome))
                     }}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-[#2A2A32] text-[#6B6B7B] hover:border-[#FF6A00]/40 hover:text-[#FF6A00] transition-all">
+                      className="text-xs px-3 py-1.5 rounded-lg border border-[#27272A] text-[#71717A] hover:border-[#8B5CF6]/40 hover:text-[#8B5CF6] transition-all">
                       {t.label}
                     </button>
                   ))}
@@ -483,22 +483,22 @@ export default function LeadDetailPage() {
 
               {showSendModal === 'EMAIL' && (
                 <div>
-                  <label className="text-xs text-[#6B6B7B] mb-1.5 block font-medium">Assunto</label>
+                  <label className="text-xs text-[#71717A] mb-1.5 block font-medium">Assunto</label>
                   <input value={msgSubject} onChange={e => setMsgSubject(e.target.value)}
-                    className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-xl px-4 py-2.5 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]" />
+                    className="w-full bg-[#09090B] border border-[#27272A] rounded-xl px-4 py-2.5 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]" />
                 </div>
               )}
 
               <div>
-                <label className="text-xs text-[#6B6B7B] mb-1.5 block font-medium">Mensagem</label>
+                <label className="text-xs text-[#71717A] mb-1.5 block font-medium">Mensagem</label>
                 <textarea value={msgText} onChange={e => setMsgText(e.target.value)} rows={6}
-                  className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-xl px-4 py-3 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00] resize-none font-mono leading-relaxed" />
-                <div className="text-[10px] text-[#4A4A5A] mt-1">{msgText.length} caracteres</div>
+                  className="w-full bg-[#09090B] border border-[#27272A] rounded-xl px-4 py-3 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] resize-none font-mono leading-relaxed" />
+                <div className="text-[10px] text-[#52525B] mt-1">{msgText.length} caracteres</div>
               </div>
 
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setShowSendModal(null)}
-                  className="px-4 py-2.5 rounded-xl border border-[#2A2A32] text-sm text-[#6B6B7B] hover:border-[#4A4A5A] hover:text-[#F5F5F7] transition-all">
+                  className="px-4 py-2.5 rounded-xl border border-[#27272A] text-sm text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3] transition-all">
                   Cancelar
                 </button>
                 <button onClick={handleSend}

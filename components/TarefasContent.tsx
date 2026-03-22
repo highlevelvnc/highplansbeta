@@ -41,8 +41,8 @@ export default function TarefasContent({ tasks: initial }: { tasks: Task[] }) {
     const isOverdue = task.dueDate && new Date(task.dueDate) < now && task.status !== 'DONE'
     const isDone = task.status === 'DONE'
     return (
-      <div className={`flex items-start gap-3 p-4 rounded-xl border transition-all ${isDone ? 'opacity-40 border-transparent' : isOverdue ? 'border-red-500/20 bg-red-500/5' : 'border-[rgba(255,106,0,0.08)] bg-[#111114]'}`}>
-        <button onClick={() => toggleDone(task.id, task.status)} className={`mt-0.5 flex-shrink-0 ${isDone ? 'text-[#10B981]' : 'text-[#4B5563] hover:text-[#FF6A00]'}`}>
+      <div className={`flex items-start gap-3 p-4 rounded-xl border transition-all ${isDone ? 'opacity-40 border-transparent' : isOverdue ? 'border-red-500/20 bg-red-500/5' : 'border-[rgba(139,92,246,0.08)] bg-[#0F0F12]'}`}>
+        <button onClick={() => toggleDone(task.id, task.status)} className={`mt-0.5 flex-shrink-0 ${isDone ? 'text-[#10B981]' : 'text-[#4B5563] hover:text-[#8B5CF6]'}`}>
           {isDone ? <CheckCircle size={18} /> : <Circle size={18} />}
         </button>
         <div className="flex-1 min-w-0">
@@ -65,7 +65,7 @@ export default function TarefasContent({ tasks: initial }: { tasks: Task[] }) {
           <h1 className="text-2xl font-bold text-white">Tarefas Internas</h1>
           <p className="text-[#6B7280] text-sm mt-1">{pending.length} pendentes · {overdue.length} atrasadas · {high.length} alta prioridade</p>
         </div>
-        <button onClick={() => setShowNew(true)} className="flex items-center gap-2 bg-[#FF6A00] hover:bg-[#FF7F1A] text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+        <button onClick={() => setShowNew(true)} className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
           <Plus size={16} />Nova Tarefa
         </button>
       </div>
@@ -73,7 +73,7 @@ export default function TarefasContent({ tasks: initial }: { tasks: Task[] }) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Pendentes', value: pending.length, color: '#FF6A00' },
+          { label: 'Pendentes', value: pending.length, color: '#8B5CF6' },
           { label: 'Atrasadas', value: overdue.length, color: '#EF4444', icon: AlertCircle },
           { label: 'Alta Prioridade', value: high.length, color: '#F59E0B' },
         ].map(s => (
@@ -107,8 +107,8 @@ export default function TarefasContent({ tasks: initial }: { tasks: Task[] }) {
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => setShowNew(false)} className="flex-1 bg-[#1A1A1F] text-[#6B7280] py-2 rounded-lg text-sm">Cancelar</button>
-            <button onClick={createTask} className="flex-1 bg-[#FF6A00] hover:bg-[#FF7F1A] text-white py-2 rounded-lg text-sm font-medium">Guardar</button>
+            <button onClick={() => setShowNew(false)} className="flex-1 bg-[#16161A] text-[#6B7280] py-2 rounded-lg text-sm">Cancelar</button>
+            <button onClick={createTask} className="flex-1 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white py-2 rounded-lg text-sm font-medium">Guardar</button>
           </div>
         </div>
       )}
@@ -124,7 +124,7 @@ export default function TarefasContent({ tasks: initial }: { tasks: Task[] }) {
         </div>
       )}
       <div>
-        <h2 className="text-sm font-semibold text-[#9CA3AF] mb-3">Pendentes</h2>
+        <h2 className="text-sm font-semibold text-[#A1A1AA] mb-3">Pendentes</h2>
         <div className="space-y-2">{pending.filter(t => !overdue.find(o => o.id === t.id)).map(t => <TaskItem key={t.id} task={t} />)}</div>
       </div>
       <div>

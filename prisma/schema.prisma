@@ -237,3 +237,16 @@ model ImportJob {
   createdAt     DateTime @default(now())
   finishedAt    DateTime?
 }
+
+// ─── Autenticação ──────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  nome         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("USER") // USER | ADMIN
+  ativo        Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

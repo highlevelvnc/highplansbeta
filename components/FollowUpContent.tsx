@@ -50,14 +50,14 @@ export default function FollowUpContent({ followUps }: { followUps: FollowUp[] }
   }
 
   const FollowUpItem = ({ fu, urgent }: { fu: FollowUp; urgent: boolean }) => (
-    <div className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${urgent ? 'border-red-500/20 bg-red-500/5' : 'border-[rgba(255,106,0,0.08)] bg-[#111114]'}`}>
+    <div className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${urgent ? 'border-red-500/20 bg-red-500/5' : 'border-[rgba(139,92,246,0.08)] bg-[#0F0F12]'}`}>
       <div className="flex-1 min-w-0">
         <div className="font-medium text-white text-sm">{fu.lead.nome}</div>
         <div className="text-xs text-[#6B7280]">{fu.lead.empresa} · {fu.tipo}</div>
         <div className={`text-xs mt-1 ${urgent ? 'text-red-400' : 'text-[#4B5563]'}`}>
           {formatDate(fu.agendadoPara)}
         </div>
-        {fu.mensagem && <div className="text-xs text-[#9CA3AF] mt-1 truncate">{fu.mensagem}</div>}
+        {fu.mensagem && <div className="text-xs text-[#A1A1AA] mt-1 truncate">{fu.mensagem}</div>}
       </div>
       <div className="flex gap-2">
         {fu.lead.whatsapp && (
@@ -67,7 +67,7 @@ export default function FollowUpContent({ followUps }: { followUps: FollowUp[] }
         )}
         <button
           onClick={() => markSent(fu.id)}
-          className="flex items-center gap-1 bg-[rgba(255,106,0,0.1)] hover:bg-[rgba(255,106,0,0.2)] text-[#FF6A00] px-3 py-1.5 rounded-lg text-xs transition-colors"
+          className="flex items-center gap-1 bg-[rgba(139,92,246,0.1)] hover:bg-[rgba(139,92,246,0.2)] text-[#8B5CF6] px-3 py-1.5 rounded-lg text-xs transition-colors"
         >
           <CheckCircle size={12} />Enviado
         </button>
@@ -84,19 +84,19 @@ export default function FollowUpContent({ followUps }: { followUps: FollowUp[] }
 
       {/* Template Selector */}
       <div className="card-dark p-4">
-        <div className="text-xs font-semibold text-[#FF6A00] uppercase tracking-wider mb-3">Template de Mensagem</div>
+        <div className="text-xs font-semibold text-[#8B5CF6] uppercase tracking-wider mb-3">Template de Mensagem</div>
         <div className="flex gap-2 flex-wrap">
           {TEMPLATES.map((t, i) => (
             <button
               key={i}
               onClick={() => setSelectedTemplate(i)}
-              className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${selectedTemplate === i ? 'bg-[rgba(255,106,0,0.2)] text-[#FF6A00] border border-[rgba(255,106,0,0.3)]' : 'bg-[#1A1A1F] text-[#6B7280] hover:text-white'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${selectedTemplate === i ? 'bg-[rgba(139,92,246,0.2)] text-[#8B5CF6] border border-[rgba(139,92,246,0.3)]' : 'bg-[#16161A] text-[#6B7280] hover:text-white'}`}
             >
               {t.label}
             </button>
           ))}
         </div>
-        <div className="text-xs text-[#6B7280] mt-2 p-2 bg-[#1A1A1F] rounded-lg">
+        <div className="text-xs text-[#6B7280] mt-2 p-2 bg-[#16161A] rounded-lg">
           {TEMPLATES[selectedTemplate].texto}
         </div>
       </div>
@@ -115,8 +115,8 @@ export default function FollowUpContent({ followUps }: { followUps: FollowUp[] }
       {todayFu.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <Clock size={15} className="text-[#FF6A00]" />
-            <h2 className="text-sm font-semibold text-[#FF6A00]">Hoje ({todayFu.length})</h2>
+            <Clock size={15} className="text-[#8B5CF6]" />
+            <h2 className="text-sm font-semibold text-[#8B5CF6]">Hoje ({todayFu.length})</h2>
           </div>
           <div className="space-y-2">{todayFu.map(f => <FollowUpItem key={f.id} fu={f} urgent={false} />)}</div>
         </div>
@@ -125,8 +125,8 @@ export default function FollowUpContent({ followUps }: { followUps: FollowUp[] }
       {upcoming.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <Calendar size={15} className="text-[#9CA3AF]" />
-            <h2 className="text-sm font-semibold text-[#9CA3AF]">Próximos 7 dias ({upcoming.length})</h2>
+            <Calendar size={15} className="text-[#A1A1AA]" />
+            <h2 className="text-sm font-semibold text-[#A1A1AA]">Próximos 7 dias ({upcoming.length})</h2>
           </div>
           <div className="space-y-2">{upcoming.map(f => <FollowUpItem key={f.id} fu={f} urgent={false} />)}</div>
         </div>

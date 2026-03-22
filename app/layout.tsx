@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import SessionProvider from '@/components/SessionProvider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -9,8 +10,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt" className="dark">
-      <body className="bg-[#0B0B0D] text-[#F5F5F7] min-h-screen">
-        {children}
+      <body className="bg-[#09090B] text-[#F0F0F3] min-h-screen">
+        <SessionProvider>
+          {children}
+        </SessionProvider>
       </body>
     </html>
   )

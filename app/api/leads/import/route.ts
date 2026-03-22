@@ -33,6 +33,22 @@ function cleanPhone(raw: string): string {
     .replace(/\s+/g, ' ')
 }
 
+/** Normalize phone to digits only for comparison.
+ *  Handles: +351…, 00351…, 351…, and raw 9-digit PT numbers. */
+function normalizePhoneForMatch(raw: string): string {
+  if (!raw) return ''
+  let digits = raw.replace(/[^\d]/g, '')
+  // Strip international dialing prefix 00
+  if (digits.startsWith('00')) {
+    digits = digits.substring(2)
+  }
+  // Portuguese numbers: add 351 prefix if 9 digits starting with 9 or 2
+  if (digits.length === 9 && (digits.startsWith('9') || digits.startsWith('2'))) {
+    return '351' + digits
+  }
+  return digits
+}
+
 function detectSiteInfo(siteField: string): {
   temSite: boolean
   siteFraco: boolean
@@ -70,6 +86,131 @@ function detectNicho(nome: string, nichoOverride?: string): string {
   return 'Serviços'
 }
 
+/** Pre-built index of existing leads' phones for O(1) lookup */
+interface PhoneIndex {
+  byTelefone: Map<string, string>  // normalizedPhone → leadId
+  byWhatsapp: Map<string, string>  // normalizedPhone → leadId
+  byEmail: Map<string, string>     // lowercased email → leadId
+  byNomeEmpresa: Map<string, string> // "nome||empresa" lowercased → leadId
+}
+
+async function buildMatchIndex(): Promise<PhoneIndex> {
+  const allLeads = await prisma.lead.findMany({
+    select: { id: true, telefone: true, whatsapp: true, email: true, nome: true, empresa: true },
+  })
+
+  const byTelefone = new Map<string, string>()
+  const byWhatsapp = new Map<string, string>()
+  const byEmail = new Map<string, string>()
+  const byNomeEmpresa = new Map<string, string>()
+
+  for (const lead of allLeads) {
+    // Index telefone
+    if (lead.telefone) {
+      const norm = normalizePhoneForMatch(lead.telefone)
+      if (norm.length >= 9) byTelefone.set(norm, lead.id)
+    }
+    // Index whatsapp
+    if (lead.whatsapp) {
+      const norm = normalizePhoneForMatch(lead.whatsapp)
+      if (norm.length >= 9) byWhatsapp.set(norm, lead.id)
+    }
+    // Index email
+    if (lead.email) {
+      byEmail.set(lead.email.trim().toLowerCase(), lead.id)
+    }
+    // Index nome+empresa
+    if (lead.nome) {
+      const key = `${lead.nome.toLowerCase()}||${(lead.empresa || '').toLowerCase()}`
+      byNomeEmpresa.set(key, lead.id)
+    }
+  }
+
+  return { byTelefone, byWhatsapp, byEmail, byNomeEmpresa }
+}
+
+/**
+ * Find existing lead by priority: email > telefone > whatsapp > nome+empresa.
+ * Uses pre-built index for O(1) lookups instead of N queries per row.
+ */
+async function findExistingLead(
+  data: { email: string; telefone: string; whatsapp: string; nome: string; empresa: string },
+  index: PhoneIndex
+): Promise<{ leadId: string; matchedBy: string } | null> {
+
+  // 1. Match by email (highest priority — most unique identifier)
+  if (data.email) {
+    const leadId = index.byEmail.get(data.email.toLowerCase())
+    if (leadId) return { leadId, matchedBy: 'email' }
+  }
+
+  // 2. Match by telefone (normalized digits)
+  if (data.telefone) {
+    const norm = normalizePhoneForMatch(data.telefone)
+    if (norm.length >= 9) {
+      const leadId = index.byTelefone.get(norm)
+      if (leadId) return { leadId, matchedBy: 'telefone' }
+    }
+  }
+
+  // 3. Match by whatsapp (normalized digits — catches cases where existing
+  //    lead has whatsapp but different/no telefone)
+  if (data.whatsapp) {
+    const norm = normalizePhoneForMatch(data.whatsapp)
+    if (norm.length >= 9) {
+      const leadId = index.byWhatsapp.get(norm)
+      if (leadId) return { leadId, matchedBy: 'whatsapp' }
+    }
+  }
+
+  // 4. Match by nome + empresa (fallback — exact case-insensitive match)
+  //    Only triggers when email/phone didn't match.
+  //    Note: import sets empresa=nome, so this is effectively a nome-only match.
+  //    Risk of false positive for same-name businesses is low at beta scale.
+  if (data.nome && data.empresa) {
+    const key = `${data.nome.toLowerCase()}||${data.empresa.toLowerCase()}`
+    const leadId = index.byNomeEmpresa.get(key)
+    if (leadId) return { leadId, matchedBy: 'nome+empresa' }
+  }
+
+  return null
+}
+
+/**
+ * Smart merge: fill empty STRING fields from new data.
+ * NEVER overwrites existing values.
+ * NEVER touches booleans or scores — existing diagnosis is more reliable
+ * than automated CSV detection (which hardcodes anunciosAtivos=false, gmbOtimizado=false).
+ * Returns the update payload (only changed fields) or null if nothing to update.
+ */
+function buildMergePayload(
+  existing: Record<string, any>,
+  newData: Record<string, any>
+): Record<string, any> | null {
+  const updates: Record<string, any> = {}
+
+  // String fields: fill if existing is empty/null/whitespace
+  const stringFields = [
+    'empresa', 'nicho', 'cidade', 'telefone', 'whatsapp', 'email',
+    'origem', 'observacaoPerfil', 'motivoScore',
+  ]
+  for (const field of stringFields) {
+    const existingVal = existing[field]
+    const newVal = newData[field]
+    if (newVal && (!existingVal || (typeof existingVal === 'string' && existingVal.trim() === ''))) {
+      updates[field] = newVal
+    }
+  }
+
+  // Booleans (temSite, siteFraco, instagramAtivo, etc.) — NOT merged.
+  // Reason: CSV auto-detection is less reliable than existing data which may
+  // have been manually reviewed. "siteFraco: true" from CSV could overwrite
+  // a manual "false" (good site). Score fields also excluded since CSV always
+  // hardcodes anunciosAtivos=false and gmbOtimizado=false, inflating the score.
+
+  return Object.keys(updates).length > 0 ? updates : null
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
@@ -94,7 +235,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'rows inválido' }, { status: 400 })
     }
 
-    let imported = 0
+    // Pre-load match index once (O(1) lookups instead of N queries per row)
+    const index = await buildMatchIndex()
+
+    let created = 0
+    let updated = 0
     let skipped = 0
     const errors: string[] = []
 
@@ -107,7 +252,7 @@ export async function POST(req: Request) {
         const telefoneRaw = row.telefone || row.Telefone || ''
         const siteRaw = row.site || row.Site || ''
         const cidadeRaw = row.cidade || row.Cidade || ''
-        const emailRaw = row.email || row.Email || ''
+        const emailRaw = (row.email || row.Email || '').trim().toLowerCase()
 
         const telefone = cleanPhone(telefoneRaw)
         const siteInfo = detectSiteInfo(siteRaw)
@@ -141,36 +286,85 @@ export async function POST(req: Request) {
         else if (isInstagram) obs = `Instagram: ${siteVal.substring(0, 120)}`
         else if (siteVal) obs = `Site: ${siteVal.substring(0, 120)}`
 
-        await prisma.lead.create({
-          data: {
-            nome: nome.substring(0, 200),
-            empresa: nome.substring(0, 200),
-            nicho,
-            cidade: cidadeRaw.trim() || 'Portugal',
-            telefone: telefone.substring(0, 30),
-            whatsapp: telefone.substring(0, 30),
-            email: emailRaw.trim().substring(0, 100) || undefined,
-            temSite: diagData.temSite,
-            siteFraco: diagData.siteFraco,
-            instagramAtivo: diagData.instagramAtivo,
-            gmbOtimizado: diagData.gmbOtimizado,
-            anunciosAtivos: diagData.anunciosAtivos,
-            opportunityScore: oppScore,
-            score,
-            motivoScore,
-            origem: origemDefault || 'Importação CSV',
-            pipelineStatus: 'NEW',
-            observacaoPerfil: obs,
+        const newLeadData = {
+          nome: nome.substring(0, 200),
+          empresa: nome.substring(0, 200),
+          nicho,
+          cidade: cidadeRaw.trim() || 'Portugal',
+          telefone: telefone.substring(0, 30),
+          whatsapp: telefone.substring(0, 30),
+          email: emailRaw.substring(0, 100) || undefined,
+          temSite: diagData.temSite,
+          siteFraco: diagData.siteFraco,
+          instagramAtivo: diagData.instagramAtivo,
+          gmbOtimizado: diagData.gmbOtimizado,
+          anunciosAtivos: diagData.anunciosAtivos,
+          opportunityScore: oppScore,
+          score,
+          motivoScore,
+          origem: origemDefault || 'Importação CSV',
+          pipelineStatus: 'NEW',
+          observacaoPerfil: obs,
+        }
+
+        // --- Duplicate detection (uses pre-built index) ---
+        const match = await findExistingLead({
+          email: emailRaw,
+          telefone: telefone,
+          whatsapp: telefone, // import always sets whatsapp = telefone
+          nome: nome.substring(0, 200),
+          empresa: nome.substring(0, 200),
+        }, index)
+
+        if (match) {
+          // Found existing lead — smart merge (fill empty fields only)
+          const existingLead = await prisma.lead.findUnique({ where: { id: match.leadId } })
+          if (existingLead) {
+            const mergePayload = buildMergePayload(existingLead as any, newLeadData)
+            if (mergePayload) {
+              await prisma.lead.update({
+                where: { id: match.leadId },
+                data: mergePayload,
+              })
+              // Update index with new data so subsequent rows see the merged state
+              if (mergePayload.email) index.byEmail.set(mergePayload.email.toLowerCase(), match.leadId)
+              if (mergePayload.telefone) {
+                const norm = normalizePhoneForMatch(mergePayload.telefone)
+                if (norm.length >= 9) index.byTelefone.set(norm, match.leadId)
+              }
+              if (mergePayload.whatsapp) {
+                const norm = normalizePhoneForMatch(mergePayload.whatsapp)
+                if (norm.length >= 9) index.byWhatsapp.set(norm, match.leadId)
+              }
+              updated++
+            } else {
+              // Nothing new to add — skip
+              skipped++
+            }
+          } else {
+            skipped++
           }
-        })
-        imported++
+        } else {
+          // No match — create new lead
+          const created_lead = await prisma.lead.create({ data: newLeadData })
+          // Add to index so subsequent CSV rows can match against it
+          if (emailRaw) index.byEmail.set(emailRaw.toLowerCase(), created_lead.id)
+          const normPhone = normalizePhoneForMatch(telefone)
+          if (normPhone.length >= 9) {
+            index.byTelefone.set(normPhone, created_lead.id)
+            index.byWhatsapp.set(normPhone, created_lead.id)
+          }
+          const nameKey = `${nome.substring(0, 200).toLowerCase()}||${nome.substring(0, 200).toLowerCase()}`
+          index.byNomeEmpresa.set(nameKey, created_lead.id)
+          created++
+        }
       } catch (e: any) {
         errors.push(`${nome}: ${e.message}`)
         skipped++
       }
     }
 
-    return NextResponse.json({ imported, skipped, errors: errors.slice(0, 10) })
+    return NextResponse.json({ created, updated, skipped, errors: errors.slice(0, 10) })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

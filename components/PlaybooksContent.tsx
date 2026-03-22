@@ -15,7 +15,7 @@ const TIPO_COLORS: Record<string, string> = {
   SCRIPT: '#6366F1',
   CHECKLIST: '#10B981',
   FERRAMENTA: '#F59E0B',
-  TEMPLATE: '#FF6A00',
+  TEMPLATE: '#8B5CF6',
 }
 
 export default function PlaybooksContent({ playbooks }: { playbooks: Playbook[] }) {
@@ -35,7 +35,7 @@ export default function PlaybooksContent({ playbooks }: { playbooks: Playbook[] 
           {tipos.map(tipo => {
             const items = playbooks.filter(p => p.tipo === tipo)
             const Icon = TIPO_ICONS[tipo] || BookOpen
-            const color = TIPO_COLORS[tipo] || '#FF6A00'
+            const color = TIPO_COLORS[tipo] || '#8B5CF6'
             return (
               <div key={tipo}>
                 <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color }}>{tipo}</div>
@@ -44,7 +44,7 @@ export default function PlaybooksContent({ playbooks }: { playbooks: Playbook[] 
                     <button
                       key={pb.id}
                       onClick={() => setSelected(pb)}
-                      className={`w-full flex items-center gap-3 p-4 rounded-xl border text-left transition-all ${selected?.id === pb.id ? 'border-[rgba(255,106,0,0.3)] bg-[rgba(255,106,0,0.05)]' : 'border-[rgba(255,106,0,0.08)] bg-[#111114] hover:bg-[#1A1A1F]'}`}
+                      className={`w-full flex items-center gap-3 p-4 rounded-xl border text-left transition-all ${selected?.id === pb.id ? 'border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.05)]' : 'border-[rgba(139,92,246,0.08)] bg-[#0F0F12] hover:bg-[#16161A]'}`}
                     >
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${color}20` }}>
                         <Icon size={15} style={{ color }} />
@@ -66,7 +66,7 @@ export default function PlaybooksContent({ playbooks }: { playbooks: Playbook[] 
           {selected ? (
             <>
               <h2 className="text-lg font-bold text-white mb-4">{selected.titulo}</h2>
-              <pre className="text-sm text-[#9CA3AF] whitespace-pre-wrap font-sans leading-relaxed">{selected.conteudo}</pre>
+              <pre className="text-sm text-[#A1A1AA] whitespace-pre-wrap font-sans leading-relaxed">{selected.conteudo}</pre>
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-center">

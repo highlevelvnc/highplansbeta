@@ -99,12 +99,12 @@ export default function ProspeccaoContent() {
         onDragOver={e => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-2xl p-12 text-center transition-all ${dragging ? 'border-[#FF6A00] bg-[rgba(255,106,0,0.05)]' : 'border-[#2D2D35] hover:border-[rgba(255,106,0,0.3)]'}`}
+        className={`border-2 border-dashed rounded-2xl p-12 text-center transition-all ${dragging ? 'border-[#8B5CF6] bg-[rgba(139,92,246,0.05)]' : 'border-[#2D2D35] hover:border-[rgba(139,92,246,0.3)]'}`}
       >
-        <Upload size={32} className={`mx-auto mb-4 ${dragging ? 'text-[#FF6A00]' : 'text-[#4B5563]'}`} />
+        <Upload size={32} className={`mx-auto mb-4 ${dragging ? 'text-[#8B5CF6]' : 'text-[#4B5563]'}`} />
         <p className="text-sm font-medium text-white mb-2">Arraste o ficheiro CSV aqui</p>
         <p className="text-xs text-[#4B5563] mb-4">ou</p>
-        <label className="cursor-pointer bg-[#FF6A00] hover:bg-[#FF7F1A] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+        <label className="cursor-pointer bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           Selecionar Ficheiro
           <input type="file" accept=".csv" className="hidden" onChange={handleFile} />
         </label>
@@ -129,7 +129,7 @@ export default function ProspeccaoContent() {
               </div>
             ))}
           </div>
-          <button onClick={buildPreview} className="bg-[rgba(255,106,0,0.1)] hover:bg-[rgba(255,106,0,0.2)] text-[#FF6A00] px-4 py-2 rounded-lg text-sm transition-colors">
+          <button onClick={buildPreview} className="bg-[rgba(139,92,246,0.1)] hover:bg-[rgba(139,92,246,0.2)] text-[#8B5CF6] px-4 py-2 rounded-lg text-sm transition-colors">
             Pré-visualizar
           </button>
         </div>
@@ -138,12 +138,12 @@ export default function ProspeccaoContent() {
       {/* Preview */}
       {preview.length > 0 && (
         <div className="card-dark overflow-hidden">
-          <div className="flex items-center justify-between p-4 border-b border-[rgba(255,106,0,0.08)]">
+          <div className="flex items-center justify-between p-4 border-b border-[rgba(139,92,246,0.08)]">
             <span className="text-sm font-semibold text-white">{preview.length} leads para importar</span>
             <button
               onClick={importLeads}
               disabled={importing}
-              className="flex items-center gap-2 bg-[#FF6A00] hover:bg-[#FF7F1A] text-white px-4 py-2 rounded-lg text-sm font-medium"
+              className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium"
             >
               {importing ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
               {importing ? 'A importar...' : 'Importar Todos'}
@@ -151,7 +151,7 @@ export default function ProspeccaoContent() {
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[rgba(255,106,0,0.05)]">
+              <tr className="border-b border-[rgba(139,92,246,0.05)]">
                 {['Nome', 'Empresa', 'Telefone', 'Email', 'Nicho', 'Cidade'].map(h => (
                   <th key={h} className="text-left px-4 py-2 text-xs text-[#6B7280]">{h}</th>
                 ))}
@@ -159,13 +159,13 @@ export default function ProspeccaoContent() {
             </thead>
             <tbody>
               {preview.slice(0, 10).map((l, i) => (
-                <tr key={i} className="border-b border-[rgba(255,106,0,0.03)]">
+                <tr key={i} className="border-b border-[rgba(139,92,246,0.03)]">
                   <td className="px-4 py-2 text-sm text-white">{l.nome}</td>
-                  <td className="px-4 py-2 text-sm text-[#9CA3AF]">{l.empresa}</td>
-                  <td className="px-4 py-2 text-sm text-[#9CA3AF]">{l.telefone}</td>
-                  <td className="px-4 py-2 text-sm text-[#9CA3AF]">{l.email}</td>
-                  <td className="px-4 py-2 text-sm text-[#9CA3AF]">{l.nicho}</td>
-                  <td className="px-4 py-2 text-sm text-[#9CA3AF]">{l.cidade}</td>
+                  <td className="px-4 py-2 text-sm text-[#A1A1AA]">{l.empresa}</td>
+                  <td className="px-4 py-2 text-sm text-[#A1A1AA]">{l.telefone}</td>
+                  <td className="px-4 py-2 text-sm text-[#A1A1AA]">{l.email}</td>
+                  <td className="px-4 py-2 text-sm text-[#A1A1AA]">{l.nicho}</td>
+                  <td className="px-4 py-2 text-sm text-[#A1A1AA]">{l.cidade}</td>
                 </tr>
               ))}
             </tbody>

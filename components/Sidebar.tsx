@@ -39,7 +39,7 @@ export default function Sidebar() {
             width: 36, height: 36, borderRadius: 10,
             background: 'var(--orange)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 16px rgba(255,106,0,0.4)',
+            boxShadow: '0 0 16px rgba(139,92,246,0.4)',
           }}>
             <Zap size={20} color="white" />
           </div>

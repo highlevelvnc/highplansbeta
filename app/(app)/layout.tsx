@@ -1,7 +1,9 @@
 'use client'
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, BarChart2 } from 'lucide-react'
+import { useSession, signOut } from 'next-auth/react'
+import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, LogOut, Menu, X } from 'lucide-react'
 import { ToastProvider } from '@/components/Toast'
 
 const nav = [
@@ -9,9 +11,9 @@ const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads', label: 'Leads CRM', icon: Users },
   { href: '/pipeline', label: 'Pipeline', icon: GitBranch },
-  { href: '/contactos', label: 'Contactos', icon: MessageCircle, badge: 'novo' },
+  { href: '/contactos', label: 'Contactos', icon: MessageCircle },
   { section: 'CLIENTES' },
-  { href: '/clientes', label: 'Clientes', icon: UserCheck, badge: 'novo' },
+  { href: '/clientes', label: 'Clientes', icon: UserCheck },
   { href: '/followups', label: 'Follow-ups', icon: Calendar },
   { href: '/propostas', label: 'Propostas', icon: FileText },
   { href: '/tarefas', label: 'Tarefas', icon: CheckSquare },
@@ -24,60 +26,113 @@ const nav = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  
-  return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-56 flex-shrink-0 bg-[#111114] border-r border-[#2A2A32] flex flex-col">
-        <div className="px-4 py-5 border-b border-[#2A2A32]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#FF6A00] flex items-center justify-center shadow-lg">
-              <span className="text-white font-black text-xs">H</span>
-            </div>
-            <div>
-              <div className="font-black text-sm tracking-wider text-[#F5F5F7]">HIGHPLANS</div>
-              <div className="text-[9px] text-[#4A4A5A] tracking-widest uppercase">Commercial OS</div>
-            </div>
+  const { data: session } = useSession()
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  const sidebarContent = (
+    <>
+      {/* Logo */}
+      <div className="px-4 py-5 border-b border-[#27272A]">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl gradient-accent flex items-center justify-center shadow-lg shadow-purple-500/20 animate-pulse-glow">
+            <span className="text-white font-black text-xs">H</span>
+          </div>
+          <div>
+            <div className="font-black text-sm tracking-wider text-[#F0F0F3]">HIGHPLANS</div>
+            <div className="text-[9px] text-[#52525B] tracking-widest uppercase">Commercial OS</div>
           </div>
         </div>
-        
-        <nav className="flex-1 overflow-y-auto py-3 px-2">
-          {nav.map((item, i) => {
-            if ('section' in item) {
-              return (
-                <div key={i} className="text-[9px] text-[#4A4A5A] uppercase tracking-widest font-bold px-3 pt-4 pb-1.5">
-                  {item.section}
-                </div>
-              )
-            }
-            const { href, label, icon: Icon, badge } = item as any
-            const active = pathname === href || pathname.startsWith(href + '/')
-            return (
-              <Link key={href} href={href}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg mb-0.5 text-sm transition-all duration-150 group ${
-                  active 
-                    ? 'bg-[rgba(255,106,0,0.12)] text-[#FF6A00] font-semibold' 
-                    : 'text-[#6B6B7B] hover:bg-[#1A1A1F] hover:text-[#F5F5F7]'
-                }`}>
-                <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-[#FF6A00]' : ''}`} />
-                <span className="flex-1">{label}</span>
-                {badge && !active && (
-                  <span className="text-[8px] bg-[#FF6A00] text-white px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide">
-                    {badge}
-                  </span>
-                )}
-              </Link>
-            )
-          })}
-        </nav>
+      </div>
 
-        <div className="px-4 py-3 border-t border-[#2A2A32]">
-          <div className="text-[10px] text-[#4A4A5A]">v1.1.0 · HIGHPLANS OS</div>
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto py-3 px-2">
+        {nav.map((item, i) => {
+          if ('section' in item) {
+            return (
+              <div key={i} className="text-[9px] text-[#52525B] uppercase tracking-widest font-bold px-3 pt-5 pb-1.5">
+                {item.section}
+              </div>
+            )
+          }
+          const { href, label, icon: Icon } = item as any
+          const active = pathname === href || pathname.startsWith(href + '/')
+          return (
+            <Link key={href} href={href}
+              onClick={() => setMobileOpen(false)}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg mb-0.5 text-sm transition-all duration-150 ${
+                active
+                  ? 'bg-[rgba(139,92,246,0.12)] text-[#A78BFA] font-semibold'
+                  : 'text-[#71717A] hover:bg-[#18181B] hover:text-[#F0F0F3]'
+              }`}>
+              <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-[#8B5CF6]' : ''}`} />
+              <span className="flex-1">{label}</span>
+            </Link>
+          )
+        })}
+      </nav>
+
+      {/* User + Logout */}
+      <div className="px-3 py-3 border-t border-[#27272A] space-y-2">
+        {session?.user && (
+          <div className="flex items-center gap-2 px-1">
+            <div className="w-7 h-7 rounded-lg bg-[rgba(139,92,246,0.15)] flex items-center justify-center flex-shrink-0">
+              <span className="text-xs font-bold text-[#A78BFA]">
+                {session.user.name?.charAt(0)?.toUpperCase() || '?'}
+              </span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium text-[#F0F0F3] truncate">{session.user.name}</div>
+              <div className="text-[9px] text-[#52525B] truncate">{session.user.email}</div>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs text-[#71717A] hover:bg-[#18181B] hover:text-red-400 transition-colors"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          Sair
+        </button>
+        <div className="text-[10px] text-[#3F3F46] px-1">v2.0.0 · HIGHPLANS OS</div>
+      </div>
+    </>
+  )
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-[#09090B]">
+      {/* Mobile header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-[#0F0F12]/95 backdrop-blur-md border-b border-[#27272A] flex items-center justify-between px-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg gradient-accent flex items-center justify-center">
+            <span className="text-white font-black text-[10px]">H</span>
+          </div>
+          <span className="font-black text-sm tracking-wider text-[#F0F0F3]">HIGHPLANS</span>
         </div>
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="w-10 h-10 rounded-xl bg-[#18181B] border border-[#27272A] flex items-center justify-center text-[#A1A1AA] hover:text-[#F0F0F3] transition-colors"
+        >
+          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+      </div>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-[#0F0F12] border-r border-[#27272A] flex flex-col animate-slide-in overflow-y-auto">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex w-56 flex-shrink-0 bg-[#0F0F12] border-r border-[#27272A] flex-col">
+        {sidebarContent}
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto bg-[#0B0B0D]">
+      <main className="flex-1 overflow-y-auto bg-[#09090B] pt-14 md:pt-0">
         <ToastProvider>
           {children}
         </ToastProvider>

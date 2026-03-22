@@ -94,7 +94,7 @@ interface ImportState {
   preview: Array<{ nome: string; telefone: string; site: string; cidade: string; email: string }>
   nicho: string
   origem: string
-  result: { imported: number; skipped: number; errors: string[] } | null
+  result: { created: number; updated: number; skipped: number; errors: string[] } | null
 }
 
 export default function LeadsPage() {
@@ -184,21 +184,21 @@ const load = useCallback(() => {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-black text-[#F5F5F7]">Leads CRM</h1>
-          <p className="text-sm text-[#6B6B7B]">{leads.length} leads · {leads.filter(l => l.score === 'HOT').length} HOT</p>
+          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Leads CRM</h1>
+          <p className="text-sm text-[#71717A]">{leads.length} leads · {leads.filter(l => l.score === 'HOT').length} HOT</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-2 bg-[#1A1A1F] hover:bg-[#2A2A32] border border-[#2A2A32] hover:border-[#FF6A00]/50 text-[#F5F5F7] px-4 py-2 rounded-lg text-sm font-medium transition-all">
-            <Upload className="w-4 h-4 text-[#FF6A00]" /> Importar CSV
+            className="flex items-center gap-2 bg-[#16161A] hover:bg-[#27272A] border border-[#27272A] hover:border-[#8B5CF6]/50 text-[#F0F0F3] px-3 md:px-4 py-2.5 rounded-xl text-sm font-medium transition-all">
+            <Upload className="w-4 h-4 text-[#8B5CF6]" /> <span className="hidden sm:inline">Importar</span> CSV
           </button>
           <button onClick={() => setShowNew(true)}
-            className="flex items-center gap-2 bg-[#FF6A00] hover:bg-[#FF7F1A] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            <Plus className="w-4 h-4" /> Novo Lead
+            className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-3 md:px-4 py-2.5 rounded-xl text-sm font-medium transition-colors">
+            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo</span> Lead
           </button>
         </div>
         <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden"
@@ -212,22 +212,22 @@ const load = useCallback(() => {
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
           onClick={() => fileRef.current?.click()}
-          className={`mb-6 border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all ${dragOver ? 'border-[#FF6A00] bg-[rgba(255,106,0,0.05)]' : 'border-[#2A2A32] hover:border-[#FF6A00]/50 hover:bg-[#111114]'}`}>
-          <Upload className="w-10 h-10 text-[#FF6A00]/60 mx-auto mb-3" />
-          <div className="text-base font-semibold text-[#F5F5F7] mb-1">Arraste o seu CSV aqui</div>
-          <div className="text-sm text-[#6B6B7B] max-w-sm mx-auto">ou clique para selecionar · suporta qualquer CSV com colunas Nome, Telefone, Site e Cidade</div>
+          className={`mb-6 border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all ${dragOver ? 'border-[#8B5CF6] bg-[rgba(139,92,246,0.05)]' : 'border-[#27272A] hover:border-[#8B5CF6]/50 hover:bg-[#0F0F12]'}`}>
+          <Upload className="w-10 h-10 text-[#8B5CF6]/60 mx-auto mb-3" />
+          <div className="text-base font-semibold text-[#F0F0F3] mb-1">Arraste o seu CSV aqui</div>
+          <div className="text-sm text-[#71717A] max-w-sm mx-auto">ou clique para selecionar · suporta qualquer CSV com colunas Nome, Telefone, Site e Cidade</div>
         </div>
       )}
 
       {/* Filters */}
-      <div className="flex gap-3 mb-5">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B6B7B]" />
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#71717A]" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar leads..."
-            className="w-full bg-[#111114] border border-[#2A2A32] rounded-lg pl-9 pr-4 py-2 text-sm text-[#F5F5F7] placeholder-[#6B6B7B] focus:outline-none focus:border-[#FF6A00]" />
+            className="w-full bg-[#0F0F12] border border-[#27272A] rounded-lg pl-9 pr-4 py-2 text-sm text-[#F0F0F3] placeholder-[#71717A] focus:outline-none focus:border-[#8B5CF6]" />
         </div>
         <select value={scoreFilter} onChange={e => setScoreFilter(e.target.value)}
-          className="bg-[#111114] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]">
+          className="bg-[#0F0F12] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]">
           <option value="">Todos os scores</option>
           <option value="HOT">HOT</option>
           <option value="WARM">WARM</option>
@@ -236,12 +236,12 @@ const load = useCallback(() => {
       </div>
 
       {/* Table */}
-      <div className="bg-[#111114] border border-[#2A2A32] rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl overflow-x-auto">
+        <table className="w-full text-sm min-w-[700px]">
           <thead>
-            <tr className="border-b border-[#2A2A32]">
+            <tr className="border-b border-[#27272A]">
               {['Lead', 'Nicho / Cidade', 'Score', 'Oportunidade', 'Pipeline', 'Plano', ''].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-[10px] text-[#6B6B7B] uppercase tracking-wider font-medium">{h}</th>
+                <th key={h} className="text-left px-4 py-3 text-[10px] text-[#71717A] uppercase tracking-wider font-medium">{h}</th>
               ))}
             </tr>
           </thead>
@@ -249,14 +249,14 @@ const load = useCallback(() => {
             {leads.map(lead => {
               const ss = SCORE_STYLES[lead.score] || SCORE_STYLES.COLD
               return (
-                <tr key={lead.id} className="border-b border-[#1A1A1F] hover:bg-[#1A1A1F]/50 transition-colors">
+                <tr key={lead.id} className="border-b border-[#16161A] hover:bg-[#16161A]/50 transition-colors">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-[#F5F5F7]">{lead.nome}</div>
-                    {lead.empresa && lead.empresa !== lead.nome && <div className="text-xs text-[#6B6B7B]">{lead.empresa}</div>}
+                    <div className="font-medium text-[#F0F0F3]">{lead.nome}</div>
+                    {lead.empresa && lead.empresa !== lead.nome && <div className="text-xs text-[#71717A]">{lead.empresa}</div>}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="text-[#F5F5F7]">{lead.nicho || '—'}</div>
-                    <div className="text-xs text-[#6B6B7B]">{lead.cidade || '—'}</div>
+                    <div className="text-[#F0F0F3]">{lead.nicho || '—'}</div>
+                    <div className="text-xs text-[#71717A]">{lead.cidade || '—'}</div>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${ss.bg} ${ss.text} ${ss.border}`}>
@@ -265,33 +265,33 @@ const load = useCallback(() => {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-20 h-1.5 bg-[#2A2A32] rounded-full overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(lead.opportunityScore, 100)}%`, background: lead.opportunityScore >= 60 ? '#FF6A00' : lead.opportunityScore >= 30 ? '#F59E0B' : '#6B6B7B' }} />
+                      <div className="w-20 h-1.5 bg-[#27272A] rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(lead.opportunityScore, 100)}%`, background: lead.opportunityScore >= 60 ? '#8B5CF6' : lead.opportunityScore >= 30 ? '#F59E0B' : '#71717A' }} />
                       </div>
-                      <span className="text-xs text-[#6B6B7B]">{lead.opportunityScore}pts</span>
+                      <span className="text-xs text-[#71717A]">{lead.opportunityScore}pts</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs text-[#6B6B7B]">{PIPELINE_STATUS[lead.pipelineStatus] || lead.pipelineStatus}</span>
+                    <span className="text-xs text-[#71717A]">{PIPELINE_STATUS[lead.pipelineStatus] || lead.pipelineStatus}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="text-xs text-[#F5F5F7]">{lead.planoAtual || <span className="text-[#6B6B7B]">—</span>}</div>
-                    {lead.planoAlvoUpgrade && <div className="text-[10px] text-[#FF6A00]">→ {lead.planoAlvoUpgrade}</div>}
+                    <div className="text-xs text-[#F0F0F3]">{lead.planoAtual || <span className="text-[#71717A]">—</span>}</div>
+                    {lead.planoAlvoUpgrade && <div className="text-[10px] text-[#8B5CF6]">→ {lead.planoAlvoUpgrade}</div>}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       {lead.whatsapp && (
                         <a href={`https://wa.me/${lead.whatsapp.replace(/\D/g, '')}`} target="_blank"
-                          className="text-[#6B6B7B] hover:text-green-400 transition-colors">
+                          className="text-[#71717A] hover:text-green-400 transition-colors">
                           <Phone className="w-3.5 h-3.5" />
                         </a>
                       )}
                       {lead.email && (
-                        <a href={`mailto:${lead.email}`} className="text-[#6B6B7B] hover:text-[#FF6A00] transition-colors">
+                        <a href={`mailto:${lead.email}`} className="text-[#71717A] hover:text-[#8B5CF6] transition-colors">
                           <Mail className="w-3.5 h-3.5" />
                         </a>
                       )}
-                      <Link href={`/leads/${lead.id}`} className="text-[#6B6B7B] hover:text-[#FF6A00] transition-colors">
+                      <Link href={`/leads/${lead.id}`} className="text-[#71717A] hover:text-[#8B5CF6] transition-colors">
                         <ExternalLink className="w-3.5 h-3.5" />
                       </Link>
                     </div>
@@ -300,7 +300,7 @@ const load = useCallback(() => {
               )
             })}
             {leads.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-12 text-[#6B6B7B]">Nenhum lead encontrado</td></tr>
+              <tr><td colSpan={7} className="text-center py-12 text-[#71717A]">Nenhum lead encontrado</td></tr>
             )}
           </tbody>
         </table>
@@ -311,21 +311,21 @@ const load = useCallback(() => {
         <div
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
           onClick={e => { if (e.target === e.currentTarget && imp.step !== 'importing') closeImport() }}>
-          <div className="bg-[#111114] border border-[#2A2A32] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
 
             {/* Modal header */}
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#2A2A32]">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#27272A]">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[rgba(255,106,0,0.15)] flex items-center justify-center">
-                  <Upload className="w-4 h-4 text-[#FF6A00]" />
+                <div className="w-8 h-8 rounded-lg bg-[rgba(139,92,246,0.15)] flex items-center justify-center">
+                  <Upload className="w-4 h-4 text-[#8B5CF6]" />
                 </div>
                 <div>
-                  <h2 className="font-bold text-[#F5F5F7]">Importar Leads via CSV</h2>
-                  <p className="text-xs text-[#6B6B7B]">{imp.file?.name} · {imp.rawRows.length} linhas detectadas</p>
+                  <h2 className="font-bold text-[#F0F0F3]">Importar Leads via CSV</h2>
+                  <p className="text-xs text-[#71717A]">{imp.file?.name} · {imp.rawRows.length} linhas detectadas</p>
                 </div>
               </div>
               {imp.step !== 'importing' && (
-                <button onClick={closeImport} className="text-[#6B6B7B] hover:text-[#F5F5F7]"><X className="w-5 h-5" /></button>
+                <button onClick={closeImport} className="text-[#71717A] hover:text-[#F0F0F3]"><X className="w-5 h-5" /></button>
               )}
             </div>
 
@@ -337,25 +337,25 @@ const load = useCallback(() => {
                   {/* Preview table */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-[#6B6B7B] uppercase tracking-wider">Pré-visualização (5 primeiras linhas)</span>
-                      <span className="text-xs text-[#FF6A00] font-bold">{imp.rawRows.length} leads para importar</span>
+                      <span className="text-xs font-semibold text-[#71717A] uppercase tracking-wider">Pré-visualização (5 primeiras linhas)</span>
+                      <span className="text-xs text-[#8B5CF6] font-bold">{imp.rawRows.length} leads para importar</span>
                     </div>
-                    <div className="bg-[#0B0B0D] rounded-xl border border-[#2A2A32] overflow-hidden">
+                    <div className="bg-[#09090B] rounded-xl border border-[#27272A] overflow-hidden">
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="border-b border-[#2A2A32]">
+                          <tr className="border-b border-[#27272A]">
                             {['Nome detectado', 'Telefone', 'Site / Social', 'Cidade'].map(h => (
-                              <th key={h} className="text-left px-3 py-2 text-[#6B6B7B] font-medium">{h}</th>
+                              <th key={h} className="text-left px-3 py-2 text-[#71717A] font-medium">{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {imp.preview.map((row, i) => (
-                            <tr key={i} className="border-b border-[#1A1A1F] last:border-0">
-                              <td className="px-3 py-2 text-[#F5F5F7] max-w-[180px] truncate">{row.nome || <span className="text-red-400">—</span>}</td>
-                              <td className="px-3 py-2 text-[#9CA3AF]">{row.telefone || '—'}</td>
-                              <td className="px-3 py-2 text-[#9CA3AF] max-w-[150px] truncate">{row.site || '—'}</td>
-                              <td className="px-3 py-2 text-[#9CA3AF]">{row.cidade || '—'}</td>
+                            <tr key={i} className="border-b border-[#16161A] last:border-0">
+                              <td className="px-3 py-2 text-[#F0F0F3] max-w-[180px] truncate">{row.nome || <span className="text-red-400">—</span>}</td>
+                              <td className="px-3 py-2 text-[#A1A1AA]">{row.telefone || '—'}</td>
+                              <td className="px-3 py-2 text-[#A1A1AA] max-w-[150px] truncate">{row.site || '—'}</td>
+                              <td className="px-3 py-2 text-[#A1A1AA]">{row.cidade || '—'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -364,8 +364,8 @@ const load = useCallback(() => {
                   </div>
 
                   {/* Score preview */}
-                  <div className="bg-[#0B0B0D] border border-[#2A2A32] rounded-xl p-4">
-                    <div className="text-xs font-semibold text-[#6B6B7B] uppercase tracking-wider mb-3">Score Automático Estimado</div>
+                  <div className="bg-[#09090B] border border-[#27272A] rounded-xl p-4">
+                    <div className="text-xs font-semibold text-[#71717A] uppercase tracking-wider mb-3">Score Automático Estimado</div>
                     <div className="grid grid-cols-3 gap-3 text-center text-sm mb-2">
                       {(() => {
                         let hot = 0, warm = 0, cold = 0
@@ -397,26 +397,26 @@ const load = useCallback(() => {
                         )
                       })()}
                     </div>
-                    <p className="text-[10px] text-[#4A4A5A] text-center">Baseado em: site, anúncios, Instagram, GMB · Ajustável individualmente após importação</p>
+                    <p className="text-[10px] text-[#52525B] text-center">Baseado em: site, anúncios, Instagram, GMB · Ajustável individualmente após importação</p>
                   </div>
 
                   {/* Config options */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs text-[#6B6B7B] mb-1.5 block">Nicho (forçar para todos)</label>
+                      <label className="text-xs text-[#71717A] mb-1.5 block">Nicho (forçar para todos)</label>
                       <div className="relative">
                         <select value={imp.nicho} onChange={e => setImp(p => ({ ...p, nicho: e.target.value }))}
-                          className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00] appearance-none">
+                          className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] appearance-none">
                           <option value="">Auto-detectar por nome</option>
                           {NICHOS.map(n => <option key={n} value={n}>{n}</option>)}
                         </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B6B7B] pointer-events-none" />
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#71717A] pointer-events-none" />
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs text-[#6B6B7B] mb-1.5 block">Origem dos Leads</label>
+                      <label className="text-xs text-[#71717A] mb-1.5 block">Origem dos Leads</label>
                       <input value={imp.origem} onChange={e => setImp(p => ({ ...p, origem: e.target.value }))}
-                        className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]"
+                        className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]"
                         placeholder="ex: Google Maps, Prospeção..." />
                     </div>
                   </div>
@@ -424,11 +424,11 @@ const load = useCallback(() => {
                   {/* Actions */}
                   <div className="flex gap-3 pt-1">
                     <button onClick={closeImport}
-                      className="flex-1 py-2.5 rounded-lg border border-[#2A2A32] text-sm text-[#6B6B7B] hover:border-[#6B6B7B]">
+                      className="flex-1 py-2.5 rounded-lg border border-[#27272A] text-sm text-[#71717A] hover:border-[#71717A]">
                       Cancelar
                     </button>
                     <button onClick={handleImport}
-                      className="flex-1 py-2.5 rounded-lg bg-[#FF6A00] hover:bg-[#FF7F1A] text-white text-sm font-bold flex items-center justify-center gap-2">
+                      className="flex-1 py-2.5 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-bold flex items-center justify-center gap-2">
                       <Upload className="w-4 h-4" />
                       Importar {imp.rawRows.length} Leads
                     </button>
@@ -439,9 +439,9 @@ const load = useCallback(() => {
               {/* IMPORTING */}
               {imp.step === 'importing' && (
                 <div className="py-12 text-center">
-                  <Loader2 className="w-12 h-12 text-[#FF6A00] mx-auto mb-4 animate-spin" />
-                  <div className="text-lg font-bold text-[#F5F5F7] mb-1">A importar {imp.rawRows.length} leads...</div>
-                  <div className="text-sm text-[#6B6B7B]">A calcular scores e organizar dados automaticamente</div>
+                  <Loader2 className="w-12 h-12 text-[#8B5CF6] mx-auto mb-4 animate-spin" />
+                  <div className="text-lg font-bold text-[#F0F0F3] mb-1">A importar {imp.rawRows.length} leads...</div>
+                  <div className="text-sm text-[#71717A]">A detectar duplicados, calcular scores e organizar dados</div>
                 </div>
               )}
 
@@ -454,14 +454,18 @@ const load = useCallback(() => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 mb-5">
-                    <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-5 text-center">
-                      <div className="text-4xl font-black text-green-400 mb-1">{imp.result.imported}</div>
-                      <div className="text-xs text-green-400 font-semibold uppercase tracking-wider">Leads Importados</div>
+                  <div className="grid grid-cols-3 gap-3 mb-5">
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 text-center">
+                      <div className="text-3xl font-black text-green-400 mb-1">{imp.result.created}</div>
+                      <div className="text-[10px] text-green-400 font-semibold uppercase tracking-wider">Novos Criados</div>
                     </div>
-                    <div className="bg-[#1A1A1F] border border-[#2A2A32] rounded-xl p-5 text-center">
-                      <div className="text-4xl font-black text-[#6B6B7B] mb-1">{imp.result.skipped}</div>
-                      <div className="text-xs text-[#6B6B7B] font-semibold uppercase tracking-wider">Ignorados</div>
+                    <div className="bg-[rgba(139,92,246,0.1)] border border-[rgba(139,92,246,0.2)] rounded-xl p-4 text-center">
+                      <div className="text-3xl font-black text-[#8B5CF6] mb-1">{imp.result.updated}</div>
+                      <div className="text-[10px] text-[#8B5CF6] font-semibold uppercase tracking-wider">Atualizados</div>
+                    </div>
+                    <div className="bg-[#16161A] border border-[#27272A] rounded-xl p-4 text-center">
+                      <div className="text-3xl font-black text-[#71717A] mb-1">{imp.result.skipped}</div>
+                      <div className="text-[10px] text-[#71717A] font-semibold uppercase tracking-wider">Ignorados</div>
                     </div>
                   </div>
 
@@ -477,13 +481,13 @@ const load = useCallback(() => {
                     </div>
                   )}
 
-                  <div className="bg-[rgba(255,106,0,0.05)] border border-[rgba(255,106,0,0.15)] rounded-xl p-4 mb-5">
-                    <span className="text-[#FF6A00] font-semibold text-sm">Próximo passo:</span>
-                    <span className="text-sm text-[#F5F5F7] ml-1">Filtra por HOT e começa a contactar as melhores oportunidades.</span>
+                  <div className="bg-[rgba(139,92,246,0.05)] border border-[rgba(139,92,246,0.15)] rounded-xl p-4 mb-5">
+                    <span className="text-[#8B5CF6] font-semibold text-sm">Próximo passo:</span>
+                    <span className="text-sm text-[#F0F0F3] ml-1">Filtra por HOT e começa a contactar as melhores oportunidades.</span>
                   </div>
 
                   <button onClick={closeImport}
-                    className="w-full py-3 rounded-lg bg-[#FF6A00] hover:bg-[#FF7F1A] text-white font-bold transition-colors">
+                    className="w-full py-3 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white font-bold transition-colors">
                     Ver Leads Importados
                   </button>
                 </div>
@@ -497,8 +501,8 @@ const load = useCallback(() => {
       {showNew && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
           onClick={e => e.target === e.currentTarget && setShowNew(false)}>
-          <div className="bg-[#111114] border border-[#2A2A32] rounded-2xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
-            <h2 className="font-bold text-lg text-[#F5F5F7] mb-5">Novo Lead</h2>
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
+            <h2 className="font-bold text-lg text-[#F0F0F3] mb-5">Novo Lead</h2>
             <div className="grid grid-cols-2 gap-3">
               {[
                 { key: 'nome', label: 'Nome *', full: true },
@@ -511,14 +515,14 @@ const load = useCallback(() => {
                 { key: 'origem', label: 'Origem' },
               ].map(({ key, label, full }) => (
                 <div key={key} className={full ? 'col-span-2' : ''}>
-                  <label className="text-xs text-[#6B6B7B] mb-1 block">{label}</label>
+                  <label className="text-xs text-[#71717A] mb-1 block">{label}</label>
                   <input value={form[key] || ''} onChange={e => setForm({ ...form, [key]: e.target.value })}
-                    className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]" />
+                    className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]" />
                 </div>
               ))}
             </div>
             <div className="mt-4">
-              <div className="text-xs text-[#6B6B7B] mb-2">Diagnóstico Digital</div>
+              <div className="text-xs text-[#71717A] mb-2">Diagnóstico Digital</div>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { key: 'temSite', label: 'Tem site' },
@@ -529,20 +533,20 @@ const load = useCallback(() => {
                 ].map(({ key, label }) => (
                   <label key={key} className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={form[key] || false} onChange={e => setForm({ ...form, [key]: e.target.checked })}
-                      className="accent-[#FF6A00] w-3.5 h-3.5" />
-                    <span className="text-sm text-[#F5F5F7]">{label}</span>
+                      className="accent-[#8B5CF6] w-3.5 h-3.5" />
+                    <span className="text-sm text-[#F0F0F3]">{label}</span>
                   </label>
                 ))}
               </div>
             </div>
             <div className="mt-4">
-              <label className="text-xs text-[#6B6B7B] mb-1 block">Observações</label>
+              <label className="text-xs text-[#71717A] mb-1 block">Observações</label>
               <textarea value={form.observacaoPerfil || ''} onChange={e => setForm({ ...form, observacaoPerfil: e.target.value })}
-                rows={2} className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00] resize-none" />
+                rows={2} className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] resize-none" />
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setShowNew(false)} className="flex-1 py-2 rounded-lg border border-[#2A2A32] text-sm text-[#6B6B7B] hover:border-[#6B6B7B]">Cancelar</button>
-              <button onClick={handleCreate} disabled={!form.nome} className="flex-1 py-2 rounded-lg bg-[#FF6A00] hover:bg-[#FF7F1A] text-white text-sm font-medium disabled:opacity-40">Criar Lead</button>
+              <button onClick={() => setShowNew(false)} className="flex-1 py-2 rounded-lg border border-[#27272A] text-sm text-[#71717A] hover:border-[#71717A]">Cancelar</button>
+              <button onClick={handleCreate} disabled={!form.nome} className="flex-1 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium disabled:opacity-40">Criar Lead</button>
             </div>
           </div>
         </div>

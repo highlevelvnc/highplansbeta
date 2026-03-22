@@ -5,11 +5,11 @@ import Link from 'next/link'
 import { useToast } from '@/components/Toast'
 
 const STAGES = [
-  { id: 'NEW', label: 'Novos', color: '#6B6B7B' },
+  { id: 'NEW', label: 'Novos', color: '#71717A' },
   { id: 'CONTACTED', label: 'Contactados', color: '#3B82F6' },
   { id: 'INTERESTED', label: 'Interessados', color: '#8B5CF6' },
   { id: 'PROPOSAL_SENT', label: 'Proposta', color: '#F59E0B' },
-  { id: 'NEGOTIATION', label: 'Negociação', color: '#FF6A00' },
+  { id: 'NEGOTIATION', label: 'Negociação', color: '#A78BFA' },
   { id: 'CLOSED', label: 'Fechados', color: '#10B981' },
   { id: 'LOST', label: 'Perdidos', color: '#EF4444' },
 ]
@@ -204,20 +204,20 @@ export default function PipelinePage() {
   }
 
   if (loading) return (
-    <div className="p-6 h-full flex flex-col">
+    <div className="p-4 md:p-6 h-full flex flex-col">
       <div className="mb-5">
-        <div className="h-7 w-44 bg-[#2A2A32] rounded animate-pulse mb-1" />
-        <div className="h-4 w-64 bg-[#1A1A1F] rounded animate-pulse" />
+        <div className="h-7 w-44 bg-[#27272A] rounded animate-pulse mb-1" />
+        <div className="h-4 w-64 bg-[#16161A] rounded animate-pulse" />
       </div>
       <div className="flex gap-3 flex-1">
         {STAGES.map(s => (
           <div key={s.id} className="flex-shrink-0 w-60">
-            <div className="h-4 w-24 bg-[#2A2A32] rounded animate-pulse mb-2.5" />
-            <div className="min-h-[200px] rounded-xl bg-[#111114] border border-[#2A2A32] p-2 space-y-2">
+            <div className="h-4 w-24 bg-[#27272A] rounded animate-pulse mb-2.5" />
+            <div className="min-h-[200px] rounded-xl bg-[#0F0F12] border border-[#27272A] p-2 space-y-2">
               {Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="bg-[#1A1A1F] rounded-xl p-3 animate-pulse">
-                  <div className="h-3 w-24 bg-[#2A2A32] rounded mb-2" />
-                  <div className="h-2 w-16 bg-[#2A2A32] rounded" />
+                <div key={i} className="bg-[#16161A] rounded-xl p-3 animate-pulse">
+                  <div className="h-3 w-24 bg-[#27272A] rounded mb-2" />
+                  <div className="h-2 w-16 bg-[#27272A] rounded" />
                 </div>
               ))}
             </div>
@@ -228,15 +228,15 @@ export default function PipelinePage() {
   )
 
   if (error) return (
-    <div className="p-6 h-full flex flex-col">
+    <div className="p-4 md:p-6 h-full flex flex-col">
       <div className="mb-5">
-        <h1 className="text-2xl font-black text-[#F5F5F7]">Pipeline Kanban</h1>
+        <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Pipeline Kanban</h1>
       </div>
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-3" />
         <p className="text-red-300 text-sm mb-1">Erro ao carregar pipeline</p>
-        <p className="text-[#6B6B7B] text-xs mb-4">{error}</p>
-        <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#FF6A00] hover:bg-[#FF7F1A] text-white text-sm font-medium transition-colors">
+        <p className="text-[#71717A] text-xs mb-4">{error}</p>
+        <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors">
           <RefreshCw className="w-4 h-4" /> Tentar novamente
         </button>
       </div>
@@ -244,15 +244,15 @@ export default function PipelinePage() {
   )
 
   return (
-    <div className="p-6 h-full flex flex-col">
-      <div className="mb-5 flex items-center justify-between">
+    <div className="p-4 md:p-6 h-full flex flex-col">
+      <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-[#F5F5F7]">Pipeline Kanban</h1>
-          <p className="text-sm text-[#6B6B7B]">Arraste para mover · clique nos ícones para contactar</p>
+          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Pipeline Kanban</h1>
+          <p className="text-sm text-[#71717A] hidden sm:block">Arraste para mover · clique nos ícones para contactar</p>
         </div>
-        <div className="flex gap-4 text-xs text-[#6B6B7B]">
+        <div className="flex gap-3 text-xs text-[#71717A] overflow-x-auto">
           {STAGES.map(s => (
-            <div key={s.id} className="flex items-center gap-1.5">
+            <div key={s.id} className="flex items-center gap-1.5 flex-shrink-0">
               <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
               <span>{leads.filter(l => l.pipelineStatus === s.id).length}</span>
             </div>
@@ -260,13 +260,13 @@ export default function PipelinePage() {
         </div>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-4 flex-1">
+      <div className="flex gap-3 overflow-x-auto pb-4 flex-1 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory md:snap-none">
         {STAGES.map(stage => {
           const stageLeads = leads.filter(l => l.pipelineStatus === stage.id)
           const isOver = dragOver === stage.id
           return (
             <div key={stage.id}
-              className="flex-shrink-0 w-60"
+              className="flex-shrink-0 w-[75vw] sm:w-60 snap-start"
               onDragOver={e => { e.preventDefault(); setDragOver(stage.id) }}
               onDragLeave={() => setDragOver(null)}
               onDrop={() => onDrop(stage.id)}>
@@ -274,16 +274,16 @@ export default function PipelinePage() {
               <div className="flex items-center justify-between mb-2.5 px-1">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full" style={{ background: stage.color }} />
-                  <span className="text-xs font-bold text-[#F5F5F7]">{stage.label}</span>
+                  <span className="text-xs font-bold text-[#F0F0F3]">{stage.label}</span>
                 </div>
-                <span className="text-xs text-[#6B6B7B] bg-[#1A1A1F] px-2 py-0.5 rounded-full font-medium">{stageLeads.length}</span>
+                <span className="text-xs text-[#71717A] bg-[#16161A] px-2 py-0.5 rounded-full font-medium">{stageLeads.length}</span>
               </div>
 
               <div
                 className="min-h-[200px] rounded-xl p-2 space-y-2 transition-all duration-150"
                 style={{
-                  background: isOver ? `${stage.color}08` : '#111114',
-                  border: `1px solid ${isOver ? stage.color + '50' : '#2A2A32'}`,
+                  background: isOver ? `${stage.color}08` : '#0F0F12',
+                  border: `1px solid ${isOver ? stage.color + '50' : '#27272A'}`,
                 }}>
                 {stageLeads.map(lead => {
                   const ss = SCORE_STYLES[lead.score] || SCORE_STYLES.COLD
@@ -294,16 +294,16 @@ export default function PipelinePage() {
                       draggable
                       onDragStart={() => setDragging(lead.id)}
                       onDragEnd={() => { setDragging(null); setDragOver(null) }}
-                      className={`bg-[#1A1A1F] border rounded-xl p-3 cursor-grab active:cursor-grabbing transition-all select-none ${
-                        dragging === lead.id ? 'opacity-30 scale-95' : 'hover:border-[#FF6A00]/40'
+                      className={`bg-[#16161A] border rounded-xl p-3 cursor-grab active:cursor-grabbing transition-all select-none ${
+                        dragging === lead.id ? 'opacity-30 scale-95' : 'hover:border-[#8B5CF6]/40'
                       }`}
-                      style={{ borderColor: dragging === lead.id ? stage.color : '#2A2A32' }}>
+                      style={{ borderColor: dragging === lead.id ? stage.color : '#27272A' }}>
 
                       {/* Lead info */}
                       <div className="flex items-start justify-between gap-1 mb-2">
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-semibold text-[#F5F5F7] leading-snug truncate">{lead.nome}</div>
-                          {lead.cidade && <div className="text-[10px] text-[#6B6B7B]">{lead.cidade}</div>}
+                          <div className="text-xs font-semibold text-[#F0F0F3] leading-snug truncate">{lead.nome}</div>
+                          {lead.cidade && <div className="text-[10px] text-[#71717A]">{lead.cidade}</div>}
                         </div>
                         <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0 ${ss.bg} ${ss.text}`}>
                           {lead.score}
@@ -311,40 +311,40 @@ export default function PipelinePage() {
                       </div>
 
                       {lead.nicho && (
-                        <div className="text-[10px] text-[#4A4A5A] mb-2.5 bg-[#0B0B0D] px-2 py-0.5 rounded-md inline-block">{lead.nicho}</div>
+                        <div className="text-[10px] text-[#52525B] mb-2.5 bg-[#09090B] px-2 py-0.5 rounded-md inline-block">{lead.nicho}</div>
                       )}
 
                       {/* Score bar */}
                       <div className="flex items-center gap-1.5 mb-2.5">
-                        <div className="flex-1 h-1 bg-[#2A2A32] rounded-full overflow-hidden">
+                        <div className="flex-1 h-1 bg-[#27272A] rounded-full overflow-hidden">
                           <div className="h-full rounded-full transition-all"
                             style={{ width: `${Math.min(lead.opportunityScore, 100)}%`, background: stage.color }} />
                         </div>
-                        <span className="text-[9px] text-[#4A4A5A] font-mono">{lead.opportunityScore}pt</span>
+                        <span className="text-[9px] text-[#52525B] font-mono">{lead.opportunityScore}pt</span>
                       </div>
 
                       {/* Action buttons */}
-                      <div className="flex items-center justify-between pt-1 border-t border-[#2A2A32]">
+                      <div className="flex items-center justify-between pt-1 border-t border-[#27272A]">
                         <div className="flex gap-1">
                           {/* WhatsApp */}
                           <button
                             onClick={e => { e.stopPropagation(); openContact(lead, 'whatsapp') }}
                             title="Enviar WhatsApp"
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${hasWA ? 'bg-green-500/10 hover:bg-green-500/20 text-green-400' : 'bg-[#2A2A32]/50 text-[#4A4A5A] cursor-not-allowed'}`}>
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${hasWA ? 'bg-green-500/10 hover:bg-green-500/20 text-green-400' : 'bg-[#27272A]/50 text-[#52525B] cursor-not-allowed'}`}>
                             <MessageCircle className="w-3.5 h-3.5" />
                           </button>
                           {/* Email */}
                           <button
                             onClick={e => { e.stopPropagation(); openContact(lead, 'email') }}
                             title="Enviar Email"
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${hasEmail ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400' : 'bg-[#2A2A32]/50 text-[#4A4A5A] cursor-not-allowed'}`}>
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${hasEmail ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400' : 'bg-[#27272A]/50 text-[#52525B] cursor-not-allowed'}`}>
                             <Mail className="w-3.5 h-3.5" />
                           </button>
                           {/* Call */}
                           <button
                             onClick={e => { e.stopPropagation(); callPhone(lead) }}
                             title="Ligar"
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${hasWA ? 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-400' : 'bg-[#2A2A32]/50 text-[#4A4A5A] cursor-not-allowed'}`}>
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${hasWA ? 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-400' : 'bg-[#27272A]/50 text-[#52525B] cursor-not-allowed'}`}>
                             <Phone className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -352,7 +352,7 @@ export default function PipelinePage() {
                         <Link href={`/leads/${lead.id}`}
                           onClick={e => e.stopPropagation()}
                           title="Abrir perfil"
-                          className="w-7 h-7 rounded-lg bg-[rgba(255,106,0,0.08)] hover:bg-[rgba(255,106,0,0.18)] text-[#FF6A00] flex items-center justify-center transition-all">
+                          className="w-7 h-7 rounded-lg bg-[rgba(139,92,246,0.08)] hover:bg-[rgba(139,92,246,0.18)] text-[#8B5CF6] flex items-center justify-center transition-all">
                           <ExternalLink className="w-3.5 h-3.5" />
                         </Link>
                       </div>
@@ -360,7 +360,7 @@ export default function PipelinePage() {
                   )
                 })}
                 {stageLeads.length === 0 && (
-                  <div className="text-[11px] text-[#2A2A32] text-center py-8 select-none">
+                  <div className="text-[11px] text-[#27272A] text-center py-8 select-none">
                     Arrastar para aqui
                   </div>
                 )}
@@ -374,9 +374,9 @@ export default function PipelinePage() {
       {contact && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
           onClick={e => { if (e.target === e.currentTarget) setContact(null) }}>
-          <div className="bg-[#111114] border border-[#2A2A32] rounded-2xl w-full max-w-xl shadow-2xl">
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl w-full max-w-xl shadow-2xl">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#2A2A32]">
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#27272A]">
               <div className="flex items-center gap-3">
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
                   contact.canal === 'whatsapp' ? 'bg-green-500/15' :
@@ -387,13 +387,13 @@ export default function PipelinePage() {
                    <Phone className="w-4.5 h-4.5 text-purple-400" />}
                 </div>
                 <div>
-                  <div className="font-bold text-[#F5F5F7] text-sm">
+                  <div className="font-bold text-[#F0F0F3] text-sm">
                     {contact.canal === 'whatsapp' ? 'Mensagem WhatsApp' : contact.canal === 'email' ? 'Enviar Email' : 'Ligar'}
                   </div>
-                  <div className="text-xs text-[#6B6B7B]">{contact.lead.nome} · {contact.lead.cidade}</div>
+                  <div className="text-xs text-[#71717A]">{contact.lead.nome} · {contact.lead.cidade}</div>
                 </div>
               </div>
-              <button onClick={() => setContact(null)} className="text-[#6B6B7B] hover:text-[#F5F5F7]">
+              <button onClick={() => setContact(null)} className="text-[#71717A] hover:text-[#F0F0F3]">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -401,14 +401,14 @@ export default function PipelinePage() {
             <div className="p-5 space-y-4">
               {/* Templates */}
               <div>
-                <div className="text-xs text-[#6B6B7B] mb-2 font-medium">Templates</div>
+                <div className="text-xs text-[#71717A] mb-2 font-medium">Templates</div>
                 <div className="flex flex-wrap gap-1.5">
                   {(contact.canal === 'email' ? EMAIL_TEMPLATES : WA_TEMPLATES).map((t, i) => (
                     <button key={i} onClick={() => applyTemplate(i)}
                       className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
                         selectedTemplate === i
-                          ? 'bg-[rgba(255,106,0,0.15)] border-[rgba(255,106,0,0.4)] text-[#FF6A00] font-medium'
-                          : 'border-[#2A2A32] text-[#6B6B7B] hover:border-[#4A4A5A] hover:text-[#F5F5F7]'
+                          ? 'bg-[rgba(139,92,246,0.15)] border-[rgba(139,92,246,0.4)] text-[#8B5CF6] font-medium'
+                          : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
                       }`}>
                       {t.label}
                     </button>
@@ -418,22 +418,22 @@ export default function PipelinePage() {
 
               {/* Message editor */}
               <div>
-                <div className="text-xs text-[#6B6B7B] mb-1.5 font-medium">Mensagem</div>
+                <div className="text-xs text-[#71717A] mb-1.5 font-medium">Mensagem</div>
                 <textarea
                   value={msgText}
                   onChange={e => setMsgText(e.target.value)}
                   rows={6}
-                  className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-xl px-4 py-3 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00] resize-none font-mono leading-relaxed" />
-                <div className="text-[10px] text-[#4A4A5A] mt-1">{msgText.length} caracteres</div>
+                  className="w-full bg-[#09090B] border border-[#27272A] rounded-xl px-4 py-3 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] resize-none font-mono leading-relaxed" />
+                <div className="text-[10px] text-[#52525B] mt-1">{msgText.length} caracteres</div>
               </div>
 
               {/* Contact info + Integration status */}
               {contact.canal === 'whatsapp' && (
-                <div className="bg-[#0B0B0D] rounded-xl px-4 py-3 flex items-center gap-3">
+                <div className="bg-[#09090B] rounded-xl px-4 py-3 flex items-center gap-3">
                   <MessageCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
                   <div className="flex-1">
-                    <div className="text-xs font-medium text-[#F5F5F7]">{(contact.lead.whatsapp || contact.lead.telefone || 'Sem número')}</div>
-                    <div className="text-[10px] text-[#6B6B7B]">
+                    <div className="text-xs font-medium text-[#F0F0F3]">{(contact.lead.whatsapp || contact.lead.telefone || 'Sem número')}</div>
+                    <div className="text-[10px] text-[#71717A]">
                       {integrationStatus?.whatsapp?.configured
                         ? 'Envio direto via Evolution API'
                         : 'Modo manual — vai abrir o WhatsApp Web'}
@@ -445,11 +445,11 @@ export default function PipelinePage() {
                 </div>
               )}
               {contact.canal === 'email' && (
-                <div className="bg-[#0B0B0D] rounded-xl px-4 py-3 flex items-center gap-3">
+                <div className="bg-[#09090B] rounded-xl px-4 py-3 flex items-center gap-3">
                   <Mail className="w-4 h-4 text-blue-400 flex-shrink-0" />
                   <div className="flex-1">
-                    <div className="text-xs font-medium text-[#F5F5F7]">{contact.lead.email || 'Email não disponível'}</div>
-                    <div className="text-[10px] text-[#6B6B7B]">
+                    <div className="text-xs font-medium text-[#F0F0F3]">{contact.lead.email || 'Email não disponível'}</div>
+                    <div className="text-[10px] text-[#71717A]">
                       {integrationStatus?.email?.configured
                         ? 'Envio direto via Resend'
                         : 'Modo manual — vai abrir o seu cliente de email'}
@@ -464,7 +464,7 @@ export default function PipelinePage() {
               {/* Actions */}
               <div className="flex gap-2 pt-1">
                 <button onClick={copyText}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#2A2A32] text-sm text-[#6B6B7B] hover:border-[#4A4A5A] hover:text-[#F5F5F7] transition-all">
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#27272A] text-sm text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3] transition-all">
                   {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                   {copied ? 'Copiado!' : 'Copiar'}
                 </button>

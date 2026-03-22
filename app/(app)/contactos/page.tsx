@@ -24,7 +24,7 @@ interface Template {
 const ALL_TEMPLATES: Template[] = [...DEFAULT_WA_TEMPLATES, ...DEFAULT_EMAIL_TEMPLATES]
 
 const CANAIS = [
-  { id: 'TODOS', label: 'Todos', icon: Filter, color: '#6B6B7B' },
+  { id: 'TODOS', label: 'Todos', icon: Filter, color: '#71717A' },
   { id: 'WHATSAPP', label: 'WhatsApp', icon: MessageCircle, color: '#25D366' },
   { id: 'EMAIL', label: 'Email', icon: Mail, color: '#3B82F6' },
 ]
@@ -213,15 +213,15 @@ export default function ContactosPage() {
   const SCORE_COLORS: Record<string, string> = { HOT: 'text-red-400', WARM: 'text-amber-400', COLD: 'text-gray-400' }
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-black text-[#F5F5F7]">Central de Contactos</h1>
-          <p className="text-sm text-[#6B6B7B]">Templates de mensagens · WhatsApp · Email · Envio em massa</p>
+          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Central de Contactos</h1>
+          <p className="text-sm text-[#71717A]">Templates de mensagens · WhatsApp · Email · Envio em massa</p>
         </div>
         <button onClick={() => setShowNewTemplate(true)}
-          className="flex items-center gap-2 bg-[#FF6A00] hover:bg-[#FF7F1A] text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
+          className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
           <Plus className="w-4 h-4" /> Novo Template
         </button>
       </div>
@@ -231,15 +231,15 @@ export default function ContactosPage() {
         {[
           { label: 'Templates WhatsApp', value: templates.filter(t => t.canal === 'WHATSAPP').length, color: '#25D366', icon: MessageCircle },
           { label: 'Templates Email', value: templates.filter(t => t.canal === 'EMAIL').length, color: '#3B82F6', icon: Mail },
-          { label: 'Leads com WhatsApp', value: leads.filter(l => l.whatsapp || l.telefone).length, color: '#FF6A00', icon: Users },
+          { label: 'Leads com WhatsApp', value: leads.filter(l => l.whatsapp || l.telefone).length, color: '#8B5CF6', icon: Users },
           { label: 'Leads com Email', value: leads.filter(l => l.email).length, color: '#8B5CF6', icon: Mail },
         ].map(({ label, value, color, icon: Icon }) => (
-          <div key={label} className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
+          <div key={label} className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <Icon className="w-4 h-4" style={{ color }} />
-              <span className="text-xs text-[#6B6B7B]">{label}</span>
+              <span className="text-xs text-[#71717A]">{label}</span>
             </div>
-            <div className="text-2xl font-black text-[#F5F5F7]">{value}</div>
+            <div className="text-xl md:text-2xl font-black text-[#F0F0F3]">{value}</div>
           </div>
         ))}
       </div>
@@ -249,7 +249,7 @@ export default function ContactosPage() {
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-5 flex items-center gap-3">
           <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
           <span className="text-sm text-red-300 flex-1">Erro ao carregar leads: {leadsError}</span>
-          <button onClick={loadLeads} className="text-xs text-[#FF6A00] hover:text-[#FF7F1A] font-medium flex items-center gap-1">
+          <button onClick={loadLeads} className="text-xs text-[#8B5CF6] hover:text-[#A78BFA] font-medium flex items-center gap-1">
             <RefreshCw className="w-3 h-3" /> Recarregar
           </button>
         </div>
@@ -257,19 +257,19 @@ export default function ContactosPage() {
 
       {/* Canal filter + search */}
       <div className="flex items-center gap-3 mb-5">
-        <div className="flex gap-1 bg-[#111114] border border-[#2A2A32] rounded-xl p-1">
+        <div className="flex gap-1 bg-[#0F0F12] border border-[#27272A] rounded-xl p-1">
           {CANAIS.map(({ id, label, icon: Icon, color }) => (
             <button key={id} onClick={() => setCanal(id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${canal === id ? 'bg-[#1A1A1F] text-[#F5F5F7] font-medium shadow-sm' : 'text-[#6B6B7B] hover:text-[#F5F5F7]'}`}>
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${canal === id ? 'bg-[#16161A] text-[#F0F0F3] font-medium shadow-sm' : 'text-[#71717A] hover:text-[#F0F0F3]'}`}>
               <Icon className="w-3.5 h-3.5" style={{ color: canal === id ? color : undefined }} />
               {label}
             </button>
           ))}
         </div>
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B6B7B]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#71717A]" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar templates..."
-            className="w-full bg-[#111114] border border-[#2A2A32] rounded-xl pl-9 pr-4 py-2 text-sm text-[#F5F5F7] placeholder-[#6B6B7B] focus:outline-none focus:border-[#FF6A00]" />
+            className="w-full bg-[#0F0F12] border border-[#27272A] rounded-xl pl-9 pr-4 py-2 text-sm text-[#F0F0F3] placeholder-[#71717A] focus:outline-none focus:border-[#8B5CF6]" />
         </div>
       </div>
 
@@ -279,7 +279,7 @@ export default function ContactosPage() {
           const isWA = template.canal === 'WHATSAPP'
           return (
             <div key={template.id}
-              className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4 hover:border-[rgba(255,106,0,0.3)] transition-all group flex flex-col">
+              className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 hover:border-[rgba(139,92,246,0.3)] transition-all group flex flex-col">
               {/* Template header */}
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -287,19 +287,19 @@ export default function ContactosPage() {
                     {isWA ? <MessageCircle className="w-3.5 h-3.5 text-green-400" /> : <Mail className="w-3.5 h-3.5 text-blue-400" />}
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-[#F5F5F7] leading-tight">{template.nome}</div>
-                    <div className="text-[10px] text-[#6B6B7B]">{template.categoria}</div>
+                    <div className="text-sm font-semibold text-[#F0F0F3] leading-tight">{template.nome}</div>
+                    <div className="text-[10px] text-[#71717A]">{template.categoria}</div>
                   </div>
                 </div>
               </div>
 
               {/* Preview */}
               {template.assunto && (
-                <div className="text-xs text-[#FF6A00] bg-[rgba(255,106,0,0.05)] border border-[rgba(255,106,0,0.1)] rounded-lg px-3 py-1.5 mb-2 truncate">
+                <div className="text-xs text-[#8B5CF6] bg-[rgba(139,92,246,0.05)] border border-[rgba(139,92,246,0.1)] rounded-lg px-3 py-1.5 mb-2 truncate">
                   📧 {template.assunto}
                 </div>
               )}
-              <div className="text-xs text-[#6B6B7B] leading-relaxed flex-1 line-clamp-4 font-mono bg-[#0B0B0D] rounded-lg p-3 mb-4 whitespace-pre-wrap">
+              <div className="text-xs text-[#71717A] leading-relaxed flex-1 line-clamp-4 font-mono bg-[#09090B] rounded-lg p-3 mb-4 whitespace-pre-wrap">
                 {template.corpo}
               </div>
 
@@ -307,7 +307,7 @@ export default function ContactosPage() {
               <div className="flex flex-wrap gap-1 mb-4">
                 {['{nome}', '{empresa}', '{cidade}'].map(v => (
                   template.corpo.includes(v) && (
-                    <span key={v} className="text-[9px] bg-[rgba(255,106,0,0.08)] text-[#FF6A00] px-1.5 py-0.5 rounded font-mono">{v}</span>
+                    <span key={v} className="text-[9px] bg-[rgba(139,92,246,0.08)] text-[#8B5CF6] px-1.5 py-0.5 rounded font-mono">{v}</span>
                   )
                 ))}
               </div>
@@ -326,7 +326,7 @@ export default function ContactosPage() {
 
         {/* Empty */}
         {filteredTemplates.length === 0 && (
-          <div className="col-span-3 text-center py-16 text-[#6B6B7B]">
+          <div className="col-span-3 text-center py-16 text-[#71717A]">
             <MessageCircle className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <div>Nenhum template encontrado</div>
           </div>
@@ -337,9 +337,9 @@ export default function ContactosPage() {
       {sendModal && (
         <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-50 p-4"
           onClick={e => { if (e.target === e.currentTarget) setSendModal(null) }}>
-          <div className="bg-[#111114] border border-[#2A2A32] rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl">
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#2A2A32] flex-shrink-0">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#27272A] flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${sendModal.template.canal === 'WHATSAPP' ? 'bg-green-500/15' : 'bg-blue-500/15'}`}>
                   {sendModal.template.canal === 'WHATSAPP'
@@ -348,7 +348,7 @@ export default function ContactosPage() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-[#F5F5F7]">{sendModal.template.nome}</span>
+                    <span className="font-bold text-[#F0F0F3]">{sendModal.template.nome}</span>
                     <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
                       (sendModal.template.canal === 'WHATSAPP' ? integrationStatus?.whatsapp?.configured : integrationStatus?.email?.configured)
                         ? 'bg-green-500/15 text-green-400' : 'bg-amber-500/15 text-amber-400'
@@ -356,29 +356,29 @@ export default function ContactosPage() {
                       {(sendModal.template.canal === 'WHATSAPP' ? integrationStatus?.whatsapp?.configured : integrationStatus?.email?.configured) ? 'API ATIVA' : 'MANUAL'}
                     </span>
                   </div>
-                  <div className="text-xs text-[#6B6B7B]">Seleciona os leads e envia</div>
+                  <div className="text-xs text-[#71717A]">Seleciona os leads e envia</div>
                 </div>
               </div>
-              <button onClick={() => setSendModal(null)} className="text-[#6B6B7B] hover:text-[#F5F5F7]">
+              <button onClick={() => setSendModal(null)} className="text-[#71717A] hover:text-[#F0F0F3]">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="flex flex-1 overflow-hidden">
               {/* Left: leads list */}
-              <div className="w-80 flex-shrink-0 border-r border-[#2A2A32] flex flex-col">
-                <div className="p-4 border-b border-[#2A2A32]">
+              <div className="w-80 flex-shrink-0 border-r border-[#27272A] flex flex-col">
+                <div className="p-4 border-b border-[#27272A]">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#6B6B7B]" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#71717A]" />
                     <input value={leadSearch} onChange={e => setLeadSearch(e.target.value)}
                       placeholder="Pesquisar leads..."
-                      className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg pl-8 pr-3 py-2 text-xs text-[#F5F5F7] placeholder-[#6B6B7B] focus:outline-none focus:border-[#FF6A00]" />
+                      className="w-full bg-[#09090B] border border-[#27272A] rounded-lg pl-8 pr-3 py-2 text-xs text-[#F0F0F3] placeholder-[#71717A] focus:outline-none focus:border-[#8B5CF6]" />
                   </div>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-[#6B6B7B]">{selectedLeads.size} selecionados</span>
+                    <span className="text-xs text-[#71717A]">{selectedLeads.size} selecionados</span>
                     {selectedLeads.size > 0 && (
                       <button onClick={() => setSelectedLeads(new Set())}
-                        className="text-xs text-[#FF6A00] hover:text-[#FF7F1A]">Limpar</button>
+                        className="text-xs text-[#8B5CF6] hover:text-[#A78BFA]">Limpar</button>
                     )}
                   </div>
                 </div>
@@ -391,13 +391,13 @@ export default function ContactosPage() {
                     const selected = selectedLeads.has(lead.id)
                     return (
                       <div key={lead.id} onClick={() => toggleLead(lead)}
-                        className={`flex items-center gap-2 p-2.5 rounded-lg cursor-pointer transition-all ${selected ? 'bg-[rgba(255,106,0,0.12)] border border-[rgba(255,106,0,0.3)]' : 'hover:bg-[#1A1A1F] border border-transparent'}`}>
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${selected ? 'bg-[#FF6A00] border-[#FF6A00]' : 'border-[#2A2A32]'}`}>
+                        className={`flex items-center gap-2 p-2.5 rounded-lg cursor-pointer transition-all ${selected ? 'bg-[rgba(139,92,246,0.12)] border border-[rgba(139,92,246,0.3)]' : 'hover:bg-[#16161A] border border-transparent'}`}>
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${selected ? 'bg-[#8B5CF6] border-[#8B5CF6]' : 'border-[#27272A]'}`}>
                           {selected && <Check className="w-2.5 h-2.5 text-white" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium text-[#F5F5F7] truncate">{lead.nome}</div>
-                          <div className="text-[10px] text-[#6B6B7B] truncate">{lead.cidade}</div>
+                          <div className="text-xs font-medium text-[#F0F0F3] truncate">{lead.nome}</div>
+                          <div className="text-[10px] text-[#71717A] truncate">{lead.cidade}</div>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className={`text-[9px] font-bold ${SCORE_COLORS[lead.score]}`}>{lead.score}</span>
@@ -416,19 +416,19 @@ export default function ContactosPage() {
 
               {/* Right: message preview */}
               <div className="flex-1 flex flex-col p-5">
-                <div className="text-xs font-semibold text-[#6B6B7B] uppercase tracking-wider mb-2">
+                <div className="text-xs font-semibold text-[#71717A] uppercase tracking-wider mb-2">
                   Preview da mensagem {selectedLeads.size > 0 ? `(${[...selectedLeads][0] ? leads.find(l => l.id === [...selectedLeads][0])?.nome : ''})` : ''}
                 </div>
                 <textarea
                   value={msgText}
                   onChange={e => setMsgText(e.target.value)}
                   rows={10}
-                  className="flex-1 w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-xl px-4 py-3 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00] resize-none font-mono leading-relaxed mb-4" />
+                  className="flex-1 w-full bg-[#09090B] border border-[#27272A] rounded-xl px-4 py-3 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] resize-none font-mono leading-relaxed mb-4" />
 
                 {sendModal.template.canal === 'WHATSAPP' && (
-                  <div className="bg-[#0B0B0D] border border-[#2A2A32] rounded-xl p-3 mb-4">
-                    <div className="text-[10px] text-[#6B6B7B] mb-1">Formatação WhatsApp</div>
-                    <div className="flex gap-3 text-xs text-[#4A4A5A]">
+                  <div className="bg-[#09090B] border border-[#27272A] rounded-xl p-3 mb-4">
+                    <div className="text-[10px] text-[#71717A] mb-1">Formatação WhatsApp</div>
+                    <div className="flex gap-3 text-xs text-[#52525B]">
                       <span>*negrito*</span><span>_itálico_</span><span>~tachado~</span><span>`mono`</span>
                     </div>
                   </div>
@@ -436,7 +436,7 @@ export default function ContactosPage() {
 
                 <div className="flex gap-2">
                   <button onClick={copyMsg}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#2A2A32] text-sm text-[#6B6B7B] hover:border-[#4A4A5A] hover:text-[#F5F5F7] transition-all">
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#27272A] text-sm text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3] transition-all">
                     {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                     {copied ? 'Copiado!' : 'Copiar texto'}
                   </button>
@@ -462,7 +462,7 @@ export default function ContactosPage() {
                   )}
 
                   {selectedLeads.size === 0 && (
-                    <div className="flex-1 flex items-center justify-center py-2.5 rounded-xl border border-dashed border-[#2A2A32] text-sm text-[#4A4A5A]">
+                    <div className="flex-1 flex items-center justify-center py-2.5 rounded-xl border border-dashed border-[#27272A] text-sm text-[#52525B]">
                       Seleciona leads à esquerda
                     </div>
                   )}
@@ -477,22 +477,22 @@ export default function ContactosPage() {
       {showNewTemplate && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
           onClick={e => { if (e.target === e.currentTarget) setShowNewTemplate(false) }}>
-          <div className="bg-[#111114] border border-[#2A2A32] rounded-2xl w-full max-w-lg shadow-2xl">
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#2A2A32]">
-              <h2 className="font-bold text-[#F5F5F7]">Novo Template</h2>
-              <button onClick={() => setShowNewTemplate(false)} className="text-[#6B6B7B] hover:text-[#F5F5F7]"><X className="w-5 h-5" /></button>
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#27272A]">
+              <h2 className="font-bold text-[#F0F0F3]">Novo Template</h2>
+              <button onClick={() => setShowNewTemplate(false)} className="text-[#71717A] hover:text-[#F0F0F3]"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-[#6B6B7B] mb-1.5 block">Nome</label>
+                  <label className="text-xs text-[#71717A] mb-1.5 block">Nome</label>
                   <input value={newTemplate.nome} onChange={e => setNewTemplate(p => ({ ...p, nome: e.target.value }))}
-                    className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]" />
+                    className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]" />
                 </div>
                 <div>
-                  <label className="text-xs text-[#6B6B7B] mb-1.5 block">Canal</label>
+                  <label className="text-xs text-[#71717A] mb-1.5 block">Canal</label>
                   <select value={newTemplate.canal} onChange={e => setNewTemplate(p => ({ ...p, canal: e.target.value }))}
-                    className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]">
+                    className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]">
                     <option value="WHATSAPP">WhatsApp</option>
                     <option value="EMAIL">Email</option>
                   </select>
@@ -500,29 +500,29 @@ export default function ContactosPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-[#6B6B7B] mb-1.5 block">Categoria</label>
+                  <label className="text-xs text-[#71717A] mb-1.5 block">Categoria</label>
                   <select value={newTemplate.categoria} onChange={e => setNewTemplate(p => ({ ...p, categoria: e.target.value }))}
-                    className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]">
+                    className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]">
                     {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
                   </select>
                 </div>
                 {newTemplate.canal === 'EMAIL' && (
                   <div>
-                    <label className="text-xs text-[#6B6B7B] mb-1.5 block">Assunto</label>
+                    <label className="text-xs text-[#71717A] mb-1.5 block">Assunto</label>
                     <input value={newTemplate.assunto} onChange={e => setNewTemplate(p => ({ ...p, assunto: e.target.value }))}
-                      className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]" />
+                      className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]" />
                   </div>
                 )}
               </div>
               <div>
-                <label className="text-xs text-[#6B6B7B] mb-1.5 block">Mensagem <span className="text-[#4A4A5A]">· use {'{nome}'} {'{empresa}'} {'{cidade}'}</span></label>
+                <label className="text-xs text-[#71717A] mb-1.5 block">Mensagem <span className="text-[#52525B]">· use {'{nome}'} {'{empresa}'} {'{cidade}'}</span></label>
                 <textarea value={newTemplate.corpo} onChange={e => setNewTemplate(p => ({ ...p, corpo: e.target.value }))}
                   rows={6}
-                  className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00] resize-none font-mono" />
+                  className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] resize-none font-mono" />
               </div>
               <div className="flex gap-3 pt-1">
                 <button onClick={() => setShowNewTemplate(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-[#2A2A32] text-sm text-[#6B6B7B] hover:border-[#6B6B7B]">Cancelar</button>
+                  className="flex-1 py-2.5 rounded-xl border border-[#27272A] text-sm text-[#71717A] hover:border-[#71717A]">Cancelar</button>
                 <button
                   onClick={() => {
                     if (!newTemplate.nome || !newTemplate.corpo) return
@@ -532,7 +532,7 @@ export default function ContactosPage() {
                     setNewTemplate({ nome: '', canal: 'WHATSAPP', categoria: 'Prospeção', assunto: '', corpo: '' })
                   }}
                   disabled={!newTemplate.nome || !newTemplate.corpo}
-                  className="flex-1 py-2.5 rounded-xl bg-[#FF6A00] hover:bg-[#FF7F1A] text-white text-sm font-bold disabled:opacity-40">
+                  className="flex-1 py-2.5 rounded-xl bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-bold disabled:opacity-40">
                   Criar Template
                 </button>
               </div>
