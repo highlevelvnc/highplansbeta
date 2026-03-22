@@ -1,0 +1,525 @@
+'use client'
+import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { ArrowLeft, Phone, Mail, Globe, Save, Plus, Trash2, MessageCircle, Send, X, Check, Clock, AlertCircle, RefreshCw } from 'lucide-react'
+import Link from 'next/link'
+import { useToast } from '@/components/Toast'
+
+const PIPELINE_STAGES = ['NEW','CONTACTED','INTERESTED','PROPOSAL_SENT','NEGOTIATION','CLOSED','LOST']
+const PIPELINE_LABELS: Record<string,string> = { NEW:'Novo', CONTACTED:'Contactado', INTERESTED:'Interessado', PROPOSAL_SENT:'Proposta Enviada', NEGOTIATION:'Negociação', CLOSED:'Fechado', LOST:'Perdido' }
+const SCORE_STYLES: Record<string,{bg:string,text:string,border:string}> = {
+  HOT:{ bg:'bg-red-500/10',text:'text-red-400',border:'border-red-500/30' },
+  WARM:{ bg:'bg-amber-500/10',text:'text-amber-400',border:'border-amber-500/30' },
+  COLD:{ bg:'bg-gray-500/10',text:'text-gray-400',border:'border-gray-500/30' },
+}
+const PLANS = ['Presença Profissional','Leads & Movimento','Crescimento Local','Programa Aceleração Digital']
+
+const MSG_STATUS_STYLES: Record<string, { icon: typeof Check; color: string; label: string }> = {
+  SENT: { icon: Check, color: 'text-green-400', label: 'Enviado' },
+  DELIVERED: { icon: Check, color: 'text-blue-400', label: 'Entregue' },
+  FAILED: { icon: AlertCircle, color: 'text-red-400', label: 'Falhou' },
+  PENDING: { icon: Clock, color: 'text-amber-400', label: 'Pendente' },
+}
+
+const QUICK_TEMPLATES = [
+  { label: 'Prospeção', canal: 'WHATSAPP', msg: 'Olá {nome}, boa tarde! Trabalho com marketing digital e encontrei oportunidades interessantes para o {empresa}. Tem 5 minutos para uma conversa rápida?' },
+  { label: 'Follow-up', canal: 'WHATSAPP', msg: 'Olá {nome}! Passando para saber se teve oportunidade de ver a proposta. Tem alguma questão?' },
+  { label: 'Diagnóstico', canal: 'EMAIL', assunto: 'Análise digital gratuita: {empresa}', msg: 'Olá {nome},\n\nFiz uma análise rápida da presença digital do {empresa} e encontrei oportunidades.\n\nPosso preparar um relatório completo sem custo. Interessa-lhe?\n\nAtenciosamente' },
+]
+
+interface Message {
+  id: string
+  canal: string
+  destinatario: string
+  assunto?: string
+  corpo: string
+  status: string
+  erro?: string
+  createdAt: string
+}
+
+export default function LeadDetailPage() {
+  const { id } = useParams() as { id: string }
+  const router = useRouter()
+  const [lead, setLead] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [messagesLoading, setMessagesLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'info' | 'messages'>('info')
+  const [showSendModal, setShowSendModal] = useState<'WHATSAPP' | 'EMAIL' | null>(null)
+  const [msgText, setMsgText] = useState('')
+  const [msgSubject, setMsgSubject] = useState('')
+  const [sendingMsg, setSendingMsg] = useState(false)
+  const [integrationStatus, setIntegrationStatus] = useState<{ whatsapp: { configured: boolean }; email: { configured: boolean } } | null>(null)
+  const { toast } = useToast()
+
+  const load = async () => {
+    try {
+      const res = await fetch(`/api/leads/${id}`)
+      if (!res.ok) throw new Error()
+      setLead(await res.json())
+    } catch {
+      toast('Erro ao carregar lead', 'error')
+    }
+  }
+
+  const loadMessages = async () => {
+    try {
+      const res = await fetch(`/api/leads/${id}/messages`)
+      if (!res.ok) throw new Error()
+      setMessages(await res.json())
+    } catch {} finally {
+      setMessagesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+    loadMessages()
+    fetch('/api/messages/status').then(r => r.json()).then(setIntegrationStatus).catch(() => {})
+  }, [id])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/leads/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(lead) })
+      if (!res.ok) throw new Error()
+      toast('Lead guardado', 'success')
+      load()
+    } catch {
+      toast('Erro ao guardar lead', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const del = async () => {
+    if (!confirm('Eliminar este lead?')) return
+    try {
+      await fetch(`/api/leads/${id}`, { method: 'DELETE' })
+      router.push('/leads')
+    } catch {
+      toast('Erro ao eliminar lead', 'error')
+    }
+  }
+
+  const openSend = (canal: 'WHATSAPP' | 'EMAIL') => {
+    setShowSendModal(canal)
+    const tmpl = canal === 'WHATSAPP' ? QUICK_TEMPLATES[0] : QUICK_TEMPLATES[2]
+    if (lead) {
+      setMsgText(tmpl.msg
+        .replace(/{nome}/g, lead.nome?.split(' ')[0] || lead.nome)
+        .replace(/{empresa}/g, lead.empresa || lead.nome)
+        .replace(/{cidade}/g, lead.cidade || 'Portugal'))
+      if (tmpl.assunto) {
+        setMsgSubject(tmpl.assunto
+          .replace(/{nome}/g, lead.nome?.split(' ')[0] || lead.nome)
+          .replace(/{empresa}/g, lead.empresa || lead.nome))
+      } else {
+        setMsgSubject('')
+      }
+    }
+  }
+
+  const handleSend = async () => {
+    if (!showSendModal || !lead) return
+    setSendingMsg(true)
+    try {
+      const res = await fetch('/api/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: id,
+          canal: showSendModal,
+          corpo: msgText,
+          assunto: showSendModal === 'EMAIL' ? msgSubject : undefined,
+        }),
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        toast(`${showSendModal === 'WHATSAPP' ? 'WhatsApp' : 'Email'} enviado com sucesso`, 'success')
+      } else if (data.error?.includes('não configurad')) {
+        // Fallback to manual
+        if (showSendModal === 'WHATSAPP') {
+          const num = (lead.whatsapp || lead.telefone || '').replace(/\D/g, '')
+          if (num) {
+            const finalNum = num.startsWith('351') ? num : '351' + num
+            window.open(`https://wa.me/${finalNum}?text=${encodeURIComponent(msgText)}`, '_blank')
+            toast('WhatsApp aberto (modo manual)', 'info')
+          }
+        } else {
+          window.open(`mailto:${lead.email || ''}?subject=${encodeURIComponent(msgSubject)}&body=${encodeURIComponent(msgText)}`, '_blank')
+          toast('Email aberto (modo manual)', 'info')
+        }
+      } else {
+        toast(data.error || 'Erro ao enviar', 'error')
+      }
+
+      setShowSendModal(null)
+      loadMessages()
+    } catch {
+      toast('Erro de conexão', 'error')
+    } finally {
+      setSendingMsg(false)
+    }
+  }
+
+  if (!lead) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-[#FF6A00] border-t-transparent rounded-full animate-spin" /></div>
+
+  const ss = SCORE_STYLES[lead.score] || SCORE_STYLES.COLD
+
+  return (
+    <div className="p-6 max-w-4xl">
+      <div className="flex items-center gap-3 mb-6">
+        <Link href="/leads" className="p-2 rounded-lg hover:bg-[#1A1A1F] text-[#6B6B7B] hover:text-[#F5F5F7] transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+        </Link>
+        <div className="flex-1">
+          <h1 className="text-xl font-black text-[#F5F5F7]">{lead.nome}</h1>
+          {lead.empresa && <p className="text-sm text-[#6B6B7B]">{lead.empresa}</p>}
+        </div>
+        <span className={`text-xs font-bold px-3 py-1 rounded-full border ${ss.bg} ${ss.text} ${ss.border}`}>{lead.score}</span>
+        <div className="text-sm font-black text-[#FF6A00]">{lead.opportunityScore}pts</div>
+        <div className="flex gap-2">
+          {(lead.whatsapp || lead.telefone) && (
+            <button onClick={() => openSend('WHATSAPP')} className="p-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors" title="Enviar WhatsApp">
+              <MessageCircle className="w-4 h-4"/>
+            </button>
+          )}
+          {lead.email && (
+            <button onClick={() => openSend('EMAIL')} className="p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors" title="Enviar Email">
+              <Mail className="w-4 h-4"/>
+            </button>
+          )}
+          <button onClick={save} disabled={saving} className="flex items-center gap-2 bg-[#FF6A00] hover:bg-[#FF7F1A] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+            <Save className="w-4 h-4"/> {saving ? 'A guardar...' : 'Guardar'}
+          </button>
+          <button onClick={del} className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"><Trash2 className="w-4 h-4"/></button>
+        </div>
+      </div>
+
+      {/* Pipeline */}
+      <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4 mb-4">
+        <div className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-3">Pipeline</div>
+        <div className="flex gap-1 flex-wrap">
+          {PIPELINE_STAGES.map(s => (
+            <button key={s} onClick={() => setLead({...lead, pipelineStatus: s})}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${lead.pipelineStatus === s ? 'bg-[#FF6A00] text-white' : 'bg-[#1A1A1F] text-[#6B6B7B] hover:text-[#F5F5F7]'}`}>
+              {PIPELINE_LABELS[s]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tabs: Info / Mensagens */}
+      <div className="flex gap-1 mb-4 bg-[#111114] border border-[#2A2A32] rounded-lg p-1 w-fit">
+        <button onClick={() => setActiveTab('info')}
+          className={`px-4 py-1.5 rounded-md text-sm transition-all ${activeTab === 'info' ? 'bg-[#FF6A00] text-white font-medium' : 'text-[#6B6B7B] hover:text-[#F5F5F7]'}`}>
+          Informações
+        </button>
+        <button onClick={() => setActiveTab('messages')}
+          className={`px-4 py-1.5 rounded-md text-sm transition-all flex items-center gap-1.5 ${activeTab === 'messages' ? 'bg-[#FF6A00] text-white font-medium' : 'text-[#6B6B7B] hover:text-[#F5F5F7]'}`}>
+          Mensagens
+          {messages.length > 0 && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === 'messages' ? 'bg-white/20' : 'bg-[#FF6A00]/20 text-[#FF6A00]'}`}>
+              {messages.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeTab === 'info' && (
+        <>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            {/* Basic Info */}
+            <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
+              <div className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-3">Informações</div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  {k:'nome',l:'Nome'},{k:'empresa',l:'Empresa'},{k:'nicho',l:'Nicho'},{k:'cidade',l:'Cidade'},
+                  {k:'telefone',l:'Telefone'},{k:'whatsapp',l:'WhatsApp'},{k:'email',l:'Email'},{k:'origem',l:'Origem'},
+                  {k:'verbaAnuncios',l:'Verba Anúncios',type:'number'}
+                ].map(({k,l,type}) => (
+                  <div key={k} className={k==='email'||k==='nome' ? 'col-span-2' : ''}>
+                    <label className="text-[10px] text-[#6B6B7B] mb-1 block">{l}</label>
+                    <input value={lead[k]||''} type={type||'text'} onChange={e=>setLead({...lead,[k]:type==='number'?parseFloat(e.target.value)||0:e.target.value})}
+                      className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-2.5 py-1.5 text-xs text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]"/>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Digital Diagnosis */}
+            <div className="space-y-4">
+              <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
+                <div className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-3">Diagnóstico Digital</div>
+                <div className="space-y-2.5">
+                  {[
+                    {k:'temSite',l:'Tem site'},{k:'siteFraco',l:'Site fraco'},{k:'instagramAtivo',l:'Instagram ativo'},
+                    {k:'gmbOtimizado',l:'GMB otimizado'},{k:'anunciosAtivos',l:'Anúncios ativos'}
+                  ].map(({k,l}) => (
+                    <label key={k} className="flex items-center justify-between cursor-pointer">
+                      <span className="text-sm text-[#F5F5F7]">{l}</span>
+                      <div onClick={()=>setLead({...lead,[k]:!lead[k]})}
+                        className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${lead[k]?'bg-[#FF6A00]':'bg-[#2A2A32]'}`}>
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${lead[k]?'translate-x-4':'translate-x-0.5'}`}/>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-3 pt-3 border-t border-[#2A2A32]">
+                  <div className="text-xs text-[#6B6B7B] mb-1">Score de Oportunidade</div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-[#2A2A32] rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{width:`${Math.min(lead.opportunityScore,100)}%`,background:lead.opportunityScore>=60?'#FF6A00':lead.opportunityScore>=30?'#F59E0B':'#6B6B7B'}}/>
+                    </div>
+                    <span className="text-sm font-black text-[#FF6A00]">{lead.opportunityScore}pts</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
+                <div className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-3">Planos</div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[10px] text-[#6B6B7B] mb-1 block">Plano Atual</label>
+                    <select value={lead.planoAtual||''} onChange={e=>setLead({...lead,planoAtual:e.target.value||null})}
+                      className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-2.5 py-1.5 text-xs text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]">
+                      <option value="">Sem plano</option>
+                      {PLANS.map(p=><option key={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-[#6B6B7B] mb-1 block">Plano Alvo (Upgrade)</label>
+                    <select value={lead.planoAlvoUpgrade||''} onChange={e=>setLead({...lead,planoAlvoUpgrade:e.target.value||null})}
+                      className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-2.5 py-1.5 text-xs text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]">
+                      <option value="">—</option>
+                      {PLANS.map(p=><option key={p}>{p}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Obs + Motivo */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
+              <label className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-2 block">Observações</label>
+              <textarea value={lead.observacaoPerfil||''} onChange={e=>setLead({...lead,observacaoPerfil:e.target.value})}
+                rows={3} className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00] resize-none"/>
+            </div>
+            <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
+              <label className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-2 block">Motivo do Score</label>
+              <textarea value={lead.motivoScore||''} onChange={e=>setLead({...lead,motivoScore:e.target.value})}
+                rows={3} className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-lg px-3 py-2 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00] resize-none"/>
+            </div>
+          </div>
+
+          {/* Activities */}
+          {lead.activities?.length > 0 && (
+            <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
+              <div className="text-xs text-[#6B6B7B] uppercase tracking-wider mb-3">Actividade Recente</div>
+              <div className="space-y-2">
+                {lead.activities.slice(0, 10).map((a: any) => (
+                  <div key={a.id} className="flex items-start gap-3 py-2 border-b border-[#1A1A1F] last:border-0">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#FF6A00] mt-1.5 flex-shrink-0"/>
+                    <div className="flex-1">
+                      <div className="text-sm text-[#F5F5F7]">{a.descricao}</div>
+                      <div className="text-[10px] text-[#6B6B7B]">{new Date(a.createdAt).toLocaleDateString('pt-PT')} · {a.tipo}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Messages Tab */}
+      {activeTab === 'messages' && (
+        <div className="space-y-4">
+          {/* Quick actions */}
+          <div className="flex gap-2">
+            {(lead.whatsapp || lead.telefone) && (
+              <button onClick={() => openSend('WHATSAPP')}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 text-sm font-medium transition-colors">
+                <MessageCircle className="w-4 h-4" /> Enviar WhatsApp
+              </button>
+            )}
+            {lead.email && (
+              <button onClick={() => openSend('EMAIL')}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-sm font-medium transition-colors">
+                <Mail className="w-4 h-4" /> Enviar Email
+              </button>
+            )}
+          </div>
+
+          {/* Message History */}
+          <div className="bg-[#111114] border border-[#2A2A32] rounded-xl p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-xs text-[#6B6B7B] uppercase tracking-wider">Histórico de Mensagens</div>
+              <button onClick={loadMessages} className="text-xs text-[#6B6B7B] hover:text-[#FF6A00] flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" /> Atualizar
+              </button>
+            </div>
+
+            {messagesLoading && messages.length === 0 && (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="animate-pulse flex gap-3 p-3 bg-[#0B0B0D] rounded-lg">
+                    <div className="w-8 h-8 rounded-lg bg-[#2A2A32]" />
+                    <div className="flex-1">
+                      <div className="h-3 w-24 bg-[#2A2A32] rounded mb-2" />
+                      <div className="h-3 w-48 bg-[#1A1A1F] rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!messagesLoading && messages.length === 0 && (
+              <div className="text-center py-8 text-[#6B6B7B]">
+                <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Nenhuma mensagem enviada</p>
+                <p className="text-xs text-[#4A4A5A] mt-1">Use os botões acima para enviar a primeira mensagem</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {messages.map(msg => {
+                const statusStyle = MSG_STATUS_STYLES[msg.status] || MSG_STATUS_STYLES.PENDING
+                const StatusIcon = statusStyle.icon
+                const isWA = msg.canal === 'WHATSAPP'
+                return (
+                  <div key={msg.id} className="bg-[#0B0B0D] rounded-lg p-3 border border-[#1A1A1F]">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isWA ? 'bg-green-500/10' : 'bg-blue-500/10'}`}>
+                        {isWA ? <MessageCircle className="w-4 h-4 text-green-400" /> : <Mail className="w-4 h-4 text-blue-400" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium text-[#F5F5F7]">
+                            {isWA ? 'WhatsApp' : 'Email'}
+                          </span>
+                          <span className="text-[10px] text-[#6B6B7B]">{msg.destinatario}</span>
+                          <div className="flex items-center gap-1 ml-auto">
+                            <StatusIcon className={`w-3 h-3 ${statusStyle.color}`} />
+                            <span className={`text-[10px] font-medium ${statusStyle.color}`}>{statusStyle.label}</span>
+                          </div>
+                        </div>
+                        {msg.assunto && (
+                          <div className="text-xs text-[#FF6A00] mb-1">Assunto: {msg.assunto}</div>
+                        )}
+                        <p className="text-xs text-[#6B6B7B] line-clamp-2 whitespace-pre-wrap">{msg.corpo}</p>
+                        {msg.erro && (
+                          <p className="text-[10px] text-red-400 mt-1">Erro: {msg.erro}</p>
+                        )}
+                        <div className="text-[10px] text-[#4A4A5A] mt-1.5">
+                          {new Date(msg.createdAt).toLocaleDateString('pt-PT')} às {new Date(msg.createdAt).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== SEND MESSAGE MODAL ===== */}
+      {showSendModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={e => { if (e.target === e.currentTarget) setShowSendModal(null) }}>
+          <div className="bg-[#111114] border border-[#2A2A32] rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#2A2A32]">
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${showSendModal === 'WHATSAPP' ? 'bg-green-500/15' : 'bg-blue-500/15'}`}>
+                  {showSendModal === 'WHATSAPP' ? <MessageCircle className="w-4.5 h-4.5 text-green-400" /> : <Mail className="w-4.5 h-4.5 text-blue-400" />}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-[#F5F5F7] text-sm">
+                      {showSendModal === 'WHATSAPP' ? 'Enviar WhatsApp' : 'Enviar Email'}
+                    </span>
+                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
+                      (showSendModal === 'WHATSAPP' ? integrationStatus?.whatsapp?.configured : integrationStatus?.email?.configured)
+                        ? 'bg-green-500/15 text-green-400' : 'bg-amber-500/15 text-amber-400'
+                    }`}>
+                      {(showSendModal === 'WHATSAPP' ? integrationStatus?.whatsapp?.configured : integrationStatus?.email?.configured) ? 'API' : 'MANUAL'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-[#6B6B7B]">{lead.nome} · {showSendModal === 'WHATSAPP' ? (lead.whatsapp || lead.telefone) : lead.email}</div>
+                </div>
+              </div>
+              <button onClick={() => setShowSendModal(null)} className="text-[#6B6B7B] hover:text-[#F5F5F7]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Quick templates */}
+              <div>
+                <div className="text-xs text-[#6B6B7B] mb-2 font-medium">Templates Rápidos</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {QUICK_TEMPLATES.filter(t => t.canal === showSendModal).map((t, i) => (
+                    <button key={i} onClick={() => {
+                      setMsgText(t.msg
+                        .replace(/{nome}/g, lead.nome?.split(' ')[0] || lead.nome)
+                        .replace(/{empresa}/g, lead.empresa || lead.nome)
+                        .replace(/{cidade}/g, lead.cidade || 'Portugal'))
+                      if (t.assunto) setMsgSubject(t.assunto
+                        .replace(/{nome}/g, lead.nome?.split(' ')[0] || lead.nome)
+                        .replace(/{empresa}/g, lead.empresa || lead.nome))
+                    }}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-[#2A2A32] text-[#6B6B7B] hover:border-[#FF6A00]/40 hover:text-[#FF6A00] transition-all">
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {showSendModal === 'EMAIL' && (
+                <div>
+                  <label className="text-xs text-[#6B6B7B] mb-1.5 block font-medium">Assunto</label>
+                  <input value={msgSubject} onChange={e => setMsgSubject(e.target.value)}
+                    className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-xl px-4 py-2.5 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00]" />
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs text-[#6B6B7B] mb-1.5 block font-medium">Mensagem</label>
+                <textarea value={msgText} onChange={e => setMsgText(e.target.value)} rows={6}
+                  className="w-full bg-[#0B0B0D] border border-[#2A2A32] rounded-xl px-4 py-3 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#FF6A00] resize-none font-mono leading-relaxed" />
+                <div className="text-[10px] text-[#4A4A5A] mt-1">{msgText.length} caracteres</div>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setShowSendModal(null)}
+                  className="px-4 py-2.5 rounded-xl border border-[#2A2A32] text-sm text-[#6B6B7B] hover:border-[#4A4A5A] hover:text-[#F5F5F7] transition-all">
+                  Cancelar
+                </button>
+                <button onClick={handleSend}
+                  disabled={sendingMsg || !msgText.trim() || (showSendModal === 'EMAIL' && !msgSubject.trim())}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-colors disabled:opacity-40 ${
+                    showSendModal === 'WHATSAPP' ? 'bg-green-600 hover:bg-green-500' : 'bg-blue-600 hover:bg-blue-500'
+                  }`}>
+                  {sendingMsg ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  {sendingMsg ? 'A enviar...' :
+                    (showSendModal === 'WHATSAPP' ? integrationStatus?.whatsapp?.configured : integrationStatus?.email?.configured)
+                      ? 'Enviar' : 'Enviar (manual)'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
