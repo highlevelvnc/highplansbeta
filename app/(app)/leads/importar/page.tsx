@@ -29,78 +29,205 @@ interface ImportResult {
   errors: string[]
 }
 
+interface CanonicalImportRow {
+  nome: string
+  empresa: string
+  telefone: string
+  whatsapp: string
+  site: string
+  cidade: string
+  termo: string
+  email: string
+}
+
 // ─── CSV Parsing ─────────────────────────────────────────────────────────────
 
+function normalizeHeader(header: string): string {
+  return header
+    .replace(/^\uFEFF/, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function detectDelimiter(firstLine: string): string {
+  const candidates = [';', ',', '\t', '|']
+  let best = ','
+  let bestCount = -1
+
+  for (const delimiter of candidates) {
+    const count = firstLine.split(delimiter).length
+    if (count > bestCount) {
+      bestCount = count
+      best = delimiter
+    }
+  }
+
+  return best
+}
+
 function parseCSV(text: string): { headers: string[]; rows: Record<string, string>[] } {
-  // Remove BOM
   text = text.replace(/^\uFEFF/, '')
-  const lines = text.split(/\r?\n/)
+  const lines = text.split(/\r?\n/).filter((line) => line.trim() !== '')
   if (lines.length < 2) return { headers: [], rows: [] }
 
-  const firstLine = lines[0]
-  const delimiter = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ','
+  const delimiter = detectDelimiter(lines[0])
 
   function parseLine(line: string): string[] {
     const result: string[] = []
     let current = ''
     let inQuotes = false
+
     for (let i = 0; i < line.length; i++) {
       const ch = line[i]
+
       if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
-        else inQuotes = !inQuotes
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"'
+          i++
+        } else {
+          inQuotes = !inQuotes
+        }
       } else if (ch === delimiter && !inQuotes) {
-        result.push(current.trim()); current = ''
+        result.push(current.trim())
+        current = ''
       } else {
         current += ch
       }
     }
+
     result.push(current.trim())
     return result
   }
 
-  const headers = parseLine(lines[0]).map(h => h.trim())
+  const headers = parseLine(lines[0]).map((h) => h.trim())
   const rows: Record<string, string>[] = []
 
   for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue
     const vals = parseLine(lines[i])
     const row: Record<string, string> = {}
-    headers.forEach((h, idx) => { row[h] = (vals[idx] || '').trim() })
+
+    headers.forEach((h, idx) => {
+      row[h] = (vals[idx] || '').trim()
+    })
+
     rows.push(row)
   }
+
   return { headers, rows }
 }
 
-// Normalize row columns to standard fields
-function normalizeRow(row: Record<string, string>) {
-  const get = (...keys: string[]) => {
-    for (const k of keys) {
-      const v = row[k] || ''
-      if (v) return v
-    }
-    // Case-insensitive fallback
-    const rowKeys = Object.keys(row)
-    for (const k of keys) {
-      const kl = k.toLowerCase()
-      const found = rowKeys.find(rk => rk.toLowerCase() === kl)
-      if (found && row[found]) return row[found]
-    }
-    return ''
+// ─── Column mapping ──────────────────────────────────────────────────────────
+
+function findValueByAliases(
+  row: Record<string, string>,
+  aliases: string[]
+): string {
+  const normalizedRow: Record<string, string> = {}
+
+  for (const [key, value] of Object.entries(row)) {
+    normalizedRow[normalizeHeader(key)] = value
   }
+
+  for (const alias of aliases) {
+    const found = normalizedRow[normalizeHeader(alias)]
+    if (found && String(found).trim() !== '') {
+      return String(found).trim()
+    }
+  }
+
+  return ''
+}
+
+function normalizeRow(row: Record<string, string>): CanonicalImportRow {
+  const nome = findValueByAliases(row, [
+    'nome',
+    'name',
+    'negocio',
+    'estabelecimento',
+    'razao social',
+    'razão social',
+  ])
+
+  const empresa = findValueByAliases(row, [
+    'empresa',
+    'company',
+  ])
+
+  const telefone = findValueByAliases(row, [
+    'telefone',
+    'phone',
+    'telemovel',
+    'telemóvel',
+    'celular',
+    'contacto',
+    'contato',
+    'numero',
+    'número',
+    'mobile',
+  ])
+
+  const whatsapp = findValueByAliases(row, [
+    'whatsapp',
+    'whats app',
+    'wa',
+  ])
+
+  const site = findValueByAliases(row, [
+    'site',
+    'website',
+    'url',
+    'link',
+    'web',
+  ])
+
+  const cidade = findValueByAliases(row, [
+    'cidade',
+    'city',
+    'localidade',
+    'municipio',
+    'município',
+    'regiao',
+    'região',
+    'distrito',
+  ])
+
+  const termo = findValueByAliases(row, [
+    'termo',
+    'nicho',
+    'categoria',
+    'keyword',
+    'palavra chave',
+    'palavra-chave',
+  ])
+
+  const email = findValueByAliases(row, [
+    'email',
+    'e mail',
+    'e-mail',
+    'mail',
+    'correio',
+  ])
+
   return {
-    nome: get('nome', 'Nome', 'name', 'empresa', 'company', 'negocio', 'estabelecimento', 'razao_social', 'titulo', 'title'),
-    telefone: get('telefone', 'Telefone', 'TelefoneNorm', 'phone', 'tel', 'telemovel', 'contacto', 'contato', 'numero', 'whatsapp', 'celular', 'movel'),
-    site: get('site', 'Site', 'website', 'url', 'link', 'web', 'instagram', 'facebook'),
-    cidade: get('cidade', 'Cidade', 'city', 'localidade', 'location', 'municipio', 'district', 'distrito', 'regiao'),
-    email: get('email', 'Email', 'e-mail', 'mail', 'correio'),
+    nome,
+    empresa,
+    telefone,
+    whatsapp,
+    site,
+    cidade,
+    termo,
+    email,
   }
 }
 
 export default function ImportarLeadsPage() {
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<{ headers: string[]; rows: PreviewRow[] } | null>(null)
-  const [allRows, setAllRows] = useState<Record<string, string>[]>([])
+  const [allRows, setAllRows] = useState<CanonicalImportRow[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -127,17 +254,36 @@ export default function ImportarLeadsPage() {
     setImporting(false)
 
     const text = await f.text()
-    const { headers, rows } = parseCSV(text)
+    const { rows } = parseCSV(text)
 
     if (rows.length === 0) {
       setError('CSV vazio ou sem dados válidos')
       return
     }
 
-    setAllRows(rows)
+    const normalizedRows = rows
+      .map(normalizeRow)
+      .filter((row) => row.nome || row.empresa || row.telefone || row.whatsapp || row.site)
+
+    if (normalizedRows.length === 0) {
+      setError('Não foi possível identificar colunas válidas no CSV')
+      return
+    }
+
+    setAllRows(normalizedRows)
+
     setPreview({
-      headers,
-      rows: rows.slice(0, 30),
+      headers: ['nome', 'empresa', 'telefone', 'whatsapp', 'site', 'cidade', 'termo', 'email'],
+      rows: normalizedRows.slice(0, 30).map((row) => ({
+        nome: row.nome,
+        empresa: row.empresa,
+        telefone: row.telefone,
+        whatsapp: row.whatsapp,
+        site: row.site,
+        cidade: row.cidade,
+        termo: row.termo,
+        email: row.email,
+      })),
     })
   }, [])
 
@@ -154,8 +300,7 @@ export default function ImportarLeadsPage() {
     setError(null)
     abortRef.current = false
 
-    const normalizedRows = allRows.map(normalizeRow)
-    const total = normalizedRows.length
+    const total = allRows.length
     const batches = Math.ceil(total / BATCH_SIZE)
 
     setImporting(true)
@@ -174,7 +319,7 @@ export default function ImportarLeadsPage() {
       if (abortRef.current) break
 
       const start = i * BATCH_SIZE
-      const batchRows = normalizedRows.slice(start, start + BATCH_SIZE)
+      const batchRows = allRows.slice(start, start + BATCH_SIZE)
 
       try {
         const res = await fetch('/api/leads/import', {
@@ -308,7 +453,7 @@ export default function ImportarLeadsPage() {
         <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#27272A]">
             <p className="text-sm text-gray-400">
-              Pré-visualização — <span className="text-white">{allRows.length.toLocaleString('pt-PT')} linhas</span> · {Math.ceil(allRows.length / BATCH_SIZE)} batches de {BATCH_SIZE}
+              Pré-visualização normalizada — <span className="text-white">{allRows.length.toLocaleString('pt-PT')} linhas</span> · {Math.ceil(allRows.length / BATCH_SIZE)} batches de {BATCH_SIZE}
             </p>
             <button
               onClick={startImport}
@@ -333,7 +478,7 @@ export default function ImportarLeadsPage() {
                 {preview.rows.map((row, i) => (
                   <tr key={i} className="border-b border-[#27272A]/50 hover:bg-[#16161A]">
                     {preview.headers.map(h => (
-                      <td key={h} className="px-3 py-2 text-gray-300 max-w-[200px] truncate whitespace-nowrap">
+                      <td key={h} className="px-3 py-2 text-gray-300 max-w-[220px] truncate whitespace-nowrap">
                         {row[h] || <span className="text-gray-600 italic">—</span>}
                       </td>
                     ))}

@@ -4,6 +4,21 @@
  * name display and WhatsApp link generation.
  */
 
+// ─── TYPES ──────────────────────────────────────────────────────────────────
+
+type LeadNameLike = {
+  nome?: string | null
+  empresa?: string | null
+  id?: string | null
+}
+
+type LeadPhoneLike = {
+  whatsapp?: string | null
+  telefone?: string | null
+  whatsappRaw?: string | null
+  telefoneRaw?: string | null
+}
+
 // ─── DISPLAY NAME ───────────────────────────────────────────────────────────
 
 /**
@@ -11,7 +26,7 @@
  * Priority: empresa (if different from nome and clean) → nome → fallback.
  * Strips numbers, URLs, emojis and garbage from the display value.
  */
-export function displayName(lead: { nome?: string; empresa?: string; id?: string }): string {
+export function displayName(lead: LeadNameLike): string {
   const cleanEmpresa = sanitizeName(lead.empresa || '')
   const cleanNome = sanitizeName(lead.nome || '')
 
@@ -19,10 +34,12 @@ export function displayName(lead: { nome?: string; empresa?: string; id?: string
   if (cleanEmpresa && cleanEmpresa.toLowerCase() !== cleanNome.toLowerCase()) {
     return cleanEmpresa
   }
+
   // nome as primary
   if (cleanNome) {
     return cleanNome
   }
+
   // fallback
   return 'Lead sem nome'
 }
@@ -31,7 +48,7 @@ export function displayName(lead: { nome?: string; empresa?: string; id?: string
  * Returns a subtitle for the lead card (the secondary name line).
  * Shows nome when empresa is the primary, or nothing if they're the same.
  */
-export function displaySubtitle(lead: { nome?: string; empresa?: string }): string {
+export function displaySubtitle(lead: LeadNameLike): string {
   const cleanEmpresa = sanitizeName(lead.empresa || '')
   const cleanNome = sanitizeName(lead.nome || '')
 
@@ -76,17 +93,24 @@ function sanitizeName(raw: string): string {
 // ─── PHONE / WHATSAPP ───────────────────────────────────────────────────────
 
 /**
- * Extract the best phone number for WhatsApp from a lead.
- * Priority: whatsapp → telefone.
+ * Returns the best VALID phone number for WhatsApp from a lead.
+ * Priority: whatsapp → telefone → whatsappRaw → telefoneRaw.
  * Returns a clean wa.me-ready number string (digits only with country code),
  * or empty string if no valid number found.
  */
-export function getWhatsAppNumber(lead: { whatsapp?: string; telefone?: string }): string {
-  const candidates = [lead.whatsapp, lead.telefone].filter(Boolean) as string[]
+export function getWhatsAppNumber(lead: LeadPhoneLike): string {
+  const candidates = [
+    lead.whatsapp,
+    lead.telefone,
+    lead.whatsappRaw,
+    lead.telefoneRaw,
+  ].filter(Boolean) as string[]
+
   for (const raw of candidates) {
     const num = extractFirstPhone(raw)
     if (num) return num
   }
+
   return ''
 }
 
@@ -94,24 +118,73 @@ export function getWhatsAppNumber(lead: { whatsapp?: string; telefone?: string }
  * Build a complete wa.me URL for a lead, optionally with a message.
  * Returns empty string if no valid number found.
  */
-export function buildWhatsAppUrl(lead: { whatsapp?: string; telefone?: string }, message?: string): string {
+export function buildWhatsAppUrl(lead: LeadPhoneLike, message?: string): string {
   const num = getWhatsAppNumber(lead)
   if (!num) return ''
+
   const base = `https://wa.me/${num}`
   return message ? `${base}?text=${encodeURIComponent(message)}` : base
 }
 
 /**
  * Get a phone number for tel: links (call).
- * Priority: telefone → whatsapp.
+ * Priority: telefone → whatsapp → telefoneRaw → whatsappRaw.
+ * Returns a normalized digits-only string if possible.
  */
-export function getCallNumber(lead: { telefone?: string; whatsapp?: string }): string {
-  const candidates = [lead.telefone, lead.whatsapp].filter(Boolean) as string[]
+export function getCallNumber(lead: LeadPhoneLike): string {
+  const candidates = [
+    lead.telefone,
+    lead.whatsapp,
+    lead.telefoneRaw,
+    lead.whatsappRaw,
+  ].filter(Boolean) as string[]
+
   for (const raw of candidates) {
     const num = extractFirstPhone(raw)
     if (num) return num
   }
+
   return ''
+}
+
+/**
+ * Returns the best number to SHOW in the CRM.
+ * Priority:
+ *   1. whatsapp (validated/stored)
+ *   2. telefone (validated/stored)
+ *   3. whatsappRaw (imported fallback)
+ *   4. telefoneRaw (imported fallback)
+ *
+ * This is for display only — not necessarily valid for wa.me.
+ */
+export function getVisiblePhone(lead: LeadPhoneLike): string {
+  return (
+    lead.whatsapp ||
+    lead.telefone ||
+    lead.whatsappRaw ||
+    lead.telefoneRaw ||
+    ''
+  )
+}
+
+/**
+ * Returns metadata for displaying phone-related UI in the CRM.
+ *
+ * visible: what should be shown to the user
+ * valid: a normalized number usable by WhatsApp / tel links
+ * needsReview: true when we have imported phone text but not a valid number
+ */
+export function getPhoneDisplayMeta(lead: LeadPhoneLike) {
+  const visible = getVisiblePhone(lead)
+  const valid = getWhatsAppNumber(lead)
+
+  return {
+    visible,
+    valid,
+    hasAnyPhone: !!visible,
+    hasValidWhatsApp: !!valid,
+    needsReview: !valid && !!visible,
+  }
 }
 
 /**
@@ -127,8 +200,6 @@ export function getCallNumber(lead: { telefone?: string; whatsapp?: string }): s
  *   "Rua 25"                               → "" (too few digits)
  */
 function findPhoneSequence(text: string): string {
-  // Match: optional +, then digit, then 7+ more digit/separator chars
-  // This captures phone numbers with formatting but stops at letters/text
   const match = text.match(/\+?\d[\d\s\-().]{7,}\d/)
   return match ? match[0] : ''
 }
@@ -149,24 +220,20 @@ function findPhoneSequence(text: string): string {
 function extractFirstPhone(raw: string): string {
   if (!raw) return ''
 
-  // Clean emojis and control chars
   const s = raw
     .replace(/[\uE000-\uF8FF]/g, '')
     .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
     .trim()
 
-  // Try splitting by explicit separators first (handles "912345678 / 918765432")
   const parts = s.split(/[/,;|]/)
 
   for (const part of parts) {
     const trimmed = part.trim()
     if (!trimmed) continue
 
-    // Find the first phone-like sequence in this part
     const seq = findPhoneSequence(trimmed)
     if (!seq) continue
 
-    // Extract only the digits from the matched sequence
     const hasPlus = seq.startsWith('+')
     let digits = seq.replace(/[^\d]/g, '')
 
@@ -177,23 +244,22 @@ function extractFirstPhone(raw: string): string {
       digits = digits.substring(2)
     }
 
-    // Already has 351 prefix (Portuguese full format)
+    // Already has Portuguese full format (351 + 9 digits)
     if (digits.startsWith('351') && digits.length >= 12) {
-      // Take exactly 12 digits (351 + 9) to avoid trailing garbage
       return digits.substring(0, 12)
     }
 
-    // Has + and enough digits — international number, return as-is
+    // Has explicit country code and enough digits
     if (hasPlus && digits.length >= 10) {
       return digits
     }
 
-    // Portuguese 9-digit number (mobile starts with 9, landline with 2)
+    // Portuguese 9-digit number (mobile 9..., landline 2...)
     if (digits.length === 9 && (digits.startsWith('9') || digits.startsWith('2'))) {
       return '351' + digits
     }
 
-    // Any number with 10+ digits — assume it has a country code
+    // Generic international fallback
     if (digits.length >= 10) {
       return digits
     }
@@ -218,23 +284,19 @@ function extractFirstPhone(raw: string): string {
 export function cleanPhoneForStorage(raw: string): string {
   if (!raw) return ''
 
-  // Remove emojis and control chars
   const s = raw
     .replace(/[\uE000-\uF8FF]/g, '')
     .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
     .replace(/\n/g, ' ')
     .trim()
 
-  // If it contains explicit separators, take only the first part
   const parts = s.split(/[/,;|]/)
   const first = parts[0]?.trim() || ''
   if (!first) return ''
 
-  // Find the phone-like sequence within the text
   const seq = findPhoneSequence(first)
   if (!seq) return ''
 
-  // Verify it has enough digits to be a real phone number
   const digits = seq.replace(/[^\d]/g, '')
   if (digits.length < 9) return ''
 

@@ -245,6 +245,10 @@ export async function POST(req: Request) {
         Site?: string
         cidade?: string
         Cidade?: string
+        termo?: string
+        Termo?: string
+        nicho?: string
+        Nicho?: string
         email?: string
         Email?: string
       }>
@@ -265,6 +269,7 @@ export async function POST(req: Request) {
 
     for (const row of rows) {
       const nomeRaw = (row.nome || row.Nome || '').trim()
+
       if (!nomeRaw) {
         skipped++
         continue
@@ -293,17 +298,15 @@ export async function POST(req: Request) {
 
         const siteRaw = row.site || row.Site || ''
         const cidadeRaw = row.cidade || row.Cidade || ''
+        const termoRaw = (row.termo || row.Termo || row.nicho || row.Nicho || '').trim()
         const emailRaw = (row.email || row.Email || '').trim().toLowerCase()
 
-        // Clean display fields
         const nome = cleanNameForStorage(nomeRaw) || nomeRaw.substring(0, 200)
-        const empresa = cleanNameForStorage(empresaRaw) || nome
+        const empresa = cleanNameForStorage(empresaRaw || nomeRaw) || nome
 
-        // Preserve raw imported values for manual review
         const telefoneRawValue = cleanPhone(String(telefoneSource || '')) || null
         const whatsappRawValue = cleanPhone(String(whatsappSource || '')) || null
 
-        // Normalized values for matching and WA usage
         const telefone = cleanPhoneForStorage(telefoneRawValue || '')
         const whatsapp = cleanPhoneForStorage(whatsappRawValue || telefoneRawValue || '')
 
@@ -311,7 +314,7 @@ export async function POST(req: Request) {
         const whatsappStored = whatsapp || null
 
         const siteInfo = detectSiteInfo(siteRaw)
-        const nicho = detectNicho(nome, nichoOverride)
+        const nicho = detectNicho(nome, termoRaw || nichoOverride)
 
         const diagData = {
           temSite: siteInfo.temSite,
