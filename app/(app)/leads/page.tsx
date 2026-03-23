@@ -35,9 +35,9 @@ interface Lead {
 }
 
 const SCORE_STYLES: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  HOT:  { label: 'HOT',  bg: 'bg-red-500/10',   text: 'text-red-400',   border: 'border-red-500/30'   },
-  WARM: { label: 'WARM', bg: 'bg-amber-500/10',  text: 'text-amber-400', border: 'border-amber-500/30' },
-  COLD: { label: 'COLD', bg: 'bg-gray-500/10',   text: 'text-gray-400',  border: 'border-gray-500/30'  },
+  HOT: { label: 'HOT', bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30' },
+  WARM: { label: 'WARM', bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
+  COLD: { label: 'COLD', bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/30' },
 }
 
 const PIPELINE_STATUS: Record<string, string> = {
@@ -66,12 +66,12 @@ const NICHOS = [
 
 type QuickFilterId = '' | 'hot' | 'whatsapp' | 'semFollowUp' | 'oportunidade' | 'proposta'
 
-const QUICK_FILTERS: { id: QuickFilterId; label: string; icon: React.ElementType; color: string; activeClasses: string }[] = [
-  { id: 'hot',          label: 'HOT',               icon: Flame,         color: 'red',    activeClasses: 'bg-red-500/15 border-red-500/40 text-red-400' },
-  { id: 'whatsapp',     label: 'Com WhatsApp',      icon: MessageCircle, color: 'green',  activeClasses: 'bg-green-500/15 border-green-500/40 text-green-400' },
-  { id: 'semFollowUp',  label: 'Sem Follow-up',     icon: Bell,          color: 'amber',  activeClasses: 'bg-amber-500/15 border-amber-500/40 text-amber-400' },
-  { id: 'oportunidade', label: 'Alta Oportunidade', icon: Zap,           color: 'purple', activeClasses: 'bg-[rgba(139,92,246,0.15)] border-[rgba(139,92,246,0.4)] text-[#8B5CF6]' },
-  { id: 'proposta',     label: 'Com Proposta',      icon: FileText,      color: 'blue',   activeClasses: 'bg-blue-500/15 border-blue-500/40 text-blue-400' },
+const QUICK_FILTERS: { id: QuickFilterId; label: string; icon: React.ElementType; activeClasses: string }[] = [
+  { id: 'hot', label: 'HOT', icon: Flame, activeClasses: 'bg-red-500/15 border-red-500/40 text-red-400' },
+  { id: 'whatsapp', label: 'Com WhatsApp', icon: MessageCircle, activeClasses: 'bg-green-500/15 border-green-500/40 text-green-400' },
+  { id: 'semFollowUp', label: 'Sem Follow-up', icon: Bell, activeClasses: 'bg-amber-500/15 border-amber-500/40 text-amber-400' },
+  { id: 'oportunidade', label: 'Alta Oportunidade', icon: Zap, activeClasses: 'bg-[rgba(139,92,246,0.15)] border-[rgba(139,92,246,0.4)] text-[#8B5CF6]' },
+  { id: 'proposta', label: 'Com Proposta', icon: FileText, activeClasses: 'bg-blue-500/15 border-blue-500/40 text-blue-400' },
 ]
 
 // ─── CSV Parsing ─────────────────────────────────────────────────────────────
@@ -333,6 +333,11 @@ export default function LeadsPage() {
   const [initialLoading, setInitialLoading] = useState(true)
   const [loadingDemo, setLoadingDemo] = useState(false)
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+
   const load = useCallback(() => {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
@@ -345,7 +350,8 @@ export default function LeadsPage() {
     if (quickFilter === 'oportunidade') params.set('oportunidadeAlta', '1')
     if (quickFilter === 'proposta') params.set('comProposta', '1')
 
-    params.set('pageSize', '200')
+    params.set('page', String(page))
+    params.set('pageSize', String(pageSize))
 
     fetch(`/api/leads?${params}`)
       .then(async r => {
@@ -356,16 +362,26 @@ export default function LeadsPage() {
       .then(data => {
         const list = Array.isArray(data?.leads) ? data.leads : []
         setLeads(list)
-        if (list.length > 0) setIsFirstLoad(false)
+        setTotal(data?.total || 0)
+        setTotalPages(data?.totalPages || 1)
+        if ((data?.total || 0) > 0) setIsFirstLoad(false)
       })
       .catch(err => {
         console.error(err)
         setLeads([])
+        setTotal(0)
+        setTotalPages(1)
       })
       .finally(() => setInitialLoading(false))
-  }, [search, scoreFilter, quickFilter])
+  }, [search, scoreFilter, quickFilter, page, pageSize])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, scoreFilter, quickFilter, pageSize])
 
   const handleCreate = async () => {
     if (!form.nome) return
@@ -505,7 +521,8 @@ export default function LeadsPage() {
       result: { ...accumulated, errors: accumulated.errors.slice(0, 20) },
     }))
 
-    load()
+    if (page !== 1) setPage(1)
+    else load()
   }
 
   const closeImport = () => {
@@ -554,7 +571,8 @@ export default function LeadsPage() {
 
     setLoadingDemo(false)
     setIsFirstLoad(false)
-    load()
+    if (page !== 1) setPage(1)
+    else load()
   }
 
   const toggleQuickFilter = (id: QuickFilterId) => {
@@ -566,6 +584,7 @@ export default function LeadsPage() {
     setSearch('')
     setScoreFilter('')
     setQuickFilter('')
+    setPage(1)
   }
 
   const hasActiveFilter = !!(search || scoreFilter || quickFilter)
@@ -581,7 +600,10 @@ export default function LeadsPage() {
         ) : (
           <Onboarding
             onImport={() => fileRef.current?.click()}
-            onCreateLead={() => { setIsFirstLoad(false); setShowNew(true) }}
+            onCreateLead={() => {
+              setIsFirstLoad(false)
+              setShowNew(true)
+            }}
             onDemo={handleDemo}
           />
         )}
@@ -608,10 +630,10 @@ export default function LeadsPage() {
   const filterLabel = quickFilter
     ? activeQF?.label
     : scoreFilter
-    ? scoreFilter
-    : search
-    ? `"${search}"`
-    : null
+      ? scoreFilter
+      : search
+        ? `"${search}"`
+        : null
 
   return (
     <div className="p-4 md:p-6">
@@ -620,9 +642,11 @@ export default function LeadsPage() {
         <div>
           <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Leads CRM</h1>
           <p className="text-sm text-[#71717A]">
-            {leads.length} leads
+            {total} leads totais
             {filterLabel && <span className="text-[#8B5CF6]"> · {filterLabel}</span>}
-            {' · '}{leads.filter(l => l.score === 'HOT').length} HOT
+            {' · a mostrar '}
+            {leads.length > 0 ? `${(page - 1) * pageSize + 1}-${(page - 1) * pageSize + leads.length}` : '0'}
+            {' · '}{leads.filter(l => l.score === 'HOT').length} HOT nesta página
           </p>
         </div>
 
@@ -692,13 +716,26 @@ export default function LeadsPage() {
 
         <select
           value={scoreFilter}
-          onChange={e => { setScoreFilter(e.target.value); if (e.target.value) setQuickFilter('') }}
+          onChange={e => {
+            setScoreFilter(e.target.value)
+            if (e.target.value) setQuickFilter('')
+          }}
           className="bg-[#0F0F12] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]"
         >
           <option value="">Todos os scores</option>
           <option value="HOT">HOT</option>
           <option value="WARM">WARM</option>
           <option value="COLD">COLD</option>
+        </select>
+
+        <select
+          value={pageSize}
+          onChange={e => setPageSize(Number(e.target.value))}
+          className="bg-[#0F0F12] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]"
+        >
+          <option value={50}>50 por página</option>
+          <option value={100}>100 por página</option>
+          <option value={200}>200 por página</option>
         </select>
 
         {hasActiveFilter && (
@@ -1041,6 +1078,32 @@ export default function LeadsPage() {
         </table>
       </div>
 
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 pt-4 border-t border-[#27272A]">
+          <div className="text-xs text-[#71717A]">
+            Página {page} de {totalPages}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-2 rounded-lg border border-[#27272A] text-sm text-[#F0F0F3] disabled:opacity-40 disabled:cursor-not-allowed hover:border-[#8B5CF6]"
+            >
+              Anterior
+            </button>
+
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-3 py-2 rounded-lg border border-[#27272A] text-sm text-[#F0F0F3] disabled:opacity-40 disabled:cursor-not-allowed hover:border-[#8B5CF6]"
+            >
+              Próxima
+            </button>
+          </div>
+        </div>
+      )}
+
       <WhatsAppModal
         lead={waLead}
         onClose={() => setWaLead(null)}
@@ -1132,20 +1195,20 @@ export default function LeadsPage() {
                           else if (score >= 30) warm++
                           else cold++
                         })
-                        const total = imp.rawRows.length
+                        const totalLocal = imp.rawRows.length
                         return (
                           <>
                             <div className="bg-red-500/10 rounded-lg p-3">
                               <div className="text-2xl font-black text-red-400">{hot}</div>
-                              <div className="text-[10px] text-red-400 font-semibold">HOT · {Math.round(hot / total * 100)}%</div>
+                              <div className="text-[10px] text-red-400 font-semibold">HOT · {Math.round(hot / totalLocal * 100)}%</div>
                             </div>
                             <div className="bg-amber-500/10 rounded-lg p-3">
                               <div className="text-2xl font-black text-amber-400">{warm}</div>
-                              <div className="text-[10px] text-amber-400 font-semibold">WARM · {Math.round(warm / total * 100)}%</div>
+                              <div className="text-[10px] text-amber-400 font-semibold">WARM · {Math.round(warm / totalLocal * 100)}%</div>
                             </div>
                             <div className="bg-gray-500/10 rounded-lg p-3">
                               <div className="text-2xl font-black text-gray-400">{cold}</div>
-                              <div className="text-[10px] text-gray-400 font-semibold">COLD · {Math.round(cold / total * 100)}%</div>
+                              <div className="text-[10px] text-gray-400 font-semibold">COLD · {Math.round(cold / totalLocal * 100)}%</div>
                             </div>
                           </>
                         )
