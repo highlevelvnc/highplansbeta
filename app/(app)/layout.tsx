@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, LogOut, Menu, X } from 'lucide-react'
 import { ToastProvider } from '@/components/Toast'
+import { BottomNavBar } from '@/components/BottomNavBar'
 
 const nav = [
   { section: 'OPERACIONAL' },
@@ -28,6 +29,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  // Lead detail pages (/leads/[id]) render their own contextual bar
+  const isLeadDetailPage =
+    pathname.startsWith('/leads/') &&
+    pathname !== '/leads/importar' &&
+    pathname.split('/').length === 3
 
   const sidebarContent = (
     <>
@@ -131,10 +138,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {sidebarContent}
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 overflow-y-auto bg-[#09090B] pt-14 md:pt-0">
+      {/* Main — pb-24 on mobile makes room for bottom bar above safe area */}
+      <main className="flex-1 overflow-y-auto bg-[#09090B] pt-14 md:pt-0 pb-24 md:pb-0">
         <ToastProvider>
           {children}
+          {/* Global bottom nav — hidden on lead detail pages (they have their own bar) */}
+          {!isLeadDetailPage && <BottomNavBar />}
         </ToastProvider>
       </main>
     </div>

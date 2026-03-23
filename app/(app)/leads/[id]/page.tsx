@@ -1,11 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Phone, Mail, Globe, Save, Plus, Trash2, MessageCircle, Send, X, Check, Clock, AlertCircle, RefreshCw, Loader2 } from 'lucide-react'
+import { ArrowLeft, Phone, Mail, Globe, Save, Plus, Trash2, MessageCircle, Send, X, Check, Clock, AlertCircle, RefreshCw, Loader2, Bell, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/components/Toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { getWhatsAppNumber, buildWhatsAppUrl } from '@/lib/lead-utils'
+import { WhatsAppModal } from '@/components/WhatsAppModal'
+import { QuickFollowUpModal } from '@/components/QuickFollowUpModal'
+import { QuickProposalModal } from '@/components/QuickProposalModal'
 
 const PIPELINE_STAGES = ['NEW','CONTACTED','INTERESTED','PROPOSAL_SENT','NEGOTIATION','CLOSED','LOST']
 const PIPELINE_LABELS: Record<string,string> = { NEW:'Novo', CONTACTED:'Contactado', INTERESTED:'Interessado', PROPOSAL_SENT:'Proposta Enviada', NEGOTIATION:'Negociação', CLOSED:'Fechado', LOST:'Perdido' }
@@ -55,6 +58,10 @@ export default function LeadDetailPage() {
   const [msgSubject, setMsgSubject] = useState('')
   const [sendingMsg, setSendingMsg] = useState(false)
   const [integrationStatus, setIntegrationStatus] = useState<{ whatsapp: { configured: boolean }; email: { configured: boolean } } | null>(null)
+  // Mobile contextual bar modals
+  const [waOpen,       setWaOpen]       = useState(false)
+  const [fuOpen,       setFuOpen]       = useState(false)
+  const [proposalOpen, setProposalOpen] = useState(false)
   const { toast } = useToast()
 
   const load = async () => {
@@ -171,10 +178,17 @@ export default function LeadDetailPage() {
 
   if (!lead) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-[#8B5CF6] border-t-transparent rounded-full animate-spin" /></div>
 
-  const ss = SCORE_STYLES[lead.score] || SCORE_STYLES.COLD
+  const ss       = SCORE_STYLES[lead.score] || SCORE_STYLES.COLD
+  const hasPhone = !!(lead.whatsapp || lead.telefone)
+
+  const callPhone = () => {
+    const raw = (lead.telefone || lead.whatsapp || '').replace(/\D/g, '')
+    if (raw) window.open(`tel:+${raw}`, '_self')
+    else toast('Sem número de telefone', 'error')
+  }
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl">
+    <div className="p-4 md:p-6 max-w-4xl pb-28 md:pb-6">
       <div className="flex items-center gap-3 mb-6">
         <Link href="/leads" className="p-2 rounded-lg hover:bg-[#16161A] text-[#71717A] hover:text-[#F0F0F3] transition-colors">
           <ArrowLeft className="w-4 h-4" />
@@ -449,6 +463,88 @@ export default function LeadDetailPage() {
         loading={deleting}
         onConfirm={del}
         onCancel={() => setShowConfirmDelete(false)}
+      />
+
+      {/* ===== MOBILE CONTEXTUAL BOTTOM BAR ===== */}
+      <div
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0F0F12]/96 backdrop-blur-lg border-t border-[#27272A]"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="grid grid-cols-5 divide-x divide-[#27272A]">
+          {/* WhatsApp */}
+          <button
+            onClick={() => setWaOpen(true)}
+            disabled={!hasPhone}
+            className={`flex flex-col items-center justify-center gap-1 py-3 min-h-[60px] transition-colors active:bg-[#16161A] ${
+              hasPhone ? 'text-[#25D366]' : 'text-[#3F3F46]'
+            }`}
+          >
+            <MessageCircle className="w-5 h-5 flex-shrink-0" />
+            <span className="text-[10px] font-semibold leading-none">WhatsApp</span>
+          </button>
+
+          {/* Ligar */}
+          <button
+            onClick={callPhone}
+            disabled={!hasPhone}
+            className={`flex flex-col items-center justify-center gap-1 py-3 min-h-[60px] transition-colors active:bg-[#16161A] ${
+              hasPhone ? 'text-purple-400' : 'text-[#3F3F46]'
+            }`}
+          >
+            <Phone className="w-5 h-5 flex-shrink-0" />
+            <span className="text-[10px] font-semibold leading-none">Ligar</span>
+          </button>
+
+          {/* Follow-up */}
+          <button
+            onClick={() => setFuOpen(true)}
+            className="flex flex-col items-center justify-center gap-1 py-3 min-h-[60px] text-amber-400 transition-colors active:bg-[#16161A]"
+          >
+            <Bell className="w-5 h-5 flex-shrink-0" />
+            <span className="text-[10px] font-semibold leading-none">Follow-up</span>
+          </button>
+
+          {/* Proposta */}
+          <button
+            onClick={() => setProposalOpen(true)}
+            className="flex flex-col items-center justify-center gap-1 py-3 min-h-[60px] text-blue-400 transition-colors active:bg-[#16161A]"
+          >
+            <FileText className="w-5 h-5 flex-shrink-0" />
+            <span className="text-[10px] font-semibold leading-none">Proposta</span>
+          </button>
+
+          {/* Guardar */}
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex flex-col items-center justify-center gap-1 py-3 min-h-[60px] text-[#8B5CF6] transition-colors active:bg-[#16161A] disabled:opacity-50"
+          >
+            {saving
+              ? <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" />
+              : <Save className="w-5 h-5 flex-shrink-0" />
+            }
+            <span className="text-[10px] font-semibold leading-none">
+              {saving ? '...' : 'Guardar'}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* ===== MOBILE CONTEXTUAL MODALS ===== */}
+      <WhatsAppModal
+        lead={waOpen ? lead : null}
+        onClose={() => setWaOpen(false)}
+        onSuccess={msg => toast(msg || 'WhatsApp enviado', 'success')}
+      />
+      <QuickFollowUpModal
+        lead={fuOpen ? lead : null}
+        onClose={() => setFuOpen(false)}
+        onSuccess={msg => { toast(msg || 'Follow-up agendado', 'success') }}
+      />
+      <QuickProposalModal
+        lead={proposalOpen ? lead : null}
+        onClose={() => setProposalOpen(false)}
+        onSuccess={msg => toast(msg || 'Proposta criada', 'success')}
       />
 
       {/* ===== SEND MESSAGE MODAL ===== */}
