@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { MessageCircle, Mail, Phone, Search, Filter, Send, Copy, Check, Plus, X, Edit2, Trash2, Zap, Users, Calendar, ChevronRight, AlertTriangle, RefreshCw } from 'lucide-react'
+import { MessageCircle, Mail, Phone, Search, Filter, Send, Copy, Check, Plus, X, Edit2, Trash2, Zap, Users, Calendar, ChevronRight, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react'
 import { useToast } from '@/components/Toast'
 import { getWhatsAppNumber, buildWhatsAppUrl } from '@/lib/lead-utils'
 
@@ -444,8 +444,8 @@ export default function ContactosPage() {
                   {selectedLeads.size === 1 && (
                     <button onClick={() => { const lead = leads.find(l => l.id === [...selectedLeads][0]); if (lead) sendToLead(lead) }}
                       disabled={sending}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-colors disabled:opacity-40 ${sendModal.template.canal === 'WHATSAPP' ? 'bg-green-600 hover:bg-green-500' : 'bg-blue-600 hover:bg-blue-500'}`}>
-                      <Send className="w-4 h-4" />
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${sendModal.template.canal === 'WHATSAPP' ? 'bg-green-600 hover:bg-green-500' : 'bg-blue-600 hover:bg-blue-500'}`}>
+                      {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                       {sending ? 'A enviar...' :
                         (sendModal.template.canal === 'WHATSAPP' ? integrationStatus?.whatsapp?.configured : integrationStatus?.email?.configured)
                           ? 'Enviar Mensagem' : sendModal.template.canal === 'WHATSAPP' ? 'Abrir WhatsApp' : 'Abrir Email'}
@@ -455,9 +455,9 @@ export default function ContactosPage() {
                   {selectedLeads.size > 1 && (
                     <button onClick={sendToAll}
                       disabled={sending}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-colors disabled:opacity-40 ${sendModal.template.canal === 'WHATSAPP' ? 'bg-green-600 hover:bg-green-500' : 'bg-blue-600 hover:bg-blue-500'}`}>
-                      <Zap className="w-4 h-4" />
-                      {sending ? 'A enviar...' : `Enviar para ${selectedLeads.size} leads`}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${sendModal.template.canal === 'WHATSAPP' ? 'bg-green-600 hover:bg-green-500' : 'bg-blue-600 hover:bg-blue-500'}`}>
+                      {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                      {sending ? `A enviar para ${selectedLeads.size} leads...` : `Enviar para ${selectedLeads.size} leads`}
                     </button>
                   )}
 
@@ -532,7 +532,7 @@ export default function ContactosPage() {
                     setNewTemplate({ nome: '', canal: 'WHATSAPP', categoria: 'Prospeção', assunto: '', corpo: '' })
                   }}
                   disabled={!newTemplate.nome || !newTemplate.corpo}
-                  className="flex-1 py-2.5 rounded-xl bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-bold disabled:opacity-40">
+                  className="flex-1 py-2.5 rounded-xl bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed">
                   Criar Template
                 </button>
               </div>

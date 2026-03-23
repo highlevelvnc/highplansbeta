@@ -1,8 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Plus, Check, Trash2, AlertTriangle, RefreshCw, CheckSquare } from 'lucide-react'
+import { Plus, Check, Trash2, AlertTriangle, RefreshCw, CheckSquare, Loader2 } from 'lucide-react'
 import { useToast } from '@/components/Toast'
 import { EmptyState } from '@/components/EmptyState'
+import { ConfirmModal } from '@/components/ConfirmModal'
 
 const PRIO_STYLES: Record<string,{label:string,bg:string,text:string}> = {
   HIGH:{label:'Alta',bg:'bg-red-500/10',text:'text-red-400'},
@@ -16,6 +17,10 @@ export default function TarefasPage() {
   const [error, setError] = useState<string | null>(null)
   const [showNew, setShowNew] = useState(false)
   const [form, setForm] = useState({ titulo:'', descricao:'', prioridade:'MEDIUM', dueDate:'' })
+  const [creating, setCreating] = useState(false)
+  const [completingId, setCompletingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const { toast } = useToast()
 
   const load = async () => {
@@ -35,6 +40,8 @@ export default function TarefasPage() {
   useEffect(()=>{load()},[])
 
   const create = async () => {
+    if (!form.titulo.trim()) return
+    setCreating(true)
     try {
       const res = await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(form)})
       if (!res.ok) throw new Error()
@@ -43,10 +50,14 @@ export default function TarefasPage() {
       load()
     } catch {
       toast('Erro ao criar tarefa', 'error')
+    } finally {
+      setCreating(false)
     }
   }
 
   const complete = async (id: string) => {
+    if (completingId === id) return
+    setCompletingId(id)
     try {
       const res = await fetch(`/api/tasks/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'DONE'})})
       if (!res.ok) throw new Error()
@@ -54,10 +65,13 @@ export default function TarefasPage() {
       load()
     } catch {
       toast('Erro ao concluir tarefa', 'error')
+    } finally {
+      setCompletingId(null)
     }
   }
 
   const del = async (id: string) => {
+    setDeletingId(id)
     try {
       const res = await fetch(`/api/tasks/${id}`,{method:'DELETE'})
       if (!res.ok) throw new Error()
@@ -65,6 +79,9 @@ export default function TarefasPage() {
       load()
     } catch {
       toast('Erro ao eliminar tarefa', 'error')
+    } finally {
+      setDeletingId(null)
+      setConfirmDeleteId(null)
     }
   }
 
@@ -76,10 +93,17 @@ export default function TarefasPage() {
   const TaskCard = ({ task }: { task: any }) => {
     const ps = PRIO_STYLES[task.prioridade] || PRIO_STYLES.MEDIUM
     const isOverdue = task.dueDate && new Date(task.dueDate) < now && task.status !== 'DONE'
+    const isCompleting = completingId === task.id
+    const isDeleting = deletingId === task.id
     return (
       <div className={`bg-[#0F0F12] border rounded-xl p-4 flex items-start gap-3 transition-all ${isOverdue?'border-red-500/30':'border-[#27272A]'} ${task.status==='DONE'?'opacity-50':''}`}>
-        <button onClick={()=>complete(task.id)} className={`w-5 h-5 rounded border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${task.status==='DONE'?'bg-[#8B5CF6] border-[#8B5CF6]':'border-[#27272A] hover:border-[#8B5CF6]'}`}>
-          {task.status==='DONE'&&<Check className="w-3 h-3 text-white"/>}
+        <button
+          onClick={() => task.status !== 'DONE' && complete(task.id)}
+          disabled={isCompleting || task.status === 'DONE'}
+          className={`w-5 h-5 rounded border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors disabled:cursor-not-allowed ${task.status==='DONE'?'bg-[#8B5CF6] border-[#8B5CF6]':isCompleting?'border-[#8B5CF6] bg-[#8B5CF6]/20':'border-[#27272A] hover:border-[#8B5CF6]'}`}>
+          {isCompleting
+            ? <Loader2 className="w-3 h-3 text-[#8B5CF6] animate-spin" />
+            : task.status==='DONE' && <Check className="w-3 h-3 text-white"/>}
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
@@ -92,8 +116,14 @@ export default function TarefasPage() {
             {isOverdue?'⚠ ':''}{new Date(task.dueDate).toLocaleDateString('pt-PT')}
           </div>}
         </div>
-        <button onClick={()=>del(task.id)} className="text-[#71717A] hover:text-red-400 transition-colors p-1 flex-shrink-0">
-          <Trash2 className="w-3.5 h-3.5"/>
+        <button
+          onClick={() => setConfirmDeleteId(task.id)}
+          disabled={isDeleting}
+          className="text-[#71717A] hover:text-red-400 transition-colors p-1 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isDeleting
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            : <Trash2 className="w-3.5 h-3.5" />}
         </button>
       </div>
     )
@@ -174,8 +204,19 @@ export default function TarefasPage() {
         />
       )}
 
+      {/* Delete confirmation modal */}
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        title="Eliminar tarefa?"
+        description="Esta acção é irreversível. A tarefa será eliminada permanentemente."
+        confirmLabel="Eliminar"
+        loading={!!deletingId}
+        onConfirm={() => confirmDeleteId && del(confirmDeleteId)}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
+
       {showNew&&(
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={e=>e.target===e.currentTarget&&setShowNew(false)}>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={e=>e.target===e.currentTarget&&!creating&&setShowNew(false)}>
           <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-md">
             <h2 className="font-bold text-lg text-[#F0F0F3] mb-4">Nova Tarefa</h2>
             <div className="space-y-3">
@@ -205,8 +246,15 @@ export default function TarefasPage() {
               </div>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={()=>setShowNew(false)} className="flex-1 py-2 rounded-lg border border-[#27272A] text-sm text-[#71717A]">Cancelar</button>
-              <button onClick={create} className="flex-1 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors">Criar</button>
+              <button onClick={()=>setShowNew(false)} disabled={creating} className="flex-1 py-2 rounded-lg border border-[#27272A] text-sm text-[#71717A] disabled:cursor-not-allowed disabled:opacity-50">Cancelar</button>
+              <button
+                onClick={create}
+                disabled={creating || !form.titulo.trim()}
+                className="flex-1 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+                {creating ? 'A criar...' : 'Criar'}
+              </button>
             </div>
           </div>
         </div>

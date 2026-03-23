@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Plus, FileText, Download, ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Plus, FileText, Download, ExternalLink, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/components/Toast'
 
@@ -112,6 +112,7 @@ export default function PropostasPage() {
   const [error, setError] = useState<string | null>(null)
   const [showNew, setShowNew] = useState(false)
   const [form, setForm] = useState({ leadId:'', plano:'', titulo:'', conteudo:'' })
+  const [creating, setCreating] = useState(false)
   const [preview, setPreview] = useState<any>(null)
   const { toast } = useToast()
 
@@ -144,14 +145,19 @@ export default function PropostasPage() {
   }
 
   const create = async () => {
+    if (!form.leadId) { toast('Seleciona um lead', 'error'); return }
+    if (!form.titulo.trim()) { toast('Adiciona um título à proposta', 'error'); return }
+    setCreating(true)
     try {
       const res = await fetch('/api/proposals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(form)})
       if (!res.ok) throw new Error()
       setShowNew(false); setForm({leadId:'',plano:'',titulo:'',conteudo:''})
-      toast('Proposta criada', 'success')
+      toast('Proposta criada com sucesso', 'success')
       load()
     } catch {
       toast('Erro ao criar proposta', 'error')
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -232,12 +238,23 @@ export default function PropostasPage() {
             </div>
           )
         })}
-        {proposals.length===0&&<div className="text-center py-12 text-[#71717A]">Nenhuma proposta criada</div>}
+        {proposals.length===0&&!loading&&(
+          <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-[#8B5CF6]/10 flex items-center justify-center mb-4">
+              <FileText className="w-7 h-7 text-[#8B5CF6]/60" />
+            </div>
+            <div className="text-base font-semibold text-[#F0F0F3] mb-1">Nenhuma proposta criada</div>
+            <div className="text-sm text-[#71717A] mb-5 max-w-xs">Crie propostas personalizadas para os seus leads com templates prontos para cada plano.</div>
+            <button onClick={()=>setShowNew(true)} className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              <Plus className="w-4 h-4"/> Nova Proposta
+            </button>
+          </div>
+        )}
       </div>
 
       {/* New Proposal Modal */}
       {showNew&&(
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={e=>e.target===e.currentTarget&&setShowNew(false)}>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={e=>e.target===e.currentTarget&&!creating&&setShowNew(false)}>
           <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h2 className="font-bold text-lg text-[#F0F0F3] mb-4">Nova Proposta</h2>
             <div className="space-y-3">
@@ -272,8 +289,15 @@ export default function PropostasPage() {
               </div>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={()=>setShowNew(false)} className="flex-1 py-2 rounded-lg border border-[#27272A] text-sm text-[#71717A]">Cancelar</button>
-              <button onClick={create} className="flex-1 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors">Guardar Proposta</button>
+              <button onClick={()=>setShowNew(false)} disabled={creating} className="flex-1 py-2 rounded-lg border border-[#27272A] text-sm text-[#71717A] disabled:opacity-50 disabled:cursor-not-allowed">Cancelar</button>
+              <button
+                onClick={create}
+                disabled={creating || !form.leadId || !form.titulo.trim()}
+                className="flex-1 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+                {creating ? 'A guardar...' : 'Guardar Proposta'}
+              </button>
             </div>
           </div>
         </div>

@@ -1,9 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Phone, Mail, Globe, Save, Plus, Trash2, MessageCircle, Send, X, Check, Clock, AlertCircle, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Phone, Mail, Globe, Save, Plus, Trash2, MessageCircle, Send, X, Check, Clock, AlertCircle, RefreshCw, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/components/Toast'
+import { ConfirmModal } from '@/components/ConfirmModal'
 import { getWhatsAppNumber, buildWhatsAppUrl } from '@/lib/lead-utils'
 
 const PIPELINE_STAGES = ['NEW','CONTACTED','INTERESTED','PROPOSAL_SENT','NEGOTIATION','CLOSED','LOST']
@@ -44,6 +45,8 @@ export default function LeadDetailPage() {
   const router = useRouter()
   const [lead, setLead] = useState<any>(null)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [messagesLoading, setMessagesLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'info' | 'messages'>('info')
@@ -95,12 +98,13 @@ export default function LeadDetailPage() {
   }
 
   const del = async () => {
-    if (!confirm('Eliminar este lead?')) return
+    setDeleting(true)
     try {
       await fetch(`/api/leads/${id}`, { method: 'DELETE' })
       router.push('/leads')
     } catch {
       toast('Erro ao eliminar lead', 'error')
+      setDeleting(false)
     }
   }
 
@@ -192,10 +196,17 @@ export default function LeadDetailPage() {
               <Mail className="w-4 h-4"/>
             </button>
           )}
-          <button onClick={save} disabled={saving} className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-            <Save className="w-4 h-4"/> {saving ? 'A guardar...' : 'Guardar'}
+          <button onClick={save} disabled={saving} className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saving ? 'A guardar...' : 'Guardar'}
           </button>
-          <button onClick={del} className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"><Trash2 className="w-4 h-4"/></button>
+          <button
+            onClick={() => setShowConfirmDelete(true)}
+            disabled={deleting}
+            className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          </button>
         </div>
       </div>
 
@@ -429,6 +440,17 @@ export default function LeadDetailPage() {
         </div>
       )}
 
+      {/* ===== DELETE CONFIRMATION ===== */}
+      <ConfirmModal
+        open={showConfirmDelete}
+        title="Eliminar este lead?"
+        description="Esta acção é irreversível. O lead e todo o historial de actividades serão eliminados permanentemente."
+        confirmLabel="Eliminar"
+        loading={deleting}
+        onConfirm={del}
+        onCancel={() => setShowConfirmDelete(false)}
+      />
+
       {/* ===== SEND MESSAGE MODAL ===== */}
       {showSendModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
@@ -503,7 +525,7 @@ export default function LeadDetailPage() {
                 </button>
                 <button onClick={handleSend}
                   disabled={sendingMsg || !msgText.trim() || (showSendModal === 'EMAIL' && !msgSubject.trim())}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-colors disabled:opacity-40 ${
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                     showSendModal === 'WHATSAPP' ? 'bg-green-600 hover:bg-green-500' : 'bg-blue-600 hover:bg-blue-500'
                   }`}>
                   {sendingMsg ? (
