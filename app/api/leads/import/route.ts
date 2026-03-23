@@ -294,13 +294,17 @@ export async function POST(req: Request) {
         else if (isInstagram) obs = `Instagram: ${siteVal.substring(0, 120)}`
         else if (siteVal) obs = `Site: ${siteVal.substring(0, 120)}`
 
+        // Store null (not empty string) when no valid phone was extracted.
+        // This keeps the DB clean: IS NOT NULL reliably means "has a real number".
+        const telefoneStored = telefone || null
+
         const newLeadData = {
           nome: nome,
           empresa: nome,
           nicho,
           cidade: cidadeRaw.trim() || 'Portugal',
-          telefone: telefone,
-          whatsapp: telefone,
+          telefone: telefoneStored,
+          whatsapp: telefoneStored,
           email: emailRaw.substring(0, 100) || undefined,
           temSite: diagData.temSite,
           siteFraco: diagData.siteFraco,

@@ -463,16 +463,17 @@ export default function LeadsPage() {
               {/* Bottom row: quick actions */}
               <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-[#27272A]">
                 <button
-                  onClick={() => setWaLead(lead)}
-                  title={hasPhone ? 'Enviar WhatsApp' : 'Sem número de WhatsApp'}
+                  onClick={() => { if (hasPhone) setWaLead(lead) }}
+                  disabled={!hasPhone}
+                  title={hasPhone ? 'Enviar WhatsApp' : 'Número inválido ou em falta'}
                   className={`flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-medium transition-all ${
                     hasPhone
                       ? 'bg-[#25D366]/12 hover:bg-[#25D366]/22 text-[#25D366] border border-[#25D366]/25'
-                      : 'bg-[#16161A] text-[#3F3F46] border border-[#27272A] cursor-not-allowed'
+                      : 'bg-[#16161A] text-[#3F3F46] border border-[#27272A] cursor-not-allowed opacity-50'
                   }`}
                 >
                   <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="hidden sm:inline">WA</span>
+                  <span className="hidden sm:inline">{hasPhone ? 'WA' : '—'}</span>
                 </button>
                 <button
                   onClick={() => setFollowUpLead(lead)}
@@ -611,12 +612,13 @@ export default function LeadsPage() {
                     <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                       {/* WhatsApp — opens compose modal */}
                       <button
-                        onClick={() => setWaLead(lead)}
-                        title={hasPhone ? 'Enviar WhatsApp' : 'Sem número de WhatsApp'}
+                        onClick={() => { if (hasPhone) setWaLead(lead) }}
+                        disabled={!hasPhone}
+                        title={hasPhone ? 'Enviar WhatsApp' : 'Número inválido ou em falta'}
                         className={`flex items-center gap-1 px-2 h-7 rounded-lg text-[11px] font-semibold transition-all border ${
                           hasPhone
                             ? 'bg-[#25D366]/12 hover:bg-[#25D366]/22 text-[#25D366] border-[#25D366]/25 hover:border-[#25D366]/50'
-                            : 'bg-[#16161A] text-[#3F3F46] border-[#27272A] cursor-not-allowed'
+                            : 'bg-[#16161A] text-[#3F3F46] border-[#27272A] cursor-not-allowed opacity-50'
                         }`}
                       >
                         <MessageCircle className="w-3 h-3" />

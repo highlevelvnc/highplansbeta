@@ -40,13 +40,29 @@ export async function GET(req: NextRequest) {
     if (nicho)    where.nicho   = { contains: nicho,  mode: 'insensitive' }
     if (cidade)   where.cidade  = { contains: cidade, mode: 'insensitive' }
     if (semSite)  where.temSite = false
-    if (comTelefone) where.telefone = { not: null }
+    // comTelefone: telefone must be non-null AND non-empty string.
+    // Some imported leads have telefone="" (failed phone parse → stored as "" not null).
+    // Excluding "" here aligns this filter with getWhatsAppNumber() validation.
+    if (comTelefone) {
+      where.AND = [
+        ...(where.AND || []),
+        { AND: [{ telefone: { not: null } }, { telefone: { not: '' } }] },
+      ]
+    }
 
-    // comWhatsapp: telefone OR whatsapp non-null — use AND to avoid conflict with OR (search)
+    // comWhatsapp: lead must have whatsapp OR telefone that is non-null AND non-empty.
+    // Root cause of filter/button mismatch: import used to store "" for invalid phones.
+    // { not: null } alone passes "" — we also exclude '' to align with
+    // getWhatsAppNumber() which requires a parseable number of ≥9 digits.
     if (comWhatsapp) {
       where.AND = [
         ...(where.AND || []),
-        { OR: [{ whatsapp: { not: null } }, { telefone: { not: null } }] },
+        {
+          OR: [
+            { AND: [{ whatsapp: { not: null } }, { whatsapp: { not: '' } }] },
+            { AND: [{ telefone: { not: null } }, { telefone: { not: '' } }] },
+          ],
+        },
       ]
     }
     // sem follow-up pendente (enviado: false)
