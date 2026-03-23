@@ -7,6 +7,7 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
+
 model Lead {
   id                String   @id @default(cuid())
   nome              String
@@ -15,6 +16,8 @@ model Lead {
   cidade            String?
   telefone          String?
   whatsapp          String?
+  telefoneRaw       String?
+  whatsappRaw       String?
   email             String?
   temSite           Boolean  @default(false)
   siteFraco         Boolean  @default(false)
@@ -36,12 +39,12 @@ model Lead {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  activities   Activity[]
-  followUps    FollowUp[]
-  proposals    Proposal[]
-  tasks        InternalTask[]
-  checklists   Checklist[]
-  messages     Message[]
+  activities        Activity[]
+  followUps         FollowUp[]
+  proposals         Proposal[]
+  tasks             InternalTask[]
+  checklists        Checklist[]
+  messages          Message[]
 }
 
 model Activity {
@@ -54,16 +57,16 @@ model Activity {
 }
 
 model FollowUp {
-  id           String    @id @default(cuid())
+  id           String   @id @default(cuid())
   leadId       String
   tipo         String
   mensagem     String?
   template     String?
   agendadoPara DateTime
-  enviado      Boolean   @default(false)
+  enviado      Boolean  @default(false)
   enviadoEm    DateTime?
-  createdAt    DateTime  @default(now())
-  lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
 }
 
 model Proposal {
@@ -80,16 +83,16 @@ model Proposal {
 }
 
 model InternalTask {
-  id          String    @id @default(cuid())
-  leadId      String?
-  titulo      String
-  descricao   String?
-  prioridade  String    @default("MEDIUM")
-  status      String    @default("PENDING")
-  dueDate     DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  lead        Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  id         String    @id @default(cuid())
+  leadId     String?
+  titulo     String
+  descricao  String?
+  prioridade String    @default("MEDIUM")
+  status     String    @default("PENDING")
+  dueDate    DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  lead       Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
 }
 
 model Checklist {
@@ -112,15 +115,15 @@ model ChecklistItem {
 }
 
 model Offer {
-  id          String  @id @default(cuid())
-  nome        String
-  descricao   String?
-  preco       Float
-  precoSetup  Float   @default(0)
-  periodo     String  @default("mensal")
-  ativo       Boolean @default(true)
-  destaque    Boolean @default(false)
-  features    String
+  id         String  @id @default(cuid())
+  nome       String
+  descricao  String?
+  preco      Float
+  precoSetup Float   @default(0)
+  periodo    String  @default("mensal")
+  ativo      Boolean @default(true)
+  destaque   Boolean @default(false)
+  features   String
 }
 
 model Objection {
@@ -141,40 +144,40 @@ model Playbook {
 }
 
 model Client {
-  id           String    @id @default(cuid())
-  leadId       String?   @unique
-  nome         String
-  empresa      String?
-  nicho        String?
-  cidade       String?
-  telefone     String?
-  whatsapp     String?
-  email        String?
-  planoAtual   String?
-  planoInicio  DateTime?
-  mrr          Float     @default(0)
-  status       String    @default("ACTIVE")
-  nps          Int?
-  observacoes  String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  reports      ClientReport[]
+  id          String         @id @default(cuid())
+  leadId      String?        @unique
+  nome        String
+  empresa     String?
+  nicho       String?
+  cidade      String?
+  telefone    String?
+  whatsapp    String?
+  email       String?
+  planoAtual  String?
+  planoInicio DateTime?
+  mrr         Float          @default(0)
+  status      String         @default("ACTIVE")
+  nps         Int?
+  observacoes String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  reports     ClientReport[]
 }
 
 model ClientReport {
-  id        String   @id @default(cuid())
-  clientId  String
-  mes       String
-  ano       Int
-  leads     Int      @default(0)
-  cliques   Int      @default(0)
-  impressoes Int     @default(0)
-  conversoes Int     @default(0)
-  roas      Float?
-  verba     Float?
+  id          String    @id @default(cuid())
+  clientId    String
+  mes         String
+  ano         Int
+  leads       Int       @default(0)
+  cliques     Int       @default(0)
+  impressoes  Int       @default(0)
+  conversoes  Int       @default(0)
+  roas        Float?
+  verba       Float?
   observacoes String?
-  createdAt DateTime @default(now())
-  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
 model MessageTemplate {
@@ -190,19 +193,19 @@ model MessageTemplate {
 }
 
 model Campaign {
-  id          String   @id @default(cuid())
-  nome        String
-  canal       String
-  status      String   @default("DRAFT")
-  templateId  String?
-  destinatarios Int    @default(0)
-  enviados    Int      @default(0)
-  abertos     Int      @default(0)
-  cliques     Int      @default(0)
-  agendadoPara DateTime?
-  enviadaEm   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  nome          String
+  canal         String
+  status        String   @default("DRAFT")
+  templateId    String?
+  destinatarios Int      @default(0)
+  enviados      Int      @default(0)
+  abertos       Int      @default(0)
+  cliques       Int      @default(0)
+  agendadoPara  DateTime?
+  enviadaEm     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Message {
