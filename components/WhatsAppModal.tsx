@@ -159,6 +159,21 @@ export function WhatsAppModal({ lead, onClose, onSuccess, initialTemplate }: Pro
     setMessage(buildMessage(activeTemplate, lead))
   }, [activeTemplate, lead, buildMessage])
 
+  // ── Full state reset when the target lead changes (or modal closes/reopens) ──
+  // This is the fix for "modal stuck in sentSuccess after closing and opening another lead"
+  // We depend only on lead.id so switching leads always triggers a clean slate.
+  useEffect(() => {
+    if (!lead) return
+    setSentSuccess(false)
+    setFuDismissed(false)
+    setSending(false)
+    setError(null)
+    setCopied(false)
+    const tpl = initialTemplate ?? defaultTemplate(lead)
+    setActiveTemplate(tpl)
+    // message will be rebuilt by the effect above once activeTemplate settles
+  }, [lead?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Check Evolution API status once
   useEffect(() => {
     fetch('/api/messages/status')

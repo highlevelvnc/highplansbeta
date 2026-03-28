@@ -4,6 +4,7 @@ import {
   Plus, Search, Upload, ExternalLink, X,
   CheckCircle, AlertCircle, ChevronDown, Loader2,
   MessageCircle, Bell, FileText, Flame, Zap, Filter,
+  CheckCheck, Tag,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Onboarding } from '@/components/Onboarding'
@@ -31,7 +32,7 @@ interface Lead {
   planoAlvoUpgrade?: string
   temSite?: boolean
   instagramAtivo?: boolean
-  _count?: { followUps: number; proposals: number }
+  _count?: { followUps: number; proposals: number; messages: number }
 }
 
 const SCORE_STYLES: Record<string, { label: string; bg: string; text: string; border: string }> = {
@@ -338,6 +339,21 @@ export default function LeadsPage() {
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
 
+  // Nicho tab filter
+  const [nichoFilter, setNichoFilter] = useState('')
+  const [nichoList, setNichoList] = useState<{ nicho: string; count: number }[]>([])
+
+  // Track WA contacted leads locally (ids of leads where WA was opened this session)
+  const [waContactedIds, setWaContactedIds] = useState<Set<string>>(new Set())
+
+  // Fetch distinct nichos once on mount
+  useEffect(() => {
+    fetch('/api/leads/nichos')
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d?.nichos)) setNichoList(d.nichos) })
+      .catch(() => {})
+  }, [])
+
   const load = useCallback(() => {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
@@ -349,6 +365,8 @@ export default function LeadsPage() {
     if (quickFilter === 'semFollowUp') params.set('semFollowUp', '1')
     if (quickFilter === 'oportunidade') params.set('oportunidadeAlta', '1')
     if (quickFilter === 'proposta') params.set('comProposta', '1')
+
+    if (nichoFilter) params.set('nicho', nichoFilter)
 
     params.set('page', String(page))
     params.set('pageSize', String(pageSize))
@@ -373,7 +391,7 @@ export default function LeadsPage() {
         setTotalPages(1)
       })
       .finally(() => setInitialLoading(false))
-  }, [search, scoreFilter, quickFilter, page, pageSize])
+  }, [search, scoreFilter, quickFilter, nichoFilter, page, pageSize])
 
   useEffect(() => {
     load()
@@ -381,7 +399,7 @@ export default function LeadsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, scoreFilter, quickFilter, pageSize])
+  }, [search, scoreFilter, quickFilter, nichoFilter, pageSize])
 
   const handleCreate = async () => {
     if (!form.nome) return
@@ -584,10 +602,11 @@ export default function LeadsPage() {
     setSearch('')
     setScoreFilter('')
     setQuickFilter('')
+    setNichoFilter('')
     setPage(1)
   }
 
-  const hasActiveFilter = !!(search || scoreFilter || quickFilter)
+  const hasActiveFilter = !!(search || scoreFilter || quickFilter || nichoFilter)
 
   if (isFirstLoad && !initialLoading && leads.length === 0 && !search && !scoreFilter && !quickFilter) {
     return (
@@ -631,9 +650,11 @@ export default function LeadsPage() {
     ? activeQF?.label
     : scoreFilter
       ? scoreFilter
-      : search
-        ? `"${search}"`
-        : null
+      : nichoFilter
+        ? nichoFilter
+        : search
+          ? `"${search}"`
+          : null
 
   return (
     <div className="p-4 md:p-6">
@@ -749,7 +770,7 @@ export default function LeadsPage() {
       </div>
 
       {/* Quick filter pills */}
-      <div className="flex flex-wrap gap-2 mb-5">
+      <div className="flex flex-wrap gap-2 mb-3">
         <div className="flex items-center gap-1 mr-1">
           <Filter className="w-3.5 h-3.5 text-[#52525B]" />
           <span className="text-[10px] text-[#52525B] uppercase tracking-wider font-medium">Filtros rápidos</span>
@@ -775,6 +796,43 @@ export default function LeadsPage() {
         })}
       </div>
 
+      {/* ── Nicho tabs ── */}
+      {nichoList.length > 0 && (
+        <div className="mb-5">
+          <div className="flex items-center gap-1 mb-2">
+            <Tag className="w-3.5 h-3.5 text-[#52525B]" />
+            <span className="text-[10px] text-[#52525B] uppercase tracking-wider font-medium">Nichos</span>
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap scrollbar-hide">
+            <button
+              onClick={() => setNichoFilter('')}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                !nichoFilter
+                  ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]'
+                  : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
+              }`}
+            >
+              Todos
+              <span className="ml-1 text-[10px] opacity-60">{nichoList.reduce((a, n) => a + n.count, 0)}</span>
+            </button>
+            {nichoList.map(n => (
+              <button
+                key={n.nicho}
+                onClick={() => setNichoFilter(prev => prev === n.nicho ? '' : n.nicho)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all whitespace-nowrap ${
+                  nichoFilter === n.nicho
+                    ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]'
+                    : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
+                }`}
+              >
+                {n.nicho}
+                <span className="ml-1 text-[10px] opacity-60">{n.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* MOBILE CARD VIEW */}
       <div className="md:hidden space-y-2 mb-4">
         {leads.map(lead => {
@@ -784,112 +842,97 @@ export default function LeadsPage() {
           const hasPhone = phoneMeta.hasValidWhatsApp
           const noFollowUp = lead._count?.followUps === 0
           const isHot = lead.score === 'HOT'
+          const waContacted = waContactedIds.has(lead.id) || (lead._count?.messages ?? 0) > 0
 
           return (
             <div
               key={lead.id}
-              className={`bg-[#0F0F12] border rounded-xl p-3.5 transition-all ${
+              className={`bg-[#0F0F12] border rounded-xl overflow-hidden transition-all ${
                 isHot ? 'border-red-500/30 bg-red-500/[0.03]' : 'border-[#27272A]'
               }`}
             >
-              <div className="flex items-start justify-between gap-2 mb-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-[#F0F0F3] text-sm leading-snug truncate">{leadName}</div>
-                  <div className="text-xs text-[#71717A] mt-0.5">
-                    {[lead.nicho, lead.cidade].filter(Boolean).join(' · ') || '—'}
-                  </div>
-
-                  <div className="mt-1.5 text-xs text-[#A1A1AA] truncate">
-                    {phoneMeta.visible || 'Sem número'}
-                  </div>
-
-                  {phoneMeta.hasValidWhatsApp && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#25D366]" />
-                      <span className="text-[10px] text-[#25D366]/80 font-medium">WhatsApp válido</span>
+              {/* ── Card body ── */}
+              <div className="p-3.5">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <div className="font-semibold text-[#F0F0F3] text-sm leading-snug truncate">{leadName}</div>
+                      {waContacted && (
+                        <span title="Já contactado por WA">
+                          <CheckCheck className="w-3.5 h-3.5 text-[#25D366] flex-shrink-0" />
+                        </span>
+                      )}
                     </div>
-                  )}
-
-                  {phoneMeta.needsReview && (
-                    <div className="text-[10px] text-amber-400 mt-1">Número importado — rever manualmente</div>
-                  )}
-                </div>
-
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border flex-shrink-0 ${ss.bg} ${ss.text} ${ss.border}`}>
-                  {ss.label}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 mb-2.5">
-                <div className="flex items-center gap-1.5 flex-1">
-                  <div className="w-20 h-1.5 bg-[#27272A] rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${Math.min(lead.opportunityScore, 100)}%`,
-                        background: lead.opportunityScore >= 60 ? '#8B5CF6' : lead.opportunityScore >= 30 ? '#F59E0B' : '#71717A',
-                      }}
-                    />
+                    <div className="text-xs text-[#71717A] mt-0.5">
+                      {[lead.nicho, lead.cidade].filter(Boolean).join(' · ') || '—'}
+                    </div>
                   </div>
-                  <span className="text-[10px] text-[#71717A]">{lead.opportunityScore}pts</span>
+
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {waContacted && (
+                      <span className="text-[9px] bg-[#25D366]/12 border border-[#25D366]/25 text-[#25D366] px-1.5 py-0.5 rounded-full font-bold">
+                        WA
+                      </span>
+                    )}
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${ss.bg} ${ss.text} ${ss.border}`}>
+                      {ss.label}
+                    </span>
+                  </div>
                 </div>
 
-                {noFollowUp && (
-                  <span className="text-[9px] bg-amber-500/15 border border-amber-500/25 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">
-                    SEM FU
-                  </span>
-                )}
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <div className="w-20 h-1.5 bg-[#27272A] rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${Math.min(lead.opportunityScore, 100)}%`,
+                          background: lead.opportunityScore >= 60 ? '#8B5CF6' : lead.opportunityScore >= 30 ? '#F59E0B' : '#71717A',
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-[#71717A]">{lead.opportunityScore}pts</span>
+                  </div>
 
-                {(lead._count?.proposals ?? 0) > 0 && (
-                  <span className="text-[9px] bg-blue-500/15 border border-blue-500/25 text-blue-400 px-1.5 py-0.5 rounded-full font-bold">
-                    {lead._count!.proposals} PROP
-                  </span>
-                )}
+                  {noFollowUp && (
+                    <span className="text-[9px] bg-amber-500/15 border border-amber-500/25 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">
+                      SEM FU
+                    </span>
+                  )}
 
-                <span className="text-[10px] text-[#52525B]">
-                  {PIPELINE_STATUS[lead.pipelineStatus] || lead.pipelineStatus}
-                </span>
+                  {(lead._count?.proposals ?? 0) > 0 && (
+                    <span className="text-[9px] bg-blue-500/15 border border-blue-500/25 text-blue-400 px-1.5 py-0.5 rounded-full font-bold">
+                      {lead._count!.proposals} PROP
+                    </span>
+                  )}
+
+                  <span className="text-[10px] text-[#52525B]">
+                    {PIPELINE_STATUS[lead.pipelineStatus] || lead.pipelineStatus}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-[#27272A]">
-                <button
-                  onClick={() => { if (hasPhone) setWaLead(lead) }}
-                  disabled={!hasPhone}
-                  title={hasPhone ? 'Enviar WhatsApp' : phoneMeta.visible ? 'Número importado — rever manualmente' : 'Número inválido ou em falta'}
-                  className={`flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-medium transition-all ${
-                    hasPhone
-                      ? 'bg-[#25D366]/12 hover:bg-[#25D366]/22 text-[#25D366] border border-[#25D366]/25'
-                      : 'bg-[#16161A] text-[#3F3F46] border border-[#27272A] cursor-not-allowed opacity-50'
-                  }`}
-                >
-                  <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span>{hasPhone ? 'WA' : '—'}</span>
-                </button>
-
-                <button
-                  onClick={() => setFollowUpLead(lead)}
-                  title="Agendar follow-up"
-                  className="w-8 h-8 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 flex items-center justify-center transition-all"
-                >
-                  <Bell className="w-4 h-4" />
-                </button>
-
-                <button
-                  onClick={() => setProposalLead(lead)}
-                  title="Criar proposta"
-                  className="w-8 h-8 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 flex items-center justify-center transition-all"
-                >
-                  <FileText className="w-4 h-4" />
-                </button>
-
-                <Link
-                  href={`/leads/${lead.id}`}
-                  title="Ver detalhes"
-                  className="w-8 h-8 rounded-lg bg-[rgba(139,92,246,0.1)] hover:bg-[rgba(139,92,246,0.2)] text-[#8B5CF6] flex items-center justify-center transition-all"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </Link>
-              </div>
+              {/* ── Full-width WA action bar (mobile prospecting optimized) ── */}
+              <button
+                onClick={() => { if (hasPhone) setWaLead(lead) }}
+                disabled={!hasPhone}
+                className={`w-full flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all active:scale-[0.98] ${
+                  hasPhone
+                    ? waContacted
+                      ? 'bg-[#25D366]/8 text-[#25D366]/70 border-t border-[#25D366]/15'
+                      : 'bg-[#25D366]/15 text-[#25D366] border-t border-[#25D366]/25'
+                    : 'bg-[#16161A] text-[#3F3F46] border-t border-[#27272A] cursor-not-allowed'
+                }`}
+              >
+                {waContacted ? (
+                  <CheckCheck className="w-4 h-4" />
+                ) : (
+                  <MessageCircle className="w-4 h-4" />
+                )}
+                {hasPhone
+                  ? waContacted ? 'Contactado · Abrir WA' : 'Abrir WhatsApp'
+                  : phoneMeta.visible ? 'Nº importado — rever' : 'Sem número'}
+              </button>
             </div>
           )
         })}
@@ -929,6 +972,7 @@ export default function LeadsPage() {
               const proposalCount = lead._count?.proposals ?? 0
               const isHot = lead.score === 'HOT'
               const isHighOpp = lead.opportunityScore >= 70
+              const waContacted = waContactedIds.has(lead.id) || (lead._count?.messages ?? 0) > 0
 
               return (
                 <tr
@@ -941,7 +985,12 @@ export default function LeadsPage() {
                     <div className="flex items-center gap-2">
                       {isHot && <div className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0 animate-pulse" title="HOT lead" />}
                       <div className="min-w-0">
-                        <div className="font-medium text-[#F0F0F3] truncate max-w-[180px]">{leadName}</div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="font-medium text-[#F0F0F3] truncate max-w-[180px]">{leadName}</div>
+                          {waContacted && (
+                            <span title="Já contactado por WA"><CheckCheck className="w-3.5 h-3.5 text-[#25D366] flex-shrink-0" /></span>
+                          )}
+                        </div>
 
                         {hasPhone && (
                           <div className="flex items-center gap-1 mt-0.5">
@@ -1021,14 +1070,16 @@ export default function LeadsPage() {
                       <button
                         onClick={() => { if (hasPhone) setWaLead(lead) }}
                         disabled={!hasPhone}
-                        title={hasPhone ? 'Enviar WhatsApp' : phoneMeta.visible ? 'Número importado — rever manualmente' : 'Número inválido ou em falta'}
+                        title={hasPhone ? (waContacted ? 'Já contactado — Abrir WA' : 'Enviar WhatsApp') : phoneMeta.visible ? 'Número importado — rever manualmente' : 'Número inválido ou em falta'}
                         className={`flex items-center gap-1 px-2 h-7 rounded-lg text-[11px] font-semibold transition-all border ${
                           hasPhone
-                            ? 'bg-[#25D366]/12 hover:bg-[#25D366]/22 text-[#25D366] border-[#25D366]/25 hover:border-[#25D366]/50'
+                            ? waContacted
+                              ? 'bg-[#25D366]/8 hover:bg-[#25D366]/18 text-[#25D366]/70 border-[#25D366]/15 hover:border-[#25D366]/40'
+                              : 'bg-[#25D366]/12 hover:bg-[#25D366]/22 text-[#25D366] border-[#25D366]/25 hover:border-[#25D366]/50'
                             : 'bg-[#16161A] text-[#3F3F46] border-[#27272A] cursor-not-allowed opacity-50'
                         }`}
                       >
-                        <MessageCircle className="w-3 h-3" />
+                        {waContacted ? <CheckCheck className="w-3 h-3" /> : <MessageCircle className="w-3 h-3" />}
                         {hasPhone ? 'WA' : '—'}
                       </button>
 
@@ -1107,7 +1158,10 @@ export default function LeadsPage() {
       <WhatsAppModal
         lead={waLead}
         onClose={() => setWaLead(null)}
-        onSuccess={msg => toast(msg || 'WhatsApp enviado', 'success')}
+        onSuccess={msg => {
+          toast(msg || 'WhatsApp enviado', 'success')
+          if (waLead) setWaContactedIds(prev => new Set(prev).add(waLead.id))
+        }}
       />
 
       <QuickFollowUpModal

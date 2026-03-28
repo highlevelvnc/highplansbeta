@@ -114,6 +114,7 @@ export async function GET(req: NextRequest) {
             select: {
               followUps: true,
               proposals: true,
+              messages: true,
             },
           },
         },
