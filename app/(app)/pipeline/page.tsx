@@ -1,9 +1,9 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import {
   MessageCircle, ExternalLink, Mail, Phone, ChevronDown, X, Send, Copy,
   Check, AlertTriangle, RefreshCw, GitBranch, Upload, Loader2, Bell,
-  Flame, Zap, Filter,
+  Flame, Zap, Filter, Search, Tag, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -87,24 +87,50 @@ export default function PipelinePage() {
   const [waLead, setWaLead]         = useState<any | null>(null)
   const [fuSuggestion, setFuSuggestion] = useState<{ lead: any; stage: string } | null>(null)
   const [integrationStatus, setIntegrationStatus] = useState<{ whatsapp: { configured: boolean }; email: { configured: boolean } } | null>(null)
+
+  // Search, nicho filter, pagination
+  const [search, setSearch]         = useState('')
+  const [nichoFilter, setNichoFilter] = useState('')
+  const [nichoList, setNichoList]   = useState<{ nicho: string; count: number }[]>([])
+  const [page, setPage]             = useState(1)
+  const [pageSize]                  = useState(200)
+  const [total, setTotal]           = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+
   const router = useRouter()
   const { toast } = useToast()
 
-  const load = async () => {
+  // Fetch distinct nichos once
+  useEffect(() => {
+    fetch('/api/leads/nichos')
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d?.nichos)) setNichoList(d.nichos) })
+      .catch(() => {})
+  }, [])
+
+  const load = useCallback(async () => {
     try {
       setError(null)
-      const res = await fetch('/api/leads?pageSize=500')
+      const params = new URLSearchParams()
+      if (search) params.set('search', search)
+      if (nichoFilter) params.set('nicho', nichoFilter)
+      params.set('page', String(page))
+      params.set('pageSize', String(pageSize))
+      const res = await fetch(`/api/leads?${params}`)
       if (!res.ok) throw new Error(`Erro ${res.status}`)
       const json = await res.json()
       setLeads(Array.isArray(json) ? json : json.leads ?? [])
+      setTotal(json?.total || 0)
+      setTotalPages(json?.totalPages || 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar leads')
     } finally {
       setLoading(false)
     }
-  }
+  }, [search, nichoFilter, page, pageSize])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
+  useEffect(() => { setPage(1) }, [search, nichoFilter])
   useEffect(() => {
     fetch('/api/messages/status').then(r => r.json()).then(setIntegrationStatus).catch(() => {})
   }, [])
@@ -274,11 +300,11 @@ export default function PipelinePage() {
   return (
     <div className="p-4 md:p-6 h-full flex flex-col">
       {/* ── Header ── */}
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Pipeline Kanban</h1>
           <p className="text-sm text-[#71717A] hidden sm:block">
-            {visibleLeads.length} leads{pipelineFilter ? ` · filtro ativo` : ''} · Arraste para mover
+            {total} leads{nichoFilter ? ` · ${nichoFilter}` : ''}{pipelineFilter ? ` · filtro ativo` : ''}{search ? ` · "${search}"` : ''} · Arraste para mover
           </p>
         </div>
         {/* Stage counts */}
@@ -291,6 +317,60 @@ export default function PipelinePage() {
           ))}
         </div>
       </div>
+
+      {/* ── Search bar ── */}
+      <div className="flex gap-2 mb-3 flex-shrink-0">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#71717A]" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Pesquisar no pipeline..."
+            className="w-full bg-[#0F0F12] border border-[#27272A] rounded-lg pl-9 pr-4 py-2 text-sm text-[#F0F0F3] placeholder-[#71717A] focus:outline-none focus:border-[#8B5CF6]"
+          />
+        </div>
+        {(search || nichoFilter) && (
+          <button
+            onClick={() => { setSearch(''); setNichoFilter('') }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#27272A] text-xs text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3] transition-all flex-shrink-0"
+          >
+            <X className="w-3 h-3" /> Limpar
+          </button>
+        )}
+      </div>
+
+      {/* ── Nicho tabs ── */}
+      {nichoList.length > 0 && (
+        <div className="mb-3 flex-shrink-0">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap scrollbar-hide">
+            <button
+              onClick={() => setNichoFilter('')}
+              className={`flex items-center gap-1 flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+                !nichoFilter
+                  ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]'
+                  : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
+              }`}
+            >
+              <Tag className="w-3 h-3" />
+              Todos
+            </button>
+            {nichoList.map(n => (
+              <button
+                key={n.nicho}
+                onClick={() => setNichoFilter(prev => prev === n.nicho ? '' : n.nicho)}
+                className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all whitespace-nowrap ${
+                  nichoFilter === n.nicho
+                    ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]'
+                    : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
+                }`}
+              >
+                {n.nicho}
+                <span className="ml-1 opacity-60">{n.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Quick filter pills ── */}
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 flex-shrink-0">
@@ -512,6 +592,31 @@ export default function PipelinePage() {
           )
         })}
       </div>
+
+      {/* ── Pagination ── */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#27272A] flex-shrink-0">
+          <div className="text-xs text-[#71717A]">
+            Página {page} de {totalPages} · {total} leads
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#27272A] text-xs text-[#F0F0F3] disabled:opacity-40 disabled:cursor-not-allowed hover:border-[#8B5CF6] transition-all"
+            >
+              <ChevronLeft className="w-3 h-3" /> Anterior
+            </button>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#27272A] text-xs text-[#F0F0F3] disabled:opacity-40 disabled:cursor-not-allowed hover:border-[#8B5CF6] transition-all"
+            >
+              Próxima <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── WhatsApp compose modal ── */}
       <WhatsAppModal
