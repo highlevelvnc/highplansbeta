@@ -48,6 +48,16 @@ model Lead {
   tasks             InternalTask[]
   checklists        Checklist[]
   messages          Message[]
+
+  @@index([score])
+  @@index([pipelineStatus])
+  @@index([nicho])
+  @@index([pais])
+  @@index([agentId])
+  @@index([opportunityScore])
+  @@index([createdAt])
+  @@index([score, pipelineStatus])
+  @@index([agentId, pipelineStatus])
 }
 
 model Activity {
@@ -57,6 +67,8 @@ model Activity {
   descricao String
   createdAt DateTime @default(now())
   lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
 }
 
 model FollowUp {
@@ -70,6 +82,10 @@ model FollowUp {
   enviadoEm    DateTime?
   createdAt    DateTime @default(now())
   lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([agendadoPara])
+  @@index([enviado])
 }
 
 model Proposal {
@@ -83,6 +99,8 @@ model Proposal {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
 }
 
 model InternalTask {

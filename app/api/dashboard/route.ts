@@ -1,76 +1,131 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getPlanPrice } from '@/lib/plans'
-import type { Lead, FollowUp, InternalTask } from '@prisma/client'
+import { PLAN_PRICES } from '@/lib/plans'
 
 export async function GET() {
   const now = new Date()
   const fortyFiveDaysAgo = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000)
 
-  const leads = await prisma.lead.findMany()
-  const tasks = await prisma.internalTask.findMany({ where: { status: { not: 'DONE' } } })
-  const followUps = await prisma.followUp.findMany({ where: { enviado: false } })
+  // All queries run in parallel — no more loading entire table
+  const [
+    totalLeads,
+    leadsHot,
+    oportunidadesAltas,
+    pipelineCounts,
+    tasksPendentes,
+    tasksAtrasadas,
+    tasksAltaPrioridade,
+    followUpsAtrasados,
+    activeClientsData,
+    potentialClientsData,
+    upsellCount,
+    topOpportunities,
+    receitaPorNichoRaw,
+  ] = await Promise.all([
+    // 1. Total leads
+    prisma.lead.count(),
 
-  const activeClients = leads.filter((l: Lead) => !!l.planoAtual)
+    // 2. HOT leads
+    prisma.lead.count({ where: { score: 'HOT' } }),
 
-  const receitaAtiva = activeClients.reduce(
-    (sum, l: Lead) => sum + getPlanPrice(l.planoAtual ?? ''),
+    // 3. High opportunity
+    prisma.lead.count({ where: { opportunityScore: { gte: 60 } } }),
+
+    // 4. Pipeline counts — single groupBy instead of 7 filters
+    prisma.lead.groupBy({
+      by: ['pipelineStatus'],
+      _count: { id: true },
+    }),
+
+    // 5. Pending tasks
+    prisma.internalTask.count({ where: { status: 'PENDING' } }),
+
+    // 6. Overdue tasks
+    prisma.internalTask.count({
+      where: { dueDate: { lt: now }, status: { not: 'DONE' } },
+    }),
+
+    // 7. High priority tasks
+    prisma.internalTask.count({
+      where: { prioridade: 'HIGH', status: { not: 'DONE' } },
+    }),
+
+    // 8. Overdue follow-ups
+    prisma.followUp.count({
+      where: { enviado: false, agendadoPara: { lt: now } },
+    }),
+
+    // 9. Active clients (have planoAtual) — only fetch plan field
+    prisma.lead.findMany({
+      where: { planoAtual: { not: null } },
+      select: { planoAtual: true, nicho: true },
+    }),
+
+    // 10. Potential revenue (have upgrade target but no current plan)
+    prisma.lead.findMany({
+      where: {
+        planoAlvoUpgrade: { not: null },
+        planoAtual: null,
+      },
+      select: { planoAlvoUpgrade: true },
+    }),
+
+    // 11. Upsell candidates
+    prisma.lead.count({
+      where: {
+        planoAtual: 'Programa Aceleração Digital',
+        planoInicio: { lt: fortyFiveDaysAgo },
+      },
+    }),
+
+    // 12. Top 5 opportunities — only fetch 5 rows
+    prisma.lead.findMany({
+      orderBy: { opportunityScore: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        nome: true,
+        empresa: true,
+        opportunityScore: true,
+        nicho: true,
+      },
+    }),
+
+    // 13. Revenue by nicho — groupBy
+    prisma.lead.groupBy({
+      by: ['nicho', 'planoAtual'],
+      where: { planoAtual: { not: null } },
+      _count: { id: true },
+    }),
+  ])
+
+  // ── Compute revenue from small datasets ──
+  const receitaAtiva = activeClientsData.reduce(
+    (sum, l) => sum + (PLAN_PRICES[l.planoAtual ?? ''] ?? 0),
     0
   )
 
-  const receitaPotencial = leads
-    .filter((l: Lead) => l.planoAlvoUpgrade && !l.planoAtual)
-    .reduce((sum, l: Lead) => sum + getPlanPrice(l.planoAlvoUpgrade ?? ''), 0)
-
-  const leadsHot = leads.filter((l: Lead) => l.score === 'HOT').length
-  const oportunidadesAltas = leads.filter((l: Lead) => l.opportunityScore >= 60).length
-
-  const upsellCandidates = leads.filter(
-    (l: Lead) =>
-      l.planoAtual === 'Programa Aceleração Digital' &&
-      l.planoInicio &&
-      new Date(l.planoInicio) < fortyFiveDaysAgo
+  const receitaPotencial = potentialClientsData.reduce(
+    (sum, l) => sum + (PLAN_PRICES[l.planoAlvoUpgrade ?? ''] ?? 0),
+    0
   )
 
-  const tasksPendentes = tasks.filter((t: InternalTask) => t.status === 'PENDING').length
-  const tasksAtrasadas = tasks.filter(
-    (t: InternalTask) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'DONE'
-  ).length
-  const tasksAltaPrioridade = tasks.filter(
-    (t: InternalTask) => t.prioridade === 'HIGH' && t.status !== 'DONE'
-  ).length
-
-  const followUpsAtrasados = followUps.filter(
-    (f: FollowUp) => new Date(f.agendadoPara) < now
-  ).length
-
-  const pipeline = {
-    NEW: leads.filter((l: Lead) => l.pipelineStatus === 'NEW').length,
-    CONTACTED: leads.filter((l: Lead) => l.pipelineStatus === 'CONTACTED').length,
-    INTERESTED: leads.filter((l: Lead) => l.pipelineStatus === 'INTERESTED').length,
-    PROPOSAL_SENT: leads.filter((l: Lead) => l.pipelineStatus === 'PROPOSAL_SENT').length,
-    NEGOTIATION: leads.filter((l: Lead) => l.pipelineStatus === 'NEGOTIATION').length,
-    CLOSED: leads.filter((l: Lead) => l.pipelineStatus === 'CLOSED').length,
-    LOST: leads.filter((l: Lead) => l.pipelineStatus === 'LOST').length,
+  // Build pipeline map
+  const pipeline: Record<string, number> = {
+    NEW: 0, CONTACTED: 0, INTERESTED: 0,
+    PROPOSAL_SENT: 0, NEGOTIATION: 0, CLOSED: 0, LOST: 0,
+  }
+  for (const row of pipelineCounts) {
+    pipeline[row.pipelineStatus] = row._count.id
   }
 
+  // Build revenue by nicho
   const receitaPorNicho: Record<string, number> = {}
-  activeClients.forEach((l: Lead) => {
-    const nicho = l.nicho || 'Outros'
-    receitaPorNicho[nicho] =
-      (receitaPorNicho[nicho] || 0) + getPlanPrice(l.planoAtual ?? '')
-  })
-
-  const topOpportunities = leads
-    .sort((a: Lead, b: Lead) => b.opportunityScore - a.opportunityScore)
-    .slice(0, 5)
-    .map((l: Lead) => ({
-      id: l.id,
-      nome: l.nome,
-      empresa: l.empresa,
-      score: l.opportunityScore,
-      nicho: l.nicho,
-    }))
+  for (const row of receitaPorNichoRaw) {
+    const nicho = row.nicho || 'Outros'
+    const price = PLAN_PRICES[row.planoAtual ?? ''] ?? 0
+    receitaPorNicho[nicho] = (receitaPorNicho[nicho] || 0) + price * row._count.id
+  }
 
   return NextResponse.json({
     receitaAtiva,
@@ -78,15 +133,21 @@ export async function GET() {
     receitaFutura: receitaAtiva + receitaPotencial,
     leadsHot,
     oportunidadesAltas,
-    upsellCandidates: upsellCandidates.length,
+    upsellCandidates: upsellCount,
     tasksPendentes,
     tasksAtrasadas,
     tasksAltaPrioridade,
     followUpsAtrasados,
-    totalLeads: leads.length,
-    activeClients: activeClients.length,
+    totalLeads,
+    activeClients: activeClientsData.length,
     pipeline,
     receitaPorNicho,
-    topOpportunities,
+    topOpportunities: topOpportunities.map(l => ({
+      id: l.id,
+      nome: l.nome,
+      empresa: l.empresa,
+      score: l.opportunityScore,
+      nicho: l.nicho,
+    })),
   })
 }
