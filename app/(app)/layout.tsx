@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, LogOut, Menu, X, Bell } from 'lucide-react'
+import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, LogOut, Menu, X, Bell, BarChart3, Copy } from 'lucide-react'
 import { ToastProvider } from '@/components/Toast'
 import { BottomNavBar } from '@/components/BottomNavBar'
 
@@ -18,6 +18,9 @@ const nav = [
   { href: '/followups', label: 'Follow-ups', icon: Calendar },
   { href: '/propostas', label: 'Propostas', icon: FileText },
   { href: '/tarefas', label: 'Tarefas', icon: CheckSquare },
+  { section: 'ANÁLISE' },
+  { href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
+  { href: '/duplicados', label: 'Duplicados', icon: Copy },
   { section: 'ESTRATÉGIA' },
   { href: '/nichos', label: 'Nichos', icon: TrendingUp },
   { href: '/objecoes', label: 'Objeções', icon: Zap },
@@ -38,7 +41,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       .then(r => r.json())
       .then(d => { if (d?.followUpsAtrasados > 0) setOverdueFU(d.followUpsAtrasados) })
       .catch(() => {})
-  }, [pathname]) // re-check on page navigation
+  }, [pathname])
+
+  // Browser push notifications for overdue follow-ups
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return
+    // Request permission once
+    if (Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+    // Check every 5 min
+    const interval = setInterval(() => {
+      if (Notification.permission !== 'granted' || document.hasFocus()) return
+      fetch('/api/dashboard')
+        .then(r => r.json())
+        .then(d => {
+          if (d?.followUpsAtrasados > 0) {
+            new Notification('HIGHPLANS — Follow-ups', {
+              body: `${d.followUpsAtrasados} follow-up${d.followUpsAtrasados > 1 ? 's' : ''} atrasado${d.followUpsAtrasados > 1 ? 's' : ''}`,
+              icon: '/favicon.ico',
+            })
+          }
+        })
+        .catch(() => {})
+    }, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Lead detail pages (/leads/[id]) render their own contextual bar
   const isLeadDetailPage =
@@ -78,7 +106,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg mb-0.5 text-sm transition-all duration-150 ${
                 active
-                  ? 'bg-[rgba(139,92,246,0.12)] text-[#A78BFA] font-semibold'
+                  ? 'nav-active bg-[rgba(139,92,246,0.1)] text-[#A78BFA] font-semibold'
                   : 'text-[#71717A] hover:bg-[#18181B] hover:text-[#F0F0F3]'
               }`}>
               <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-[#8B5CF6]' : ''}`} />

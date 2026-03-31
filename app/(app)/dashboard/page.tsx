@@ -32,6 +32,7 @@ interface DashData {
   leadsPorPais?: Record<string, number>
   agentStats?: Array<{ id: string; nome: string; totalLeads: number; pipeline: Record<string, number> }>
   unassignedLeads?: number
+  avgStageDays?: Record<string, number>
 }
 
 const COUNTRY_FLAGS: Record<string, { flag: string; name: string }> = {
@@ -464,6 +465,30 @@ export default function DashboardPage() {
               <PipelineRow key={s} status={s} count={data.pipeline[s] || 0} total={pipelineTotal} />
             ))}
           </div>
+
+          {/* Stage duration metrics */}
+          {data.avgStageDays && Object.keys(data.avgStageDays).length > 0 && (
+            <div className="mt-4 pt-3 border-t border-[#16161A]">
+              <div className="text-[10px] text-[#52525B] uppercase tracking-wider font-medium mb-2">Tempo médio por etapa</div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(data.avgStageDays).map(([stage, days]) => {
+                  const meta = PIPELINE_META[stage]
+                  if (!meta) return null
+                  const maxDays = Math.max(...Object.values(data.avgStageDays!))
+                  const isBottleneck = days === maxDays && days > 7
+                  return (
+                    <div key={stage} className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] border ${
+                      isBottleneck ? 'bg-red-500/8 border-red-500/20 text-red-400' : 'bg-[#09090B] border-[#27272A] text-[#71717A]'
+                    }`}>
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color }} />
+                      <span>{meta.label}</span>
+                      <span className="font-bold tabular-nums">{days}d</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Conversion highlight */}
           {data.pipeline.CLOSED > 0 && (

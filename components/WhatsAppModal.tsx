@@ -24,6 +24,7 @@ interface Lead {
   whatsapp?: string
   score?: string
   pipelineStatus?: string
+  pais?: string
 }
 
 // ─── Template definitions ─────────────────────────────────────────────────────
@@ -45,73 +46,46 @@ function empresa(lead: Lead) {
   return lead.empresa || lead.nome || 'a vossa empresa'
 }
 
-const TEMPLATES: Template[] = [
-  {
-    id: 'novo',
-    label: 'Primeiro Contacto',
-    emoji: '👋',
-    hint: 'Para leads novos ainda não contactados',
-    build: l => [
-      `Olá ${firstName(l)}, boa tarde! 👋`,
-      '',
-      `Vi o vosso negócio ${empresa(l)} e gostaria de perceber se posso ajudar a melhorar a vossa presença digital.`,
-      '',
-      'Tenho sugestões concretas que podem fazer diferença. Tem 5 minutos para uma conversa esta semana?',
-    ].join('\n'),
-  },
-  {
-    id: 'followup',
-    label: 'Follow-up',
-    emoji: '📩',
-    hint: 'Para leads já contactados sem resposta',
-    build: l => [
-      `Olá ${firstName(l)}, bom dia! 😊`,
-      '',
-      `Passava apenas para saber se teve oportunidade de ver o que enviei sobre ${empresa(l)}.`,
-      '',
-      'Tem alguma questão que eu possa esclarecer? Estou disponível quando preferir.',
-    ].join('\n'),
-  },
-  {
-    id: 'proposta',
-    label: 'Proposta Enviada',
-    emoji: '📋',
-    hint: 'Após enviar proposta comercial',
-    build: l => [
-      `Olá ${firstName(l)}!`,
-      '',
-      `Enviei a proposta para ${empresa(l)} — conseguiu dar uma vista de olhos?`,
-      '',
-      'Se quiser ajustar algum ponto ou tiver alguma dúvida, é só dizer. Posso ligar quando preferir.',
-    ].join('\n'),
-  },
-  {
-    id: 'retomar',
-    label: 'Retomar Contacto',
-    emoji: '🌟',
-    hint: 'Para leads perdidos ou inativos',
-    build: l => [
-      `Olá ${firstName(l)}, boa tarde! 🌟`,
-      '',
-      `Sei que estamos há algum tempo sem falar. Tenho novidades que podem ser muito interessantes para ${empresa(l)}.`,
-      '',
-      'Disponível para uma conversa rápida esta semana?',
-    ].join('\n'),
-  },
-  {
-    id: 'urgencia',
-    label: 'Fecho / Urgência',
-    emoji: '⚡',
-    hint: 'Para leads em negociação a fechar',
-    build: l => [
-      `Olá ${firstName(l)}!`,
-      '',
-      `Queria dar-lhe esta última oportunidade antes de fecharmos as vagas do mês para ${l.cidade || 'a vossa zona'}.`,
-      '',
-      'Temos apenas 2 spots disponíveis. Posso reservar um para si?',
-    ].join('\n'),
-  },
-]
+type LangId = 'pt' | 'de' | 'en'
+
+const LANG_META: Record<LangId, { label: string; flag: string }> = {
+  pt: { label: 'Português', flag: '🇵🇹' },
+  de: { label: 'Deutsch', flag: '🇩🇪' },
+  en: { label: 'English', flag: '🇬🇧' },
+}
+
+function detectLang(lead: Lead): LangId {
+  if (lead.pais === 'DE') return 'de'
+  if (lead.pais === 'NL') return 'en'
+  return 'pt'
+}
+
+const TEMPLATES_BY_LANG: Record<LangId, Template[]> = {
+  pt: [
+    { id: 'novo', label: 'Primeiro Contacto', emoji: '👋', hint: 'Para leads novos', build: l => `Olá ${firstName(l)}, boa tarde! 👋\n\nVi o vosso negócio ${empresa(l)} e gostaria de perceber se posso ajudar a melhorar a vossa presença digital.\n\nTenho sugestões concretas que podem fazer diferença. Tem 5 minutos para uma conversa esta semana?` },
+    { id: 'followup', label: 'Follow-up', emoji: '📩', hint: 'Leads sem resposta', build: l => `Olá ${firstName(l)}, bom dia! 😊\n\nPassava apenas para saber se teve oportunidade de ver o que enviei sobre ${empresa(l)}.\n\nTem alguma questão que eu possa esclarecer? Estou disponível quando preferir.` },
+    { id: 'proposta', label: 'Proposta Enviada', emoji: '📋', hint: 'Após proposta', build: l => `Olá ${firstName(l)}!\n\nEnviei a proposta para ${empresa(l)} — conseguiu dar uma vista de olhos?\n\nSe quiser ajustar algum ponto ou tiver alguma dúvida, é só dizer. Posso ligar quando preferir.` },
+    { id: 'retomar', label: 'Retomar Contacto', emoji: '🌟', hint: 'Leads inativos', build: l => `Olá ${firstName(l)}, boa tarde! 🌟\n\nSei que estamos há algum tempo sem falar. Tenho novidades que podem ser muito interessantes para ${empresa(l)}.\n\nDisponível para uma conversa rápida esta semana?` },
+    { id: 'urgencia', label: 'Fecho / Urgência', emoji: '⚡', hint: 'Em negociação', build: l => `Olá ${firstName(l)}!\n\nQueria dar-lhe esta última oportunidade antes de fecharmos as vagas do mês para ${l.cidade || 'a vossa zona'}.\n\nTemos apenas 2 spots disponíveis. Posso reservar um para si?` },
+  ],
+  de: [
+    { id: 'novo', label: 'Erstkontakt', emoji: '👋', hint: 'Neue Leads', build: l => `Hallo ${firstName(l)}, guten Tag! 👋\n\nIch habe Ihr Unternehmen ${empresa(l)} gesehen und würde gerne verstehen, wie ich Ihnen helfen kann, Ihre digitale Präsenz zu verbessern.\n\nIch habe konkrete Vorschläge, die einen Unterschied machen können. Haben Sie diese Woche 5 Minuten Zeit für ein Gespräch?` },
+    { id: 'followup', label: 'Nachfassen', emoji: '📩', hint: 'Keine Antwort', build: l => `Hallo ${firstName(l)}, guten Morgen! 😊\n\nIch wollte nur kurz nachfragen, ob Sie Gelegenheit hatten, sich das anzusehen, was ich über ${empresa(l)} geschickt habe.\n\nHaben Sie Fragen? Ich stehe Ihnen jederzeit zur Verfügung.` },
+    { id: 'proposta', label: 'Angebot gesendet', emoji: '📋', hint: 'Nach Angebot', build: l => `Hallo ${firstName(l)}!\n\nIch habe das Angebot für ${empresa(l)} gesendet — konnten Sie es sich bereits ansehen?\n\nWenn Sie etwas anpassen möchten oder Fragen haben, melden Sie sich gerne.` },
+    { id: 'retomar', label: 'Wieder aufnehmen', emoji: '🌟', hint: 'Inaktive Leads', build: l => `Hallo ${firstName(l)}, guten Tag! 🌟\n\nEs ist eine Weile her, seit wir gesprochen haben. Ich habe Neuigkeiten, die für ${empresa(l)} sehr interessant sein könnten.\n\nHätten Sie diese Woche Zeit für ein kurzes Gespräch?` },
+    { id: 'urgencia', label: 'Abschluss', emoji: '⚡', hint: 'In Verhandlung', build: l => `Hallo ${firstName(l)}!\n\nIch möchte Ihnen diese letzte Gelegenheit geben, bevor wir die Plätze für diesen Monat schließen.\n\nWir haben nur noch 2 Plätze verfügbar. Soll ich einen für Sie reservieren?` },
+  ],
+  en: [
+    { id: 'novo', label: 'First Contact', emoji: '👋', hint: 'New leads', build: l => `Hi ${firstName(l)}, good afternoon! 👋\n\nI came across your business ${empresa(l)} and would love to understand how I can help improve your digital presence.\n\nI have concrete suggestions that can make a real difference. Do you have 5 minutes for a quick chat this week?` },
+    { id: 'followup', label: 'Follow-up', emoji: '📩', hint: 'No response', build: l => `Hi ${firstName(l)}, good morning! 😊\n\nJust checking in to see if you had a chance to look at what I sent about ${empresa(l)}.\n\nAny questions I can help with? I'm available whenever works for you.` },
+    { id: 'proposta', label: 'Proposal Sent', emoji: '📋', hint: 'After proposal', build: l => `Hi ${firstName(l)}!\n\nI sent the proposal for ${empresa(l)} — have you had a chance to review it?\n\nIf you'd like to adjust anything or have questions, just let me know.` },
+    { id: 'retomar', label: 'Re-engage', emoji: '🌟', hint: 'Inactive leads', build: l => `Hi ${firstName(l)}, good afternoon! 🌟\n\nIt's been a while since we last spoke. I have some exciting news that could be very interesting for ${empresa(l)}.\n\nWould you be available for a quick chat this week?` },
+    { id: 'urgencia', label: 'Close / Urgency', emoji: '⚡', hint: 'In negotiation', build: l => `Hi ${firstName(l)}!\n\nI wanted to give you this last opportunity before we close the spots for this month.\n\nWe only have 2 spots left. Shall I reserve one for you?` },
+  ],
+}
+
+// Back-compat
+const TEMPLATES = TEMPLATES_BY_LANG.pt
 
 // Derive the most relevant default template from the lead's pipeline status
 function defaultTemplate(lead: Lead): TemplateId {
@@ -139,6 +113,8 @@ interface Props {
 // ─── Component ────────────────────────────────────────────────────────────────
 export function WhatsAppModal({ lead, onClose, onSuccess, initialTemplate }: Props) {
   const startTemplate = initialTemplate ?? (lead ? defaultTemplate(lead) : 'novo')
+  const startLang = lead ? detectLang(lead) : 'pt'
+  const [lang, setLang]               = useState<LangId>(startLang)
   const [activeTemplate, setActiveTemplate] = useState<TemplateId>(startTemplate)
   const [message, setMessage] = useState('')
   const [copied, setCopied]         = useState(false)
@@ -148,16 +124,16 @@ export function WhatsAppModal({ lead, onClose, onSuccess, initialTemplate }: Pro
   const [sentSuccess, setSentSuccess]   = useState(false)
   const [fuDismissed, setFuDismissed]   = useState(false)
 
-  // Rebuild message when template or lead changes
-  const buildMessage = useCallback((tpl: TemplateId, l: Lead) => {
-    const found = TEMPLATES.find(t => t.id === tpl)
+  // Rebuild message when template, lead, or language changes
+  const buildMessage = useCallback((tpl: TemplateId, l: Lead, lng: LangId) => {
+    const found = (TEMPLATES_BY_LANG[lng] || TEMPLATES).find(t => t.id === tpl)
     return found ? found.build(l) : ''
   }, [])
 
   useEffect(() => {
     if (!lead) return
-    setMessage(buildMessage(activeTemplate, lead))
-  }, [activeTemplate, lead, buildMessage])
+    setMessage(buildMessage(activeTemplate, lead, lang))
+  }, [activeTemplate, lead, lang, buildMessage])
 
   // ── Full state reset when the target lead changes (or modal closes/reopens) ──
   // This is the fix for "modal stuck in sentSuccess after closing and opening another lead"
@@ -169,9 +145,10 @@ export function WhatsAppModal({ lead, onClose, onSuccess, initialTemplate }: Pro
     setSending(false)
     setError(null)
     setCopied(false)
+    const lng = detectLang(lead)
+    setLang(lng)
     const tpl = initialTemplate ?? defaultTemplate(lead)
     setActiveTemplate(tpl)
-    // message will be rebuilt by the effect above once activeTemplate settles
   }, [lead?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check Evolution API status once
@@ -190,13 +167,17 @@ export function WhatsAppModal({ lead, onClose, onSuccess, initialTemplate }: Pro
 
   const handleSelectTemplate = (id: TemplateId) => {
     setActiveTemplate(id)
-    // Reset manual edits — rebuild fresh from template
-    setMessage(buildMessage(id, lead))
+    setMessage(buildMessage(id, lead, lang))
     setError(null)
   }
 
+  const handleChangeLang = (lng: LangId) => {
+    setLang(lng)
+    setMessage(buildMessage(activeTemplate, lead, lng))
+  }
+
   const handleReset = () => {
-    setMessage(buildMessage(activeTemplate, lead))
+    setMessage(buildMessage(activeTemplate, lead, lang))
     setError(null)
   }
 
@@ -251,7 +232,7 @@ export function WhatsAppModal({ lead, onClose, onSuccess, initialTemplate }: Pro
     }
   }
 
-  const activeInfo = TEMPLATES.find(t => t.id === activeTemplate)
+  const activeInfo = (TEMPLATES_BY_LANG[lang] || TEMPLATES).find(t => t.id === activeTemplate)
 
   return (
     <div
@@ -299,13 +280,31 @@ export function WhatsAppModal({ lead, onClose, onSuccess, initialTemplate }: Pro
         {/* ── Scrollable body ── */}
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
 
+          {/* Language selector */}
+          <div className="flex items-center gap-1.5">
+            {(Object.keys(LANG_META) as LangId[]).map(lng => (
+              <button
+                key={lng}
+                onClick={() => handleChangeLang(lng)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                  lang === lng
+                    ? 'bg-[#8B5CF6]/12 border-[#8B5CF6]/35 text-[#8B5CF6]'
+                    : 'border-[#27272A] text-[#52525B] hover:border-[#3F3F46] hover:text-[#71717A]'
+                }`}
+              >
+                <span>{LANG_META[lng].flag}</span>
+                <span>{LANG_META[lng].label}</span>
+              </button>
+            ))}
+          </div>
+
           {/* Context template selector */}
           <div>
             <div className="text-[10px] text-[#71717A] uppercase tracking-wider font-medium mb-2">
               Contexto da mensagem
             </div>
             <div className="grid grid-cols-5 gap-1.5">
-              {TEMPLATES.map(t => (
+              {(TEMPLATES_BY_LANG[lang] || TEMPLATES).map(t => (
                 <button
                   key={t.id}
                   onClick={() => handleSelectTemplate(t.id)}

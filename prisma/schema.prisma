@@ -37,6 +37,7 @@ model Lead {
   observacaoPerfil  String?
   pipelineStatus    String   @default("NEW")
   pais              String?  // "PT", "BR", "DE", "NL"
+  tags              String?  // comma-separated: "respondeu,interessado"
   agentId           String?
   agent             User?    @relation(fields: [agentId], references: [id])
   createdAt         DateTime @default(now())

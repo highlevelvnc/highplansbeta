@@ -25,6 +25,7 @@ export async function GET() {
     agentsData,
     agentPipelineRaw,
     recentMessages,
+    stageDurationLeads,
   ] = await Promise.all([
     // 1. Total leads
     prisma.lead.count(),
@@ -134,6 +135,14 @@ export async function GET() {
       },
       _count: { id: true },
     }),
+
+    // 18. Avg stage duration (sample last 200 leads that moved from NEW)
+    prisma.lead.findMany({
+      where: { pipelineStatus: { not: 'NEW' } },
+      select: { pipelineStatus: true, createdAt: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
+    }),
   ])
 
   // ── Compute revenue from small datasets ──
@@ -191,6 +200,19 @@ export async function GET() {
   const assignedTotal = agentsData.reduce((s: number, a: any) => s + a._count.leads, 0)
   const unassignedLeads = totalLeads - assignedTotal
 
+  // Avg days per current stage (rough estimate from createdAt → updatedAt)
+  const stageDurations: Record<string, { totalDays: number; count: number }> = {}
+  for (const lead of stageDurationLeads) {
+    const days = Math.max(1, Math.round((new Date(lead.updatedAt).getTime() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60 * 24)))
+    if (!stageDurations[lead.pipelineStatus]) stageDurations[lead.pipelineStatus] = { totalDays: 0, count: 0 }
+    stageDurations[lead.pipelineStatus].totalDays += days
+    stageDurations[lead.pipelineStatus].count++
+  }
+  const avgStageDays: Record<string, number> = {}
+  for (const [stage, data] of Object.entries(stageDurations)) {
+    avgStageDays[stage] = Math.round(data.totalDays / data.count)
+  }
+
   return NextResponse.json({
     receitaAtiva,
     receitaPotencial,
@@ -216,5 +238,6 @@ export async function GET() {
     leadsPorPais,
     agentStats,
     unassignedLeads,
+    avgStageDays,
   })
 }
