@@ -70,11 +70,12 @@ const NICHOS = [
   'Outro',
 ]
 
-type QuickFilterId = '' | 'hot' | 'whatsapp' | 'semFollowUp' | 'oportunidade' | 'proposta'
+type QuickFilterId = '' | 'hot' | 'whatsapp' | 'semFollowUp' | 'oportunidade' | 'proposta' | 'nuncaContactado'
 
 const QUICK_FILTERS: { id: QuickFilterId; label: string; icon: React.ElementType; activeClasses: string }[] = [
   { id: 'hot', label: 'HOT', icon: Flame, activeClasses: 'bg-red-500/15 border-red-500/40 text-red-400' },
   { id: 'whatsapp', label: 'Com WhatsApp', icon: MessageCircle, activeClasses: 'bg-green-500/15 border-green-500/40 text-green-400' },
+  { id: 'nuncaContactado', label: 'Nunca Contactado', icon: AlertCircle, activeClasses: 'bg-orange-500/15 border-orange-500/40 text-orange-400' },
   { id: 'semFollowUp', label: 'Sem Follow-up', icon: Bell, activeClasses: 'bg-amber-500/15 border-amber-500/40 text-amber-400' },
   { id: 'oportunidade', label: 'Alta Oportunidade', icon: Zap, activeClasses: 'bg-[rgba(139,92,246,0.15)] border-[rgba(139,92,246,0.4)] text-[#8B5CF6]' },
   { id: 'proposta', label: 'Com Proposta', icon: FileText, activeClasses: 'bg-blue-500/15 border-blue-500/40 text-blue-400' },
@@ -277,6 +278,7 @@ interface ImportState {
   }>
   nicho: string
   origem: string
+  autoAssign: boolean
   result: ImportResult | null
   totalRows: number
   processedRows: number
@@ -326,6 +328,7 @@ export default function LeadsPage() {
     preview: [],
     nicho: '',
     origem: 'Importação CSV',
+    autoAssign: true,
     result: null,
     totalRows: 0,
     processedRows: 0,
@@ -385,6 +388,7 @@ export default function LeadsPage() {
     else if (scoreFilter) params.set('score', scoreFilter)
 
     if (quickFilter === 'whatsapp') params.set('comWhatsapp', '1')
+    if (quickFilter === 'nuncaContactado') params.set('nuncaContactado', '1')
     if (quickFilter === 'semFollowUp') params.set('semFollowUp', '1')
     if (quickFilter === 'oportunidade') params.set('oportunidadeAlta', '1')
     if (quickFilter === 'proposta') params.set('comProposta', '1')
@@ -529,6 +533,7 @@ export default function LeadsPage() {
             rows: batchRows,
             nicho: imp.nicho || undefined,
             origem: imp.origem,
+            autoAssign: imp.autoAssign || false,
           }),
         })
 
@@ -579,6 +584,7 @@ export default function LeadsPage() {
       preview: [],
       nicho: '',
       origem: 'Importação CSV',
+      autoAssign: true,
       result: null,
       totalRows: 0,
       processedRows: 0,
@@ -1664,6 +1670,20 @@ export default function LeadsPage() {
                       />
                     </div>
                   </div>
+
+                  {/* Auto-assign toggle */}
+                  <label className="flex items-center gap-3 bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2.5 cursor-pointer hover:border-[#8B5CF6]/30 transition-all">
+                    <input
+                      type="checkbox"
+                      checked={imp.autoAssign}
+                      onChange={e => setImp(p => ({ ...p, autoAssign: e.target.checked }))}
+                      className="w-4 h-4 rounded border-[#27272A] bg-[#09090B] text-[#8B5CF6] focus:ring-0 cursor-pointer"
+                    />
+                    <div>
+                      <div className="text-sm text-[#F0F0F3] font-medium">Auto-atribuir agentes</div>
+                      <div className="text-[10px] text-[#52525B]">Distribui leads igualmente entre BIA e VINICIUS (round-robin)</div>
+                    </div>
+                  </label>
 
                   <div className="flex gap-3 pt-1">
                     <button

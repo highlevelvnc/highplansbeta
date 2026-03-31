@@ -61,10 +61,11 @@ const SCORE_STYLES: Record<string, { bg: string; text: string }> = {
 const FU_SUGGESTION_STAGES = new Set(['CONTACTED', 'INTERESTED', 'PROPOSAL_SENT', 'NEGOTIATION'])
 
 // ── Pipeline card filter type ────────────────────────────────────────────────
-type PipelineFilter = '' | 'hot' | 'semFollowUp' | 'altaOportunidade'
+type PipelineFilter = '' | 'hot' | 'semFollowUp' | 'altaOportunidade' | 'nuncaContactado'
 
 const PIPELINE_FILTERS: { id: PipelineFilter; label: string; icon: React.ElementType }[] = [
   { id: 'hot',             label: 'HOT',              icon: Flame },
+  { id: 'nuncaContactado', label: 'Nunca Contactado', icon: AlertTriangle },
   { id: 'semFollowUp',     label: 'Sem Follow-up',    icon: Bell  },
   { id: 'altaOportunidade',label: 'Alta Oportunidade',icon: Zap   },
 ]
@@ -152,6 +153,7 @@ export default function PipelinePage() {
   const filterLeads = (list: any[]) => {
     if (!pipelineFilter) return list
     if (pipelineFilter === 'hot')             return list.filter(l => l.score === 'HOT')
+    if (pipelineFilter === 'nuncaContactado') return list.filter(l => (l._count?.messages ?? 0) === 0)
     if (pipelineFilter === 'semFollowUp')     return list.filter(l => (l._count?.followUps ?? 0) === 0)
     if (pipelineFilter === 'altaOportunidade') return list.filter(l => l.opportunityScore >= 70)
     return list
@@ -457,12 +459,16 @@ export default function PipelinePage() {
           const Icon = f.icon
           const count = f.id === 'hot'
             ? leads.filter(l => l.score === 'HOT').length
+            : f.id === 'nuncaContactado'
+            ? leads.filter(l => (l._count?.messages ?? 0) === 0).length
             : f.id === 'semFollowUp'
             ? leads.filter(l => (l._count?.followUps ?? 0) === 0).length
             : leads.filter(l => l.opportunityScore >= 70).length
 
           const activeClasses = f.id === 'hot'
             ? 'bg-red-500/15 border-red-500/40 text-red-400'
+            : f.id === 'nuncaContactado'
+            ? 'bg-orange-500/15 border-orange-500/40 text-orange-400'
             : f.id === 'semFollowUp'
             ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
             : 'bg-[rgba(139,92,246,0.15)] border-[rgba(139,92,246,0.4)] text-[#8B5CF6]'
@@ -605,19 +611,33 @@ export default function PipelinePage() {
                       {/* Action buttons */}
                       <div className="flex items-center justify-between pt-1 border-t border-[#27272A]/60">
                         <div className="flex gap-1">
-                          {/* WhatsApp — opens WhatsAppModal with smart templates */}
-                          <button
-                            onClick={e => { e.stopPropagation(); if (hasWA) setWaLead(lead) }}
-                            title={hasWA ? 'Enviar WhatsApp' : 'Sem número de WhatsApp'}
-                            className={`flex items-center gap-0.5 px-1.5 h-6 rounded-md text-[10px] font-bold transition-all ${
-                              hasWA
-                                ? 'bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] border border-[#25D366]/25'
-                                : 'bg-[#27272A]/50 text-[#52525B] cursor-not-allowed border border-transparent'
-                            }`}
-                          >
-                            <MessageCircle className="w-3 h-3" />
-                            {hasWA && <span>WA</span>}
-                          </button>
+                          {/* WhatsApp — quick open (1 tap = opens wa.me) */}
+                          {hasWA ? (
+                            <a
+                              href={buildWhatsAppUrl(lead) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={e => {
+                                e.stopPropagation()
+                                // Register in DB silently
+                                fetch('/api/messages/send', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ leadId: lead.id, canal: 'WHATSAPP', corpo: '(aberto via pipeline)' }),
+                                }).catch(() => {})
+                                toast(`WA aberto · ${leadName}`, 'success')
+                              }}
+                              title="Abrir WhatsApp (1 toque)"
+                              className="flex items-center gap-0.5 px-1.5 h-6 rounded-md text-[10px] font-bold transition-all bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] border border-[#25D366]/25 active:scale-95"
+                            >
+                              <MessageCircle className="w-3 h-3" />
+                              <span>WA</span>
+                            </a>
+                          ) : (
+                            <span className="flex items-center gap-0.5 px-1.5 h-6 rounded-md text-[10px] font-bold bg-[#27272A]/50 text-[#52525B] border border-transparent">
+                              <MessageCircle className="w-3 h-3" />
+                            </span>
+                          )}
                           {/* Email */}
                           <button
                             onClick={e => { e.stopPropagation(); openContact(lead, 'email') }}

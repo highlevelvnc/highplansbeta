@@ -223,7 +223,8 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
 
-    const { rows, nicho: nichoOverride, origem: origemDefault } = body as {
+    const { rows, nicho: nichoOverride, origem: origemDefault, autoAssign } = body as {
+      autoAssign?: boolean
       rows: Array<{
         nome?: string
         Nome?: string
@@ -261,6 +262,18 @@ export async function POST(req: Request) {
     }
 
     const index = await buildMatchIndex()
+
+    // Round-robin agent assignment
+    let agentIds: string[] = []
+    let agentIdx = 0
+    if (autoAssign) {
+      const agents = await prisma.user.findMany({
+        where: { ativo: true, role: 'USER' },
+        select: { id: true },
+        orderBy: { nome: 'asc' },
+      })
+      agentIds = agents.map(a => a.id)
+    }
 
     let created = 0
     let updated = 0
@@ -368,7 +381,9 @@ export async function POST(req: Request) {
           pipelineStatus: 'NEW',
           observacaoPerfil: obs,
           pais: detectCountry(telefoneRawValue || telefoneStored, cidadeRaw),
+          ...(agentIds.length > 0 ? { agentId: agentIds[agentIdx % agentIds.length] } : {}),
         }
+        if (agentIds.length > 0) agentIdx++
 
         const match = await findExistingLead(
           {
