@@ -310,3 +310,74 @@ export function cleanPhoneForStorage(raw: string): string {
 export function cleanNameForStorage(raw: string): string {
   return sanitizeName(raw).substring(0, 200)
 }
+
+// ─── COUNTRY DETECTION ─────────────────────────────────────────────────────
+
+export const COUNTRY_INFO: Record<string, { flag: string; name: string; code: string }> = {
+  PT: { flag: '🇵🇹', name: 'Portugal', code: '+351' },
+  BR: { flag: '🇧🇷', name: 'Brasil', code: '+55' },
+  DE: { flag: '🇩🇪', name: 'Alemanha', code: '+49' },
+  NL: { flag: '🇳🇱', name: 'Holanda', code: '+31' },
+}
+
+// Cities → country mapping for fallback detection
+const CITY_COUNTRY: Record<string, string> = {
+  // Portugal
+  lisboa: 'PT', porto: 'PT', braga: 'PT', faro: 'PT', coimbra: 'PT',
+  aveiro: 'PT', setúbal: 'PT', setubal: 'PT', viseu: 'PT', leiria: 'PT',
+  funchal: 'PT', guimarães: 'PT', guimaraes: 'PT', évora: 'PT', evora: 'PT',
+  maia: 'PT', matosinhos: 'PT', almada: 'PT', oeiras: 'PT', cascais: 'PT',
+  sintra: 'PT', amadora: 'PT', gondomar: 'PT', vila: 'PT', gaia: 'PT',
+  // Brasil
+  'são paulo': 'BR', 'sao paulo': 'BR', rio: 'BR', 'rio de janeiro': 'BR',
+  brasília: 'BR', brasilia: 'BR', salvador: 'BR', fortaleza: 'BR',
+  'belo horizonte': 'BR', manaus: 'BR', curitiba: 'BR', recife: 'BR',
+  goiânia: 'BR', goiania: 'BR', belém: 'BR', belem: 'BR', campinas: 'BR',
+  guarulhos: 'BR', florianópolis: 'BR', florianopolis: 'BR',
+  // Alemanha
+  berlin: 'DE', münchen: 'DE', munchen: 'DE', munich: 'DE', hamburg: 'DE',
+  frankfurt: 'DE', köln: 'DE', koln: 'DE', düsseldorf: 'DE', dusseldorf: 'DE',
+  stuttgart: 'DE', dortmund: 'DE', essen: 'DE', bremen: 'DE', dresden: 'DE',
+  // Holanda
+  amsterdam: 'NL', rotterdam: 'NL', haia: 'NL', 'the hague': 'NL',
+  utrecht: 'NL', eindhoven: 'NL', groningen: 'NL', tilburg: 'NL',
+  almere: 'NL', breda: 'NL', nijmegen: 'NL',
+}
+
+/**
+ * Detect country from phone number (DDD) and optionally cidade.
+ * Priority: phone prefix → local format heuristics → city fallback.
+ */
+export function detectCountry(phone?: string | null, cidade?: string | null): string | null {
+  if (phone) {
+    const digits = phone.replace(/\D/g, '')
+
+    // Check international prefixes (longest match first)
+    if (digits.startsWith('351') || digits.startsWith('00351')) return 'PT'
+    if (digits.startsWith('55') || digits.startsWith('0055')) return 'BR'
+    if (digits.startsWith('49') || digits.startsWith('0049')) return 'DE'
+    if (digits.startsWith('31') || digits.startsWith('0031')) return 'NL'
+
+    // Portuguese local format: 9 digits starting with 9 (mobile) or 2 (landline)
+    if (digits.length === 9 && (digits[0] === '9' || digits[0] === '2')) return 'PT'
+
+    // Brazilian local: 10-11 digits (DDD 2 digits + 8-9 digit number)
+    if ((digits.length === 10 || digits.length === 11) && /^[1-9][1-9]/.test(digits)) return 'BR'
+
+    // German local: 10-11 digits starting with 0 (national prefix)
+    if (digits.length >= 10 && digits.length <= 12 && digits[0] === '0' && /^0(1[567]|[2-9])/.test(digits)) return 'DE'
+
+    // Dutch local: 10 digits starting with 0
+    if (digits.length === 10 && digits[0] === '0' && digits[1] === '6') return 'NL'
+  }
+
+  // Fallback: city name matching
+  if (cidade) {
+    const normalized = cidade.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+    for (const [city, country] of Object.entries(CITY_COUNTRY)) {
+      if (normalized.includes(city)) return country
+    }
+  }
+
+  return null
+}

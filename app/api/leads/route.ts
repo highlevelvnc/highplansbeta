@@ -14,6 +14,10 @@ export async function GET(req: NextRequest) {
     const semSite = searchParams.get('semSite') === '1'
     const comTelefone = searchParams.get('comTelefone') === '1'
 
+    const pais = searchParams.get('pais') ?? ''
+    const agentId = searchParams.get('agentId') ?? ''
+    const semAgente = searchParams.get('semAgente') === '1'
+
     // filtros comerciais
     const comWhatsapp = searchParams.get('comWhatsapp') === '1'
     const semFollowUp = searchParams.get('semFollowUp') === '1'
@@ -47,6 +51,9 @@ export async function GET(req: NextRequest) {
     if (score) where.score = score
     if (nicho) where.nicho = { contains: nicho, mode: 'insensitive' }
     if (cidade) where.cidade = { contains: cidade, mode: 'insensitive' }
+    if (pais) where.pais = pais
+    if (agentId) where.agentId = agentId
+    if (semAgente) where.agentId = null
     if (semSite) where.temSite = false
 
     // comTelefone: inclui normalizado OU raw, desde que não seja null nem string vazia
@@ -107,6 +114,9 @@ export async function GET(req: NextRequest) {
           opportunityScore: true,
           score: true,
           pipelineStatus: true,
+          pais: true,
+          agentId: true,
+          agent: { select: { id: true, nome: true } },
           planoAtual: true,
           planoAlvoUpgrade: true,
           createdAt: true,

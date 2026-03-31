@@ -12,7 +12,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { QuickFollowUpModal } from '@/components/QuickFollowUpModal'
 import { WhatsAppModal } from '@/components/WhatsAppModal'
 import { FollowUpSuggestion } from '@/components/FollowUpSuggestion'
-import { displayName, getWhatsAppNumber, getCallNumber, buildWhatsAppUrl } from '@/lib/lead-utils'
+import { displayName, getWhatsAppNumber, getCallNumber, buildWhatsAppUrl, COUNTRY_INFO } from '@/lib/lead-utils'
 
 const STAGES = [
   { id: 'NEW',           label: 'Novos',       color: '#71717A' },
@@ -88,10 +88,14 @@ export default function PipelinePage() {
   const [fuSuggestion, setFuSuggestion] = useState<{ lead: any; stage: string } | null>(null)
   const [integrationStatus, setIntegrationStatus] = useState<{ whatsapp: { configured: boolean }; email: { configured: boolean } } | null>(null)
 
-  // Search, nicho filter, pagination
+  // Search, nicho, country, agent filter, pagination
   const [search, setSearch]         = useState('')
   const [nichoFilter, setNichoFilter] = useState('')
   const [nichoList, setNichoList]   = useState<{ nicho: string; count: number }[]>([])
+  const [paisFilter, setPaisFilter] = useState('')
+  const [paisList, setPaisList]     = useState<{ pais: string; count: number }[]>([])
+  const [agentFilter, setAgentFilter] = useState('')
+  const [agentList, setAgentList]   = useState<{ id: string; nome: string; _count: { leads: number } }[]>([])
   const [page, setPage]             = useState(1)
   const [pageSize]                  = useState(200)
   const [total, setTotal]           = useState(0)
@@ -100,12 +104,11 @@ export default function PipelinePage() {
   const router = useRouter()
   const { toast } = useToast()
 
-  // Fetch distinct nichos once
+  // Fetch distinct nichos, paises, agents once
   useEffect(() => {
-    fetch('/api/leads/nichos')
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d?.nichos)) setNichoList(d.nichos) })
-      .catch(() => {})
+    fetch('/api/leads/nichos').then(r => r.json()).then(d => { if (Array.isArray(d?.nichos)) setNichoList(d.nichos) }).catch(() => {})
+    fetch('/api/leads/paises').then(r => r.json()).then(d => { if (Array.isArray(d?.paises)) setPaisList(d.paises) }).catch(() => {})
+    fetch('/api/leads/agents').then(r => r.json()).then(d => { if (Array.isArray(d?.agents)) setAgentList(d.agents) }).catch(() => {})
   }, [])
 
   const load = useCallback(async () => {
@@ -114,6 +117,9 @@ export default function PipelinePage() {
       const params = new URLSearchParams()
       if (search) params.set('search', search)
       if (nichoFilter) params.set('nicho', nichoFilter)
+      if (paisFilter) params.set('pais', paisFilter)
+      if (agentFilter === '_none') params.set('semAgente', '1')
+      else if (agentFilter) params.set('agentId', agentFilter)
       params.set('page', String(page))
       params.set('pageSize', String(pageSize))
       const res = await fetch(`/api/leads?${params}`)
@@ -127,10 +133,10 @@ export default function PipelinePage() {
     } finally {
       setLoading(false)
     }
-  }, [search, nichoFilter, page, pageSize])
+  }, [search, nichoFilter, paisFilter, agentFilter, page, pageSize])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => { setPage(1) }, [search, nichoFilter])
+  useEffect(() => { setPage(1) }, [search, nichoFilter, paisFilter, agentFilter])
   useEffect(() => {
     fetch('/api/messages/status').then(r => r.json()).then(setIntegrationStatus).catch(() => {})
   }, [])
@@ -329,9 +335,9 @@ export default function PipelinePage() {
             className="w-full bg-[#0F0F12] border border-[#27272A] rounded-lg pl-9 pr-4 py-2 text-sm text-[#F0F0F3] placeholder-[#71717A] focus:outline-none focus:border-[#8B5CF6]"
           />
         </div>
-        {(search || nichoFilter) && (
+        {(search || nichoFilter || paisFilter || agentFilter) && (
           <button
-            onClick={() => { setSearch(''); setNichoFilter('') }}
+            onClick={() => { setSearch(''); setNichoFilter(''); setPaisFilter(''); setAgentFilter('') }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#27272A] text-xs text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3] transition-all flex-shrink-0"
           >
             <X className="w-3 h-3" /> Limpar
@@ -371,6 +377,65 @@ export default function PipelinePage() {
           </div>
         </div>
       )}
+
+      {/* ── Country + Agent filters ── */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-3 flex-shrink-0">
+        {paisList.length > 0 && (
+          <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
+            <button
+              onClick={() => setPaisFilter('')}
+              className={`flex-shrink-0 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+                !paisFilter ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B]'
+              }`}
+            >
+              Todos
+            </button>
+            {paisList.map(p => (
+              <button
+                key={p.pais}
+                onClick={() => setPaisFilter(prev => prev === p.pais ? '' : p.pais)}
+                className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+                  paisFilter === p.pais ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B]'
+                }`}
+              >
+                <span>{COUNTRY_INFO[p.pais]?.flag || '🌍'}</span>
+                {p.pais}
+              </button>
+            ))}
+          </div>
+        )}
+        {agentList.length > 0 && (
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-hide sm:ml-auto">
+            <button
+              onClick={() => setAgentFilter('')}
+              className={`flex-shrink-0 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+                !agentFilter ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B]'
+              }`}
+            >
+              Todos
+            </button>
+            {agentList.map(a => (
+              <button
+                key={a.id}
+                onClick={() => setAgentFilter(prev => prev === a.id ? '' : a.id)}
+                className={`flex-shrink-0 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+                  agentFilter === a.id ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B]'
+                }`}
+              >
+                {a.nome}
+              </button>
+            ))}
+            <button
+              onClick={() => setAgentFilter(prev => prev === '_none' ? '' : '_none')}
+              className={`flex-shrink-0 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+                agentFilter === '_none' ? 'bg-amber-500/15 border-amber-500/40 text-amber-400' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B]'
+              }`}
+            >
+              Sem agente
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* ── Quick filter pills ── */}
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 flex-shrink-0">
@@ -482,12 +547,22 @@ export default function PipelinePage() {
                       <div className="flex items-start justify-between gap-1 mb-1.5">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1 mb-0.5">
+                            {lead.pais && COUNTRY_INFO[lead.pais] && (
+                              <span className="text-xs flex-shrink-0" title={COUNTRY_INFO[lead.pais].name}>{COUNTRY_INFO[lead.pais].flag}</span>
+                            )}
                             {hasWA && (
                               <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#25D366] flex-shrink-0" title="Tem WhatsApp" />
                             )}
                             <div className="text-xs font-semibold text-[#F0F0F3] leading-snug truncate">{leadName}</div>
                           </div>
-                          {lead.cidade && <div className="text-[10px] text-[#71717A]">{lead.cidade}</div>}
+                          <div className="flex items-center gap-1">
+                            {lead.cidade && <span className="text-[10px] text-[#71717A]">{lead.cidade}</span>}
+                            {lead.agent && (
+                              <span className="text-[8px] bg-[#8B5CF6]/12 border border-[#8B5CF6]/25 text-[#8B5CF6] px-1 py-0 rounded font-bold">
+                                {lead.agent?.nome}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
                           <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${ss.bg} ${ss.text}`}>

@@ -4,7 +4,7 @@ import {
   Plus, Search, Upload, ExternalLink, X,
   CheckCircle, AlertCircle, ChevronDown, Loader2,
   MessageCircle, Bell, FileText, Flame, Zap, Filter,
-  CheckCheck, Tag,
+  CheckCheck, Tag, UserCheck, Users2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Onboarding } from '@/components/Onboarding'
@@ -12,7 +12,7 @@ import { QuickFollowUpModal } from '@/components/QuickFollowUpModal'
 import { QuickProposalModal } from '@/components/QuickProposalModal'
 import { WhatsAppModal } from '@/components/WhatsAppModal'
 import { useToast } from '@/components/Toast'
-import { displayName, getPhoneDisplayMeta } from '@/lib/lead-utils'
+import { displayName, getPhoneDisplayMeta, COUNTRY_INFO } from '@/lib/lead-utils'
 
 interface Lead {
   id: string
@@ -28,6 +28,9 @@ interface Lead {
   opportunityScore: number
   score: string
   pipelineStatus: string
+  pais?: string
+  agentId?: string
+  agent?: { id: string; nome: string }
   planoAtual?: string
   planoAlvoUpgrade?: string
   temSite?: boolean
@@ -343,14 +346,32 @@ export default function LeadsPage() {
   const [nichoFilter, setNichoFilter] = useState('')
   const [nichoList, setNichoList] = useState<{ nicho: string; count: number }[]>([])
 
+  // Country + Agent filters
+  const [paisFilter, setPaisFilter] = useState('')
+  const [paisList, setPaisList] = useState<{ pais: string; count: number }[]>([])
+  const [agentFilter, setAgentFilter] = useState('')
+  const [agentList, setAgentList] = useState<{ id: string; nome: string; _count: { leads: number } }[]>([])
+
+  // Multi-select for assignment
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [assigning, setAssigning] = useState(false)
+
   // Track WA contacted leads locally (ids of leads where WA was opened this session)
   const [waContactedIds, setWaContactedIds] = useState<Set<string>>(new Set())
 
-  // Fetch distinct nichos once on mount
+  // Fetch distinct nichos, paises, agents once on mount
   useEffect(() => {
     fetch('/api/leads/nichos')
       .then(r => r.json())
       .then(d => { if (Array.isArray(d?.nichos)) setNichoList(d.nichos) })
+      .catch(() => {})
+    fetch('/api/leads/paises')
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d?.paises)) setPaisList(d.paises) })
+      .catch(() => {})
+    fetch('/api/leads/agents')
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d?.agents)) setAgentList(d.agents) })
       .catch(() => {})
   }, [])
 
@@ -367,6 +388,9 @@ export default function LeadsPage() {
     if (quickFilter === 'proposta') params.set('comProposta', '1')
 
     if (nichoFilter) params.set('nicho', nichoFilter)
+    if (paisFilter) params.set('pais', paisFilter)
+    if (agentFilter === '_none') params.set('semAgente', '1')
+    else if (agentFilter) params.set('agentId', agentFilter)
 
     params.set('page', String(page))
     params.set('pageSize', String(pageSize))
@@ -391,7 +415,7 @@ export default function LeadsPage() {
         setTotalPages(1)
       })
       .finally(() => setInitialLoading(false))
-  }, [search, scoreFilter, quickFilter, nichoFilter, page, pageSize])
+  }, [search, scoreFilter, quickFilter, nichoFilter, paisFilter, agentFilter, page, pageSize])
 
   useEffect(() => {
     load()
@@ -399,7 +423,7 @@ export default function LeadsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, scoreFilter, quickFilter, nichoFilter, pageSize])
+  }, [search, scoreFilter, quickFilter, nichoFilter, paisFilter, agentFilter, pageSize])
 
   const handleCreate = async () => {
     if (!form.nome) return
@@ -603,10 +627,56 @@ export default function LeadsPage() {
     setScoreFilter('')
     setQuickFilter('')
     setNichoFilter('')
+    setPaisFilter('')
+    setAgentFilter('')
+    setSelectedIds(new Set())
     setPage(1)
   }
 
-  const hasActiveFilter = !!(search || scoreFilter || quickFilter || nichoFilter)
+  const hasActiveFilter = !!(search || scoreFilter || quickFilter || nichoFilter || paisFilter || agentFilter)
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const assignLeads = async (targetAgentId: string | null) => {
+    if (selectedIds.size === 0) return
+    setAssigning(true)
+    try {
+      const res = await fetch('/api/leads/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadIds: Array.from(selectedIds), agentId: targetAgentId }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        const agentName = targetAgentId
+          ? agentList.find(a => a.id === targetAgentId)?.nome || 'Agente'
+          : null
+        toast(
+          targetAgentId
+            ? `${data.updated} leads atribuídos a ${agentName}`
+            : `${data.updated} leads desatribuídos`,
+          'success'
+        )
+        setSelectedIds(new Set())
+        load()
+        // Refresh agent counts
+        fetch('/api/leads/agents').then(r => r.json()).then(d => { if (Array.isArray(d?.agents)) setAgentList(d.agents) }).catch(() => {})
+      } else {
+        toast(data.error || 'Erro ao atribuir', 'error')
+      }
+    } catch {
+      toast('Erro de conexão', 'error')
+    } finally {
+      setAssigning(false)
+    }
+  }
 
   if (isFirstLoad && !initialLoading && leads.length === 0 && !search && !scoreFilter && !quickFilter) {
     return (
@@ -833,6 +903,84 @@ export default function LeadsPage() {
         </div>
       )}
 
+      {/* ── Country + Agent filters ── */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        {/* Country tabs */}
+        {paisList.length > 0 && (
+          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+            <button
+              onClick={() => setPaisFilter('')}
+              className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                !paisFilter
+                  ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]'
+                  : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
+              }`}
+            >
+              Todos Países
+            </button>
+            {paisList.map(p => {
+              const info = COUNTRY_INFO[p.pais]
+              return (
+                <button
+                  key={p.pais}
+                  onClick={() => setPaisFilter(prev => prev === p.pais ? '' : p.pais)}
+                  className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all whitespace-nowrap ${
+                    paisFilter === p.pais
+                      ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]'
+                      : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
+                  }`}
+                >
+                  <span>{info?.flag || '🌍'}</span>
+                  {p.pais}
+                  <span className="opacity-60">{p.count}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Agent selector */}
+        {agentList.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide sm:ml-auto">
+            <Users2 className="w-3.5 h-3.5 text-[#52525B] flex-shrink-0" />
+            <button
+              onClick={() => setAgentFilter('')}
+              className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                !agentFilter
+                  ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]'
+                  : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
+              }`}
+            >
+              Todos
+            </button>
+            {agentList.map(a => (
+              <button
+                key={a.id}
+                onClick={() => setAgentFilter(prev => prev === a.id ? '' : a.id)}
+                className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all whitespace-nowrap ${
+                  agentFilter === a.id
+                    ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]'
+                    : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
+                }`}
+              >
+                {a.nome}
+                <span className="ml-1 opacity-60">{a._count.leads}</span>
+              </button>
+            ))}
+            <button
+              onClick={() => setAgentFilter(prev => prev === '_none' ? '' : '_none')}
+              className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                agentFilter === '_none'
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                  : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
+              }`}
+            >
+              Sem agente
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* MOBILE CARD VIEW */}
       <div className="md:hidden space-y-2 mb-4">
         {leads.map(lead => {
@@ -854,21 +1002,38 @@ export default function LeadsPage() {
               {/* ── Card body ── */}
               <div className="p-3.5">
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <div className="font-semibold text-[#F0F0F3] text-sm leading-snug truncate">{leadName}</div>
-                      {waContacted && (
-                        <span title="Já contactado por WA">
-                          <CheckCheck className="w-3.5 h-3.5 text-[#25D366] flex-shrink-0" />
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-[#71717A] mt-0.5">
-                      {[lead.nicho, lead.cidade].filter(Boolean).join(' · ') || '—'}
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {/* Selection checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(lead.id)}
+                      onChange={() => toggleSelect(lead.id)}
+                      className="w-4 h-4 rounded border-[#27272A] bg-[#09090B] text-[#8B5CF6] focus:ring-0 flex-shrink-0 cursor-pointer"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        {lead.pais && COUNTRY_INFO[lead.pais] && (
+                          <span className="text-sm flex-shrink-0" title={COUNTRY_INFO[lead.pais].name}>{COUNTRY_INFO[lead.pais].flag}</span>
+                        )}
+                        <div className="font-semibold text-[#F0F0F3] text-sm leading-snug truncate">{leadName}</div>
+                        {waContacted && (
+                          <span title="Já contactado por WA">
+                            <CheckCheck className="w-3.5 h-3.5 text-[#25D366] flex-shrink-0" />
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-[#71717A] mt-0.5">
+                        {[lead.nicho, lead.cidade].filter(Boolean).join(' · ') || '—'}
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {lead.agent && (
+                      <span className="text-[9px] bg-[#8B5CF6]/12 border border-[#8B5CF6]/25 text-[#8B5CF6] px-1.5 py-0.5 rounded-full font-bold">
+                        {lead.agent.nome}
+                      </span>
+                    )}
                     {waContacted && (
                       <span className="text-[9px] bg-[#25D366]/12 border border-[#25D366]/25 text-[#25D366] px-1.5 py-0.5 rounded-full font-bold">
                         WA
@@ -955,7 +1120,18 @@ export default function LeadsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#27272A]">
-              {['Lead', 'Nicho / Cidade', 'Contacto', 'Score · Oportunidade', 'Pipeline', 'FU · Prop', 'Ações'].map(h => (
+              <th className="w-10 px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={leads.length > 0 && leads.every(l => selectedIds.has(l.id))}
+                  onChange={() => {
+                    if (leads.every(l => selectedIds.has(l.id))) setSelectedIds(new Set())
+                    else setSelectedIds(new Set(leads.map(l => l.id)))
+                  }}
+                  className="w-4 h-4 rounded border-[#27272A] bg-[#09090B] text-[#8B5CF6] focus:ring-0 cursor-pointer"
+                />
+              </th>
+              {['Lead', 'Nicho / Cidade', 'Contacto', 'Score · Oportunidade', 'Pipeline', 'Agente', 'Ações'].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-[10px] text-[#71717A] uppercase tracking-wider font-medium whitespace-nowrap">
                   {h}
                 </th>
@@ -981,8 +1157,19 @@ export default function LeadsPage() {
                     isHot ? 'bg-red-500/[0.02]' : ''
                   }`}
                 >
+                  <td className="w-10 px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(lead.id)}
+                      onChange={() => toggleSelect(lead.id)}
+                      className="w-4 h-4 rounded border-[#27272A] bg-[#09090B] text-[#8B5CF6] focus:ring-0 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
+                      {lead.pais && COUNTRY_INFO[lead.pais] && (
+                        <span className="text-sm flex-shrink-0" title={COUNTRY_INFO[lead.pais].name}>{COUNTRY_INFO[lead.pais].flag}</span>
+                      )}
                       {isHot && <div className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0 animate-pulse" title="HOT lead" />}
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
@@ -1066,6 +1253,16 @@ export default function LeadsPage() {
                   </td>
 
                   <td className="px-4 py-3">
+                    {lead.agent ? (
+                      <span className="text-[10px] bg-[#8B5CF6]/12 border border-[#8B5CF6]/25 text-[#8B5CF6] px-2 py-0.5 rounded-full font-bold">
+                        {lead.agent.nome}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-[#3F3F46]">—</span>
+                    )}
+                  </td>
+
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => { if (hasPhone) setWaLead(lead) }}
@@ -1114,7 +1311,7 @@ export default function LeadsPage() {
 
             {leads.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-14">
+                <td colSpan={9} className="text-center py-14">
                   <Search className="w-6 h-6 text-[#27272A] mx-auto mb-2" />
                   <div className="text-sm text-[#71717A] mb-1">Nenhum lead encontrado</div>
                   {hasActiveFilter && (
@@ -1151,6 +1348,43 @@ export default function LeadsPage() {
             >
               Próxima
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Multi-select assignment bar ── */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-20 md:bottom-4 left-1/2 -translate-x-1/2 z-[55] w-full max-w-md px-4">
+          <div className="bg-[#0F0F12] border border-[#8B5CF6]/40 rounded-2xl shadow-2xl p-3 flex items-center gap-2">
+            <div className="flex-1 text-sm text-[#F0F0F3] font-medium pl-1">
+              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+            </div>
+            <div className="flex items-center gap-1.5">
+              {agentList.map(a => (
+                <button
+                  key={a.id}
+                  onClick={() => assignLeads(a.id)}
+                  disabled={assigning}
+                  className="flex items-center gap-1 px-3 py-2 rounded-xl bg-[#8B5CF6]/15 border border-[#8B5CF6]/30 text-[#8B5CF6] text-xs font-bold hover:bg-[#8B5CF6]/25 transition-all disabled:opacity-40"
+                >
+                  <UserCheck className="w-3 h-3" />
+                  {a.nome}
+                </button>
+              ))}
+              <button
+                onClick={() => assignLeads(null)}
+                disabled={assigning}
+                className="px-3 py-2 rounded-xl bg-[#27272A] border border-[#3F3F46] text-[#71717A] text-xs font-medium hover:text-[#F0F0F3] transition-all disabled:opacity-40"
+              >
+                Remover
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="w-8 h-8 rounded-xl bg-[#27272A] text-[#71717A] flex items-center justify-center hover:text-[#F0F0F3] transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cleanPhoneForStorage, cleanNameForStorage } from '@/lib/lead-utils'
+import { cleanPhoneForStorage, cleanNameForStorage, detectCountry } from '@/lib/lead-utils'
 
 // Vercel serverless: allow up to 60s per batch request
 export const maxDuration = 60
@@ -367,6 +367,7 @@ export async function POST(req: Request) {
           origem: origemDefault || 'Importação CSV',
           pipelineStatus: 'NEW',
           observacaoPerfil: obs,
+          pais: detectCountry(telefoneRawValue || telefoneStored, cidadeRaw),
         }
 
         const match = await findExistingLead(

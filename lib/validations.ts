@@ -39,6 +39,8 @@ export const createLeadSchema = z.object({
   pipelineStatus: z.enum(['NEW', 'CONTACTED', 'INTERESTED', 'PROPOSAL_SENT', 'NEGOTIATION', 'CLOSED', 'LOST']).default('NEW'),
   planoAtual: z.string().nullish(),
   planoAlvoUpgrade: z.string().nullish(),
+  pais: z.string().nullish(),
+  agentId: z.string().nullish(),
 }).passthrough()
 
 export const updateLeadSchema = createLeadSchema.partial()
