@@ -29,6 +29,16 @@ interface DashData {
   pipeline: Record<string, number>
   receitaPorNicho: Record<string, number>
   topOpportunities: Array<{ id: string; nome: string; empresa: string; score: number; nicho: string }>
+  leadsPorPais?: Record<string, number>
+  agentStats?: Array<{ id: string; nome: string; totalLeads: number; pipeline: Record<string, number> }>
+  unassignedLeads?: number
+}
+
+const COUNTRY_FLAGS: Record<string, { flag: string; name: string }> = {
+  PT: { flag: '🇵🇹', name: 'Portugal' },
+  BR: { flag: '🇧🇷', name: 'Brasil' },
+  DE: { flag: '🇩🇪', name: 'Alemanha' },
+  NL: { flag: '🇳🇱', name: 'Holanda' },
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -678,6 +688,97 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Country + Agent stats ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* Leads by Country */}
+        {data.leadsPorPais && Object.keys(data.leadsPorPais).length > 0 && (
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-5">
+            <h2 className="font-semibold text-[#F0F0F3] text-sm mb-3">Leads por País</h2>
+            <div className="space-y-2">
+              {Object.entries(data.leadsPorPais)
+                .sort((a, b) => b[1] - a[1])
+                .map(([code, count]) => {
+                  const info = COUNTRY_FLAGS[code]
+                  const pct = data.totalLeads > 0 ? Math.round((count / data.totalLeads) * 100) : 0
+                  return (
+                    <div key={code} className="flex items-center justify-between py-1.5">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-lg">{info?.flag || '🌍'}</span>
+                        <span className="text-xs text-[#A1A1AA]">{info?.name || code || 'Sem país'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 h-1.5 bg-[#27272A] rounded-full overflow-hidden hidden sm:block">
+                          <div
+                            className="h-full rounded-full bg-[#8B5CF6]"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-bold text-[#F0F0F3] w-12 text-right">{count.toLocaleString('pt-PT')}</span>
+                        <span className="text-[10px] text-[#52525B] w-8 text-right">{pct}%</span>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* Agent Performance */}
+        {data.agentStats && data.agentStats.length > 0 && (
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-[#F0F0F3] text-sm">Performance por Agente</h2>
+              {data.unassignedLeads !== undefined && data.unassignedLeads > 0 && (
+                <span className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
+                  {data.unassignedLeads.toLocaleString('pt-PT')} sem agente
+                </span>
+              )}
+            </div>
+            <div className="space-y-4">
+              {data.agentStats.map(agent => {
+                const contacted = (agent.pipeline['CONTACTED'] || 0) + (agent.pipeline['INTERESTED'] || 0)
+                const proposals = (agent.pipeline['PROPOSAL_SENT'] || 0) + (agent.pipeline['NEGOTIATION'] || 0)
+                const closed = agent.pipeline['CLOSED'] || 0
+                return (
+                  <div key={agent.id} className="border border-[#27272A] rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-[#8B5CF6]/15 flex items-center justify-center text-xs font-black text-[#8B5CF6]">
+                          {agent.nome.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-[#F0F0F3]">{agent.nome}</div>
+                          <div className="text-[10px] text-[#52525B]">{agent.totalLeads} leads atribuídos</div>
+                        </div>
+                      </div>
+                      {closed > 0 && (
+                        <span className="text-[10px] bg-[#10B981]/12 text-[#10B981] px-2 py-0.5 rounded-full font-bold">
+                          {closed} fechados
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-4 gap-1.5 text-center">
+                      {[
+                        { label: 'Novos', value: agent.pipeline['NEW'] || 0, color: '#71717A' },
+                        { label: 'Contacto', value: contacted, color: '#3B82F6' },
+                        { label: 'Proposta', value: proposals, color: '#F59E0B' },
+                        { label: 'Fechados', value: closed, color: '#10B981' },
+                      ].map(s => (
+                        <div key={s.label} className="bg-[#09090B] rounded-lg py-1.5 px-1">
+                          <div className="text-sm font-black" style={{ color: s.color }}>{s.value}</div>
+                          <div className="text-[9px] text-[#52525B]">{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

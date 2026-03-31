@@ -21,6 +21,10 @@ export async function GET() {
     upsellCount,
     topOpportunities,
     receitaPorNichoRaw,
+    countryCounts,
+    agentsData,
+    agentPipelineRaw,
+    recentMessages,
   ] = await Promise.all([
     // 1. Total leads
     prisma.lead.count(),
@@ -97,6 +101,39 @@ export async function GET() {
       where: { planoAtual: { not: null } },
       _count: { id: true },
     }),
+
+    // 14. Leads by country
+    prisma.lead.groupBy({
+      by: ['pais'],
+      _count: { id: true },
+    }),
+
+    // 15. Leads by agent
+    prisma.user.findMany({
+      where: { ativo: true },
+      select: {
+        id: true,
+        nome: true,
+        _count: { select: { leads: true } },
+      },
+    }),
+
+    // 16. Agent pipeline breakdown
+    prisma.lead.groupBy({
+      by: ['agentId', 'pipelineStatus'],
+      where: { agentId: { not: null } },
+      _count: { id: true },
+    }),
+
+    // 17. Agent messages sent (last 30 days)
+    prisma.message.groupBy({
+      by: ['leadId'],
+      where: {
+        createdAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) },
+        canal: 'WHATSAPP',
+      },
+      _count: { id: true },
+    }),
   ])
 
   // ── Compute revenue from small datasets ──
@@ -127,6 +164,33 @@ export async function GET() {
     receitaPorNicho[nicho] = (receitaPorNicho[nicho] || 0) + price * row._count.id
   }
 
+  // Build country stats
+  const leadsPorPais: Record<string, number> = {}
+  for (const row of countryCounts) {
+    const key = row.pais || 'unknown'
+    leadsPorPais[key] = row._count.id
+  }
+
+  // Build agent stats with pipeline breakdown
+  const agentStats = agentsData.map((agent: any) => {
+    const pipelineBreakdown: Record<string, number> = {}
+    for (const row of agentPipelineRaw) {
+      if (row.agentId === agent.id) {
+        pipelineBreakdown[row.pipelineStatus] = row._count.id
+      }
+    }
+    return {
+      id: agent.id,
+      nome: agent.nome,
+      totalLeads: agent._count.leads,
+      pipeline: pipelineBreakdown,
+    }
+  })
+
+  // Unassigned leads count
+  const assignedTotal = agentsData.reduce((s: number, a: any) => s + a._count.leads, 0)
+  const unassignedLeads = totalLeads - assignedTotal
+
   return NextResponse.json({
     receitaAtiva,
     receitaPotencial,
@@ -149,5 +213,8 @@ export async function GET() {
       score: l.opportunityScore,
       nicho: l.nicho,
     })),
+    leadsPorPais,
+    agentStats,
+    unassignedLeads,
   })
 }

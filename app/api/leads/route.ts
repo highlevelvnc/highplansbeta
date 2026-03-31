@@ -127,6 +127,11 @@ export async function GET(req: NextRequest) {
               messages: true,
             },
           },
+          messages: {
+            select: { createdAt: true },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
         },
       }),
     ])

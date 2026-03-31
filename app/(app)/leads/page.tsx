@@ -5,6 +5,7 @@ import {
   CheckCircle, AlertCircle, ChevronDown, Loader2,
   MessageCircle, Bell, FileText, Flame, Zap, Filter,
   CheckCheck, Tag, UserCheck, Users2,
+  Download, Trash2, ArrowRightLeft,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Onboarding } from '@/components/Onboarding'
@@ -36,6 +37,7 @@ interface Lead {
   temSite?: boolean
   instagramAtivo?: boolean
   _count?: { followUps: number; proposals: number; messages: number }
+  messages?: { createdAt: string }[]
 }
 
 const SCORE_STYLES: Record<string, { label: string; bg: string; text: string; border: string }> = {
@@ -678,6 +680,63 @@ export default function LeadsPage() {
     }
   }
 
+  const exportCSV = () => {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    if (quickFilter === 'hot') params.set('score', 'HOT')
+    else if (scoreFilter) params.set('score', scoreFilter)
+    if (quickFilter === 'whatsapp') params.set('comWhatsapp', '1')
+    if (nichoFilter) params.set('nicho', nichoFilter)
+    if (paisFilter) params.set('pais', paisFilter)
+    if (agentFilter === '_none') params.set('semAgente', '1')
+    else if (agentFilter) params.set('agentId', agentFilter)
+    window.open(`/api/leads/export?${params}`, '_blank')
+    toast('A exportar CSV...', 'success')
+  }
+
+  const bulkAction = async (action: string, value?: string) => {
+    if (selectedIds.size === 0) return
+    if (action === 'delete' && !confirm(`Apagar ${selectedIds.size} leads? Esta ação é irreversível.`)) return
+    setAssigning(true)
+    try {
+      const res = await fetch('/api/leads/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadIds: Array.from(selectedIds), action, value }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast(
+          action === 'delete'
+            ? `${data.deleted} leads apagados`
+            : `${data.updated} leads atualizados`,
+          'success'
+        )
+        setSelectedIds(new Set())
+        load()
+      } else {
+        toast(data.error || 'Erro', 'error')
+      }
+    } catch {
+      toast('Erro de conexão', 'error')
+    } finally {
+      setAssigning(false)
+    }
+  }
+
+  const relativeTime = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 60) return `Há ${mins}min`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `Há ${hours}h`
+    const days = Math.floor(hours / 24)
+    if (days === 1) return 'Ontem'
+    if (days < 7) return `Há ${days} dias`
+    const weeks = Math.floor(days / 7)
+    return `Há ${weeks} sem`
+  }
+
   if (isFirstLoad && !initialLoading && leads.length === 0 && !search && !scoreFilter && !quickFilter) {
     return (
       <div className="p-4 md:p-6">
@@ -742,6 +801,17 @@ export default function LeadsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {total > 0 && (
+            <button
+              onClick={exportCSV}
+              title="Exportar leads filtrados para CSV"
+              className="flex items-center gap-2 bg-[#16161A] hover:bg-[#27272A] border border-[#27272A] hover:border-[#10B981]/50 text-[#F0F0F3] px-3 md:px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
+            >
+              <Download className="w-4 h-4 text-[#10B981]" />
+              <span className="hidden sm:inline">Exportar</span>
+            </button>
+          )}
+
           <button
             onClick={() => fileRef.current?.click()}
             className="flex items-center gap-2 bg-[#16161A] hover:bg-[#27272A] border border-[#27272A] hover:border-[#8B5CF6]/50 text-[#F0F0F3] px-3 md:px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
@@ -991,6 +1061,7 @@ export default function LeadsPage() {
           const noFollowUp = lead._count?.followUps === 0
           const isHot = lead.score === 'HOT'
           const waContacted = waContactedIds.has(lead.id) || (lead._count?.messages ?? 0) > 0
+          const lastMsg = lead.messages?.[0]?.createdAt
 
           return (
             <div
@@ -1074,6 +1145,15 @@ export default function LeadsPage() {
                   <span className="text-[10px] text-[#52525B]">
                     {PIPELINE_STATUS[lead.pipelineStatus] || lead.pipelineStatus}
                   </span>
+                </div>
+
+                {/* Last contact info */}
+                <div className="text-[10px] mt-1 mb-0.5">
+                  {lastMsg ? (
+                    <span className="text-[#52525B]">Último contacto: <span className="text-[#71717A]">{relativeTime(lastMsg)}</span></span>
+                  ) : (
+                    <span className="text-amber-400/70">Nunca contactado</span>
+                  )}
                 </div>
               </div>
 
@@ -1352,37 +1432,90 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* ── Multi-select assignment bar ── */}
+      {/* ── Multi-select action bar ── */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-20 md:bottom-4 left-1/2 -translate-x-1/2 z-[55] w-full max-w-md px-4">
-          <div className="bg-[#0F0F12] border border-[#8B5CF6]/40 rounded-2xl shadow-2xl p-3 flex items-center gap-2">
-            <div className="flex-1 text-sm text-[#F0F0F3] font-medium pl-1">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+        <div className="fixed bottom-20 md:bottom-4 left-1/2 -translate-x-1/2 z-[55] w-full max-w-xl px-4">
+          <div className="bg-[#0F0F12] border border-[#8B5CF6]/40 rounded-2xl shadow-2xl p-3 space-y-2">
+            {/* Top row — count + close */}
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-[#F0F0F3] font-medium pl-1">
+                {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+              </div>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="w-7 h-7 rounded-lg bg-[#27272A] text-[#71717A] flex items-center justify-center hover:text-[#F0F0F3] transition-all"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <div className="flex items-center gap-1.5">
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* Assign to agent */}
               {agentList.map(a => (
                 <button
                   key={a.id}
                   onClick={() => assignLeads(a.id)}
                   disabled={assigning}
-                  className="flex items-center gap-1 px-3 py-2 rounded-xl bg-[#8B5CF6]/15 border border-[#8B5CF6]/30 text-[#8B5CF6] text-xs font-bold hover:bg-[#8B5CF6]/25 transition-all disabled:opacity-40"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#8B5CF6]/15 border border-[#8B5CF6]/30 text-[#8B5CF6] text-[11px] font-bold hover:bg-[#8B5CF6]/25 transition-all disabled:opacity-40"
                 >
                   <UserCheck className="w-3 h-3" />
                   {a.nome}
                 </button>
               ))}
+
+              <span className="w-px h-5 bg-[#27272A]" />
+
+              {/* Pipeline status */}
+              <select
+                onChange={e => { if (e.target.value) bulkAction('pipelineStatus', e.target.value); e.target.value = '' }}
+                disabled={assigning}
+                className="bg-[#16161A] border border-[#27272A] rounded-lg px-2 py-1.5 text-[11px] text-[#A1A1AA] focus:outline-none disabled:opacity-40 cursor-pointer"
+                defaultValue=""
+              >
+                <option value="" disabled>Pipeline...</option>
+                <option value="NEW">Novo</option>
+                <option value="CONTACTED">Contactado</option>
+                <option value="INTERESTED">Interessado</option>
+                <option value="PROPOSAL_SENT">Proposta</option>
+                <option value="NEGOTIATION">Negociação</option>
+                <option value="CLOSED">Fechado</option>
+                <option value="LOST">Perdido</option>
+              </select>
+
+              {/* Score */}
+              <select
+                onChange={e => { if (e.target.value) bulkAction('score', e.target.value); e.target.value = '' }}
+                disabled={assigning}
+                className="bg-[#16161A] border border-[#27272A] rounded-lg px-2 py-1.5 text-[11px] text-[#A1A1AA] focus:outline-none disabled:opacity-40 cursor-pointer"
+                defaultValue=""
+              >
+                <option value="" disabled>Score...</option>
+                <option value="HOT">HOT</option>
+                <option value="WARM">WARM</option>
+                <option value="COLD">COLD</option>
+              </select>
+
+              <span className="w-px h-5 bg-[#27272A]" />
+
+              {/* Remove agent */}
               <button
                 onClick={() => assignLeads(null)}
                 disabled={assigning}
-                className="px-3 py-2 rounded-xl bg-[#27272A] border border-[#3F3F46] text-[#71717A] text-xs font-medium hover:text-[#F0F0F3] transition-all disabled:opacity-40"
+                className="px-2.5 py-1.5 rounded-lg bg-[#27272A] border border-[#3F3F46] text-[#71717A] text-[11px] font-medium hover:text-[#F0F0F3] transition-all disabled:opacity-40"
               >
-                Remover
+                <ArrowRightLeft className="w-3 h-3 inline mr-1" />
+                Desatribuir
               </button>
+
+              {/* Delete */}
               <button
-                onClick={() => setSelectedIds(new Set())}
-                className="w-8 h-8 rounded-xl bg-[#27272A] text-[#71717A] flex items-center justify-center hover:text-[#F0F0F3] transition-all"
+                onClick={() => bulkAction('delete')}
+                disabled={assigning}
+                className="px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/25 text-red-400 text-[11px] font-bold hover:bg-red-500/20 transition-all disabled:opacity-40"
               >
-                <X className="w-4 h-4" />
+                <Trash2 className="w-3 h-3 inline mr-1" />
+                Apagar
               </button>
             </div>
           </div>
