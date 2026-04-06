@@ -307,8 +307,16 @@ export async function POST(req: Request) {
 
         const siteRaw = r.site || r.Site || r.website || ''
         const cidadeRaw = r.cidade || r.Cidade || r.city || r.address || r.location || ''
-        const termoRaw = (r.termo || r.Termo || r.nicho || r.Nicho || r.category || r.query || r.search || '').trim()
+        const termoRaw = (r.termo || r.Termo || r.nicho || r.Nicho || r.category || r.query || r.search || r.search_term || '').trim()
         const emailRaw = (r.email || r.Email || r.mail || '').trim().toLowerCase()
+
+        // Extra fields from scraper exports
+        const countryRaw = (r.country || r.pais || '').trim()
+        const sourceRaw = (r.source || r.origem || '').trim()
+        const websiteStatus = (r.websiteStatus || r.website_status || '').trim().toLowerCase()
+        const outreachScoreRaw = parseInt(r.outreachScore || r.outreach_priority_score || r.priority_score || '0', 10)
+        const noWebsiteScoreRaw = parseInt(r.noWebsiteScore || r.no_website_score || '0', 10)
+        const weakDigitalScoreRaw = parseInt(r.weakDigitalScore || r.weak_digital_presence_score || '0', 10)
 
         const nome = cleanNameForStorage(nomeRaw) || nomeRaw.substring(0, 200)
         const empresa = cleanNameForStorage(empresaRaw || nomeRaw) || nome
@@ -325,15 +333,22 @@ export async function POST(req: Request) {
         const siteInfo = detectSiteInfo(siteRaw)
         const nicho = detectNicho(nome, termoRaw || nichoOverride)
 
+        // Use websiteStatus from scraper if available
+        const hasWebsiteFromScraper = websiteStatus === 'active' || websiteStatus === 'ok' || websiteStatus === 'live'
+        const noWebsiteFromScraper = websiteStatus === 'no website' || websiteStatus === 'none' || websiteStatus === 'error' || websiteStatus === 'dead'
+
         const diagData = {
-          temSite: siteInfo.temSite,
-          siteFraco: siteInfo.siteFraco,
+          temSite: noWebsiteFromScraper ? false : (hasWebsiteFromScraper || siteInfo.temSite),
+          siteFraco: siteInfo.siteFraco || (weakDigitalScoreRaw > 50),
           anunciosAtivos: false,
           instagramAtivo: siteInfo.instagramAtivo,
           gmbOtimizado: false,
         }
 
-        const oppScore = calcOppScore(diagData)
+        // Use pre-calculated outreach score if available and > 0, otherwise calculate
+        const oppScore = outreachScoreRaw > 0
+          ? Math.min(110, outreachScoreRaw)
+          : calcOppScore(diagData)
         const score = calcLeadScore(oppScore)
 
         const siteVal = siteRaw.trim()
@@ -373,10 +388,17 @@ export async function POST(req: Request) {
           opportunityScore: oppScore,
           score,
           motivoScore,
-          origem: origemDefault || 'Importação CSV',
+          origem: sourceRaw || origemDefault || 'Importação CSV',
           pipelineStatus: 'NEW',
           observacaoPerfil: obs,
-          pais: detectCountry(telefoneRawValue || telefoneStored, cidadeRaw),
+          pais: countryRaw
+            ? (countryRaw.toUpperCase() === 'GERMANY' || countryRaw.toUpperCase() === 'DEUTSCHLAND' ? 'DE'
+              : countryRaw.toUpperCase() === 'PORTUGAL' ? 'PT'
+              : countryRaw.toUpperCase() === 'BRAZIL' || countryRaw.toUpperCase() === 'BRASIL' ? 'BR'
+              : countryRaw.toUpperCase() === 'NETHERLANDS' || countryRaw.toUpperCase() === 'NEDERLAND' ? 'NL'
+              : countryRaw.length === 2 ? countryRaw.toUpperCase()
+              : detectCountry(telefoneRawValue || telefoneStored, cidadeRaw))
+            : detectCountry(telefoneRawValue || telefoneStored, cidadeRaw),
           ...(agentIds.length > 0 ? { agentId: agentIds[agentIdx % agentIds.length] } : {}),
         }
         if (agentIds.length > 0) agentIdx++

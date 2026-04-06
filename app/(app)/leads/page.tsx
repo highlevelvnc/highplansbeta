@@ -174,22 +174,22 @@ function findValueByAliases(row: Record<string, string>, aliases: string[]): str
 }
 
 function normalizeRow(row: Record<string, string>) {
-  // Supports PT, EN, DE column names + Google Maps / Apify export formats
+  // Supports PT, EN, DE column names + Google Maps / Apify / custom scraper export formats
   const nome = findValueByAliases(row, [
     'nome', 'name', 'title', 'negocio', 'estabelecimento',
     'razao social', 'razão social', 'firmenname', 'unternehmen',
-    'business name', 'place name', 'placename',
+    'business name', 'business_name', 'place name', 'placename',
   ])
 
   const empresa = findValueByAliases(row, [
-    'empresa', 'company', 'firma', 'betrieb', 'company name',
+    'empresa', 'company', 'firma', 'betrieb', 'company name', 'company_name',
   ])
 
   const telefone = findValueByAliases(row, [
     'telefone', 'phone', 'telemovel', 'telemóvel', 'celular',
     'contacto', 'contato', 'numero', 'número', 'mobile',
     'telefon', 'telefonnummer', 'handy', 'rufnummer',
-    'phone number', 'phonenumber', 'telephone',
+    'phone number', 'phone_number', 'phonenumber', 'telephone',
   ])
 
   const whatsapp = findValueByAliases(row, [
@@ -199,31 +199,69 @@ function normalizeRow(row: Record<string, string>) {
   const site = findValueByAliases(row, [
     'site', 'website', 'url', 'link', 'web',
     'webseite', 'internetseite', 'homepage',
-    'website url', 'websiteurl',
+    'website url', 'website_url', 'websiteurl',
   ])
 
-  const cidade = findValueByAliases(row, [
+  // City: try city first, then state, then address as fallback
+  const city = findValueByAliases(row, [
     'cidade', 'city', 'localidade', 'municipio', 'município',
-    'regiao', 'região', 'distrito', 'location',
-    'stadt', 'ort', 'gemeinde', 'standort', 'adresse', 'address',
-    'full address', 'fulladdress', 'street',
+    'stadt', 'ort', 'gemeinde',
   ])
+  const state = findValueByAliases(row, [
+    'estado', 'state', 'bundesland', 'province', 'provincia', 'região', 'regiao',
+  ])
+  const addressFallback = findValueByAliases(row, [
+    'address', 'adresse', 'standort', 'location', 'full address', 'full_address', 'fulladdress',
+  ])
+  // Combine: city + state if both exist, otherwise fallback to address
+  const cidade = city
+    ? (state ? `${city}, ${state}` : city)
+    : (state || addressFallback)
 
   const termo = findValueByAliases(row, [
     'termo', 'nicho', 'categoria', 'keyword', 'palavra chave',
-    'palavra-chave', 'category', 'type', 'business type',
-    'branche', 'kategorie', 'suchbegriff',
-    'search query', 'searchquery', 'query', 'search',
-    'search string', 'searchstring',
+    'palavra-chave', 'category', 'type', 'business type', 'business_type',
+    'branche', 'kategorie', 'suchbegriff', 'subcategory',
+    'search query', 'search_query', 'searchquery', 'query', 'search',
+    'search string', 'search_string', 'searchstring', 'search term', 'search_term',
   ])
 
   const email = findValueByAliases(row, [
     'email', 'e mail', 'e-mail', 'mail', 'correio',
-    'email address', 'emailaddress',
+    'email address', 'email_address', 'emailaddress',
+  ])
+
+  // Country field — used to force country detection
+  const country = findValueByAliases(row, [
+    'pais', 'país', 'country', 'land',
+  ])
+
+  // Source / origin
+  const source = findValueByAliases(row, [
+    'origem', 'source', 'quelle', 'fonte',
+  ])
+
+  // Website status — determines temSite
+  const websiteStatus = findValueByAliases(row, [
+    'website status', 'website_status', 'sitestatus',
+  ])
+
+  // Pre-calculated scores from scraper
+  const outreachScore = findValueByAliases(row, [
+    'outreach priority score', 'outreach_priority_score',
+    'score', 'priority', 'priority score', 'priority_score',
+  ])
+
+  const noWebsiteScore = findValueByAliases(row, [
+    'no website score', 'no_website_score',
+  ])
+
+  const weakDigitalScore = findValueByAliases(row, [
+    'weak digital presence score', 'weak_digital_presence_score',
   ])
 
   return {
-    nome,
+    nome: nome || empresa, // fallback: use empresa as nome if nome is empty
     empresa,
     telefone,
     whatsapp,
@@ -231,6 +269,12 @@ function normalizeRow(row: Record<string, string>) {
     cidade,
     termo,
     email,
+    country,
+    source,
+    websiteStatus,
+    outreachScore,
+    noWebsiteScore,
+    weakDigitalScore,
   }
 }
 
@@ -254,6 +298,12 @@ interface ImportState {
     cidade: string
     termo: string
     email: string
+    country?: string
+    source?: string
+    websiteStatus?: string
+    outreachScore?: string
+    noWebsiteScore?: string
+    weakDigitalScore?: string
   }>
   nicho: string
   origem: string
