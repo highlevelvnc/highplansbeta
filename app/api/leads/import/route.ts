@@ -281,7 +281,10 @@ export async function POST(req: Request) {
     const errors: string[] = []
 
     for (const row of rows) {
-      const nomeRaw = (row.nome || row.Nome || '').trim()
+      // Read from normalized field names — frontend normalizeRow maps aliases → these keys
+      // Use bracket notation for fields not in the TS interface (e.g. from German CSVs)
+      const r = row as Record<string, string | undefined>
+      const nomeRaw = (r.nome || r.Nome || r.name || r.title || '').trim()
 
       if (!nomeRaw) {
         skipped++
@@ -289,30 +292,23 @@ export async function POST(req: Request) {
       }
 
       try {
-        const empresaRaw = (row.empresa || row.Empresa || '').trim()
+        const empresaRaw = (r.empresa || r.Empresa || r.company || '').trim()
 
         const telefoneSource =
-          row.telefone ||
-          row.Telefone ||
-          row.celular ||
-          row.Celular ||
-          row.phone ||
-          row.Phone ||
-          row.mobile ||
-          row.Mobile ||
-          ''
+          r.telefone || r.Telefone ||
+          r.celular || r.Celular ||
+          r.phone || r.Phone ||
+          r.mobile || r.Mobile ||
+          r.telephone || ''
 
         const whatsappSource =
-          row.whatsapp ||
-          row.WhatsApp ||
-          row.wa ||
-          row.WA ||
-          ''
+          r.whatsapp || r.WhatsApp ||
+          r.wa || r.WA || ''
 
-        const siteRaw = row.site || row.Site || ''
-        const cidadeRaw = row.cidade || row.Cidade || ''
-        const termoRaw = (row.termo || row.Termo || row.nicho || row.Nicho || '').trim()
-        const emailRaw = (row.email || row.Email || '').trim().toLowerCase()
+        const siteRaw = r.site || r.Site || r.website || ''
+        const cidadeRaw = r.cidade || r.Cidade || r.city || r.address || r.location || ''
+        const termoRaw = (r.termo || r.Termo || r.nicho || r.Nicho || r.category || r.query || r.search || '').trim()
+        const emailRaw = (r.email || r.Email || r.mail || '').trim().toLowerCase()
 
         const nome = cleanNameForStorage(nomeRaw) || nomeRaw.substring(0, 200)
         const empresa = cleanNameForStorage(empresaRaw || nomeRaw) || nome

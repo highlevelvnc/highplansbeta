@@ -174,73 +174,52 @@ function findValueByAliases(row: Record<string, string>, aliases: string[]): str
 }
 
 function normalizeRow(row: Record<string, string>) {
+  // Supports PT, EN, DE column names + Google Maps / Apify export formats
   const nome = findValueByAliases(row, [
-    'nome',
-    'name',
-    'negocio',
-    'estabelecimento',
-    'razao social',
-    'razão social',
+    'nome', 'name', 'title', 'negocio', 'estabelecimento',
+    'razao social', 'razão social', 'firmenname', 'unternehmen',
+    'business name', 'place name', 'placename',
   ])
 
   const empresa = findValueByAliases(row, [
-    'empresa',
-    'company',
+    'empresa', 'company', 'firma', 'betrieb', 'company name',
   ])
 
   const telefone = findValueByAliases(row, [
-    'telefone',
-    'phone',
-    'telemovel',
-    'telemóvel',
-    'celular',
-    'contacto',
-    'contato',
-    'numero',
-    'número',
-    'mobile',
+    'telefone', 'phone', 'telemovel', 'telemóvel', 'celular',
+    'contacto', 'contato', 'numero', 'número', 'mobile',
+    'telefon', 'telefonnummer', 'handy', 'rufnummer',
+    'phone number', 'phonenumber', 'telephone',
   ])
 
   const whatsapp = findValueByAliases(row, [
-    'whatsapp',
-    'whats app',
-    'wa',
+    'whatsapp', 'whats app', 'wa',
   ])
 
   const site = findValueByAliases(row, [
-    'site',
-    'website',
-    'url',
-    'link',
-    'web',
+    'site', 'website', 'url', 'link', 'web',
+    'webseite', 'internetseite', 'homepage',
+    'website url', 'websiteurl',
   ])
 
   const cidade = findValueByAliases(row, [
-    'cidade',
-    'city',
-    'localidade',
-    'municipio',
-    'município',
-    'regiao',
-    'região',
-    'distrito',
+    'cidade', 'city', 'localidade', 'municipio', 'município',
+    'regiao', 'região', 'distrito', 'location',
+    'stadt', 'ort', 'gemeinde', 'standort', 'adresse', 'address',
+    'full address', 'fulladdress', 'street',
   ])
 
   const termo = findValueByAliases(row, [
-    'termo',
-    'nicho',
-    'categoria',
-    'keyword',
-    'palavra chave',
-    'palavra-chave',
+    'termo', 'nicho', 'categoria', 'keyword', 'palavra chave',
+    'palavra-chave', 'category', 'type', 'business type',
+    'branche', 'kategorie', 'suchbegriff',
+    'search query', 'searchquery', 'query', 'search',
+    'search string', 'searchstring',
   ])
 
   const email = findValueByAliases(row, [
-    'email',
-    'e mail',
-    'e-mail',
-    'mail',
-    'correio',
+    'email', 'e mail', 'e-mail', 'mail', 'correio',
+    'email address', 'emailaddress',
   ])
 
   return {

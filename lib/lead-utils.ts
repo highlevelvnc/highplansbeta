@@ -334,14 +334,33 @@ const CITY_COUNTRY: Record<string, string> = {
   'belo horizonte': 'BR', manaus: 'BR', curitiba: 'BR', recife: 'BR',
   goiânia: 'BR', goiania: 'BR', belém: 'BR', belem: 'BR', campinas: 'BR',
   guarulhos: 'BR', florianópolis: 'BR', florianopolis: 'BR',
-  // Alemanha
+  // Alemanha (top 50 cities + common patterns)
   berlin: 'DE', münchen: 'DE', munchen: 'DE', munich: 'DE', hamburg: 'DE',
-  frankfurt: 'DE', köln: 'DE', koln: 'DE', düsseldorf: 'DE', dusseldorf: 'DE',
-  stuttgart: 'DE', dortmund: 'DE', essen: 'DE', bremen: 'DE', dresden: 'DE',
+  frankfurt: 'DE', köln: 'DE', koln: 'DE', cologne: 'DE',
+  düsseldorf: 'DE', dusseldorf: 'DE', stuttgart: 'DE', dortmund: 'DE',
+  essen: 'DE', bremen: 'DE', dresden: 'DE', hannover: 'DE', hanover: 'DE',
+  nürnberg: 'DE', nurnberg: 'DE', nuremberg: 'DE', duisburg: 'DE',
+  bochum: 'DE', wuppertal: 'DE', bielefeld: 'DE', bonn: 'DE',
+  mannheim: 'DE', karlsruhe: 'DE', augsburg: 'DE', wiesbaden: 'DE',
+  gelsenkirchen: 'DE', aachen: 'DE', mönchengladbach: 'DE',
+  braunschweig: 'DE', kiel: 'DE', chemnitz: 'DE', halle: 'DE',
+  magdeburg: 'DE', freiburg: 'DE', oberhausen: 'DE', lübeck: 'DE',
+  lubeck: 'DE', erfurt: 'DE', rostock: 'DE', mainz: 'DE',
+  kassel: 'DE', saarbrücken: 'DE', hagen: 'DE', potsdam: 'DE',
+  ludwigshafen: 'DE', oldenburg: 'DE', leverkusen: 'DE', heidelberg: 'DE',
+  darmstadt: 'DE', regensburg: 'DE', paderborn: 'DE', würzburg: 'DE',
+  wolfsburg: 'DE', göttingen: 'DE', ulm: 'DE', heilbronn: 'DE',
+  recklinghausen: 'DE', ingolstadt: 'DE',
+  deutschland: 'DE', germany: 'DE', alemanha: 'DE',
   // Holanda
   amsterdam: 'NL', rotterdam: 'NL', haia: 'NL', 'the hague': 'NL',
   utrecht: 'NL', eindhoven: 'NL', groningen: 'NL', tilburg: 'NL',
-  almere: 'NL', breda: 'NL', nijmegen: 'NL',
+  almere: 'NL', breda: 'NL', nijmegen: 'NL', haarlem: 'NL',
+  enschede: 'NL', arnhem: 'NL', amersfoort: 'NL', apeldoorn: 'NL',
+  'den haag': 'NL', leiden: 'NL', maastricht: 'NL', dordrecht: 'NL',
+  nederland: 'NL', netherlands: 'NL', holanda: 'NL',
+  // Country names as fallback
+  portugal: 'PT', brasil: 'BR', brazil: 'BR',
 }
 
 /**
