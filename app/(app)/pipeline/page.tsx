@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import {
   MessageCircle, ExternalLink, Mail, Phone, ChevronDown, X, Send, Copy,
   Check, AlertTriangle, RefreshCw, GitBranch, Upload, Loader2, Bell,
-  Flame, Zap, Filter, Search, Tag, ChevronLeft, ChevronRight,
+  Flame, Zap, Filter, Search, Tag, ChevronLeft, ChevronRight, StickyNote,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -88,6 +88,11 @@ export default function PipelinePage() {
   const [waLead, setWaLead]         = useState<any | null>(null)
   const [fuSuggestion, setFuSuggestion] = useState<{ lead: any; stage: string } | null>(null)
   const [integrationStatus, setIntegrationStatus] = useState<{ whatsapp: { configured: boolean }; email: { configured: boolean } } | null>(null)
+
+  // Quick note on pipeline card
+  const [noteLeadId, setNoteLeadId]  = useState<string | null>(null)
+  const [noteText, setNoteText]      = useState('')
+  const [savingNote, setSavingNote]   = useState(false)
 
   // Search, nicho, country, agent filter, pagination
   const [search, setSearch]         = useState('')
@@ -253,6 +258,25 @@ export default function PipelinePage() {
     const num = getCallNumber(lead)
     if (!num) { toast('Lead sem número de telefone', 'error'); return }
     window.open(`tel:+${num}`, '_blank')
+  }
+
+  const saveNote = async (leadId: string) => {
+    if (!noteText.trim()) return
+    setSavingNote(true)
+    try {
+      await fetch(`/api/leads/${leadId}/activity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: 'NOTA', descricao: noteText.trim() }),
+      })
+      toast('Nota guardada', 'success')
+      setNoteLeadId(null)
+      setNoteText('')
+    } catch {
+      toast('Erro ao guardar nota', 'error')
+    } finally {
+      setSavingNote(false)
+    }
   }
 
   if (loading) return (
@@ -654,13 +678,23 @@ export default function PipelinePage() {
                           >
                             <Phone className="w-3 h-3" />
                           </button>
-                          {/* Follow-up (new) */}
+                          {/* Follow-up */}
                           <button
                             onClick={e => { e.stopPropagation(); setFuLead(lead) }}
                             title="Agendar follow-up"
                             className="w-6 h-6 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 flex items-center justify-center transition-all"
                           >
                             <Bell className="w-3 h-3" />
+                          </button>
+                          {/* Quick note */}
+                          <button
+                            onClick={e => { e.stopPropagation(); setNoteLeadId(noteLeadId === lead.id ? null : lead.id); setNoteText('') }}
+                            title="Adicionar nota"
+                            className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
+                              noteLeadId === lead.id ? 'bg-[#8B5CF6]/20 text-[#8B5CF6]' : 'bg-[#27272A]/50 hover:bg-[#27272A] text-[#52525B] hover:text-[#71717A]'
+                            }`}
+                          >
+                            <StickyNote className="w-3 h-3" />
                           </button>
                         </div>
                         {/* Open lead */}
@@ -673,6 +707,35 @@ export default function PipelinePage() {
                           <ExternalLink className="w-3 h-3" />
                         </Link>
                       </div>
+
+                      {/* Inline note input */}
+                      {noteLeadId === lead.id && (
+                        <div className="mt-2 pt-2 border-t border-[#27272A]/40" onClick={e => e.stopPropagation()}>
+                          <textarea
+                            autoFocus
+                            value={noteText}
+                            onChange={e => setNoteText(e.target.value)}
+                            placeholder="Escrever nota..."
+                            rows={2}
+                            className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-2.5 py-1.5 text-[11px] text-[#F0F0F3] placeholder-[#3F3F46] focus:outline-none focus:border-[#8B5CF6] resize-none"
+                          />
+                          <div className="flex gap-1.5 mt-1.5">
+                            <button
+                              onClick={() => saveNote(lead.id)}
+                              disabled={savingNote || !noteText.trim()}
+                              className="flex-1 py-1.5 rounded-md bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-[10px] font-bold disabled:opacity-40 transition-colors"
+                            >
+                              {savingNote ? 'A guardar...' : 'Guardar'}
+                            </button>
+                            <button
+                              onClick={() => { setNoteLeadId(null); setNoteText('') }}
+                              className="px-2 py-1.5 rounded-md border border-[#27272A] text-[10px] text-[#71717A] hover:text-[#F0F0F3] transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}

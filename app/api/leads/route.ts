@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
     const comProposta = searchParams.get('comProposta') === '1'
     const oportunidadeAlta = searchParams.get('oportunidadeAlta') === '1'
     const nuncaContactado = searchParams.get('nuncaContactado') === '1'
+    const tag = searchParams.get('tag') ?? ''
 
     const pageRaw = parseInt(searchParams.get('page') ?? '1', 10)
     const pageSizeRaw = parseInt(searchParams.get('pageSize') ?? '50', 10)
@@ -89,6 +90,7 @@ export async function GET(req: NextRequest) {
     if (comProposta) where.proposals = { some: {} }
     if (oportunidadeAlta) where.opportunityScore = { gte: 70 }
     if (nuncaContactado) where.messages = { none: {} }
+    if (tag) where.tags = { contains: tag, mode: 'insensitive' }
 
     const [total, leads] = await Promise.all([
       prisma.lead.count({ where }),
@@ -117,6 +119,7 @@ export async function GET(req: NextRequest) {
           score: true,
           pipelineStatus: true,
           pais: true,
+          tags: true,
           agentId: true,
           agent: { select: { id: true, nome: true } },
           planoAtual: true,

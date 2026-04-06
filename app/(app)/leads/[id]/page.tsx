@@ -342,6 +342,68 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
+          {/* Tags */}
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 mb-4">
+            <label className="text-xs text-[#71717A] uppercase tracking-wider mb-2 block">Tags</label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {(lead.tags || '').split(',').filter((t: string) => t.trim()).map((t: string) => (
+                <span key={t.trim()} className="flex items-center gap-1 text-xs bg-[#27272A] text-[#A1A1AA] px-2.5 py-1 rounded-full">
+                  {t.trim()}
+                  <button
+                    onClick={() => {
+                      const tags = (lead.tags || '').split(',').filter((x: string) => x.trim() !== t.trim()).join(',')
+                      setLead({ ...lead, tags })
+                    }}
+                    className="text-[#52525B] hover:text-red-400 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {['respondeu', 'não atende', 'pedir orçamento', 'ligar segunda', 'interessado', 'sem interesse'].map(tag => {
+                const current = (lead.tags || '').split(',').map((t: string) => t.trim())
+                const isActive = current.includes(tag)
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => {
+                      if (isActive) {
+                        setLead({ ...lead, tags: current.filter((t: string) => t !== tag).join(',') })
+                      } else {
+                        setLead({ ...lead, tags: [...current.filter(Boolean), tag].join(',') })
+                      }
+                    }}
+                    className={`text-[10px] px-2 py-1 rounded-full border transition-all ${
+                      isActive ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/30 text-[#8B5CF6]' : 'border-[#27272A] text-[#52525B] hover:border-[#52525B]'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                )
+              })}
+            </div>
+            <input
+              value=""
+              placeholder="Tag personalizada + Enter"
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  const input = e.currentTarget
+                  const val = input.value.trim()
+                  if (val) {
+                    const current = (lead.tags || '').split(',').filter((t: string) => t.trim())
+                    if (!current.includes(val)) {
+                      setLead({ ...lead, tags: [...current, val].join(',') })
+                    }
+                    input.value = ''
+                  }
+                }
+              }}
+              className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] placeholder-[#3F3F46] focus:outline-none focus:border-[#8B5CF6]"
+            />
+          </div>
+
           {/* Activities */}
           {lead.activities?.length > 0 && (
             <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
