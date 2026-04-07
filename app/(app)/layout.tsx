@@ -79,14 +79,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const sidebarContent = (
     <>
       {/* Logo */}
-      <div className="px-4 py-5 border-b border-[#27272A]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl gradient-accent flex items-center justify-center shadow-lg shadow-purple-500/20 animate-pulse-glow">
-            <span className="text-white font-black text-xs">H</span>
+      <div className="px-4 py-5 border-b border-[#27272A] relative">
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#8B5CF6]/20 to-transparent" />
+        <div className="flex items-center gap-3">
+          <div className="relative w-9 h-9 rounded-xl gradient-accent flex items-center justify-center shadow-lg shadow-purple-500/30">
+            <div className="absolute inset-0 rounded-xl bg-white/10 blur-sm" />
+            <span className="relative text-white font-black text-sm">H</span>
           </div>
           <div>
             <div className="font-black text-sm tracking-wider text-[#F0F0F3]">HIGHPLANS</div>
-            <div className="text-[9px] text-[#52525B] tracking-widest uppercase">Commercial OS</div>
+            <div className="text-[9px] text-[#52525B] tracking-[0.2em] uppercase font-medium">Commercial OS</div>
           </div>
         </div>
       </div>
@@ -96,8 +98,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {nav.map((item, i) => {
           if ('section' in item) {
             return (
-              <div key={i} className="text-[9px] text-[#52525B] uppercase tracking-widest font-bold px-3 pt-5 pb-1.5">
-                {item.section}
+              <div key={i} className="flex items-center gap-1.5 px-3 pt-5 pb-1.5">
+                <div className="w-3 h-px bg-gradient-to-r from-[#8B5CF6]/40 to-transparent" />
+                <div className="text-[9px] text-[#52525B] uppercase tracking-[0.2em] font-bold">
+                  {item.section}
+                </div>
               </div>
             )
           }
@@ -106,12 +111,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           return (
             <Link key={href} href={href}
               onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg mb-0.5 text-sm transition-all duration-150 ${
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg mb-0.5 text-sm transition-all duration-200 ${
                 active
-                  ? 'nav-active bg-[rgba(139,92,246,0.1)] text-[#A78BFA] font-semibold'
+                  ? 'nav-active text-[#A78BFA] font-semibold'
                   : 'text-[#71717A] hover:bg-[#18181B] hover:text-[#F0F0F3]'
               }`}>
-              <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-[#8B5CF6]' : ''}`} />
+              <Icon className={`w-4 h-4 flex-shrink-0 transition-all ${active ? 'text-[#8B5CF6]' : 'group-hover:text-[#A78BFA]'}`} />
               <span className="flex-1">{label}</span>
             </Link>
           )
@@ -119,28 +124,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* User + Logout */}
-      <div className="px-3 py-3 border-t border-[#27272A] space-y-2">
+      <div className="px-3 py-3 border-t border-[#27272A] space-y-2 relative">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#8B5CF6]/20 to-transparent" />
         {session?.user && (
-          <div className="flex items-center gap-2 px-1">
-            <div className="w-7 h-7 rounded-lg bg-[rgba(139,92,246,0.15)] flex items-center justify-center flex-shrink-0">
-              <span className="text-xs font-bold text-[#A78BFA]">
+          <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg bg-gradient-to-br from-[#16161A] to-[#0F0F12] border border-[#27272A]">
+            <div className="relative w-8 h-8 rounded-lg gradient-accent flex items-center justify-center flex-shrink-0 shadow-lg shadow-purple-500/20">
+              <span className="text-xs font-black text-white">
                 {session.user.name?.charAt(0)?.toUpperCase() || '?'}
               </span>
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium text-[#F0F0F3] truncate">{session.user.name}</div>
+              <div className="text-xs font-bold text-[#F0F0F3] truncate">{session.user.name}</div>
               <div className="text-[9px] text-[#52525B] truncate">{session.user.email}</div>
             </div>
           </div>
         )}
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs text-[#71717A] hover:bg-[#18181B] hover:text-red-400 transition-colors"
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs text-[#71717A] hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 border border-transparent transition-all"
         >
           <LogOut className="w-3.5 h-3.5" />
           Sair
         </button>
-        <div className="text-[10px] text-[#3F3F46] px-1">v2.0.0 · HIGHPLANS OS</div>
+        <div className="text-[9px] text-[#3F3F46] px-1 text-center tracking-wider">v2.0.0 · HIGHPLANS OS</div>
       </div>
     </>
   )
@@ -148,7 +154,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden bg-[#09090B]">
       {/* Mobile header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-[#0F0F12]/95 backdrop-blur-md border-b border-[#27272A] flex items-center justify-between px-4">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-[#0F0F12]/80 backdrop-blur-xl border-b border-[#27272A]/80 flex items-center justify-between px-4 relative">
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#8B5CF6]/20 to-transparent" />
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg gradient-accent flex items-center justify-center">
             <span className="text-white font-black text-[10px]">H</span>
@@ -174,7 +181,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-56 flex-shrink-0 bg-[#0F0F12] border-r border-[#27272A] flex-col">
+      <aside className="hidden md:flex w-56 flex-shrink-0 bg-gradient-to-b from-[#0F0F12] to-[#0A0A0D] border-r border-[#27272A] flex-col relative">
+        <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-[#8B5CF6]/10 to-transparent" />
         {sidebarContent}
       </aside>
 

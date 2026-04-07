@@ -411,14 +411,24 @@ export default function ProspeccaoPage() {
       {/* Header */}
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">
+          <h1 className="text-2xl md:text-3xl font-black text-[#F0F0F3] tracking-tight">
             Modo <span className="gradient-text">Prospecção</span>
           </h1>
-          <p className="text-sm text-[#71717A] mt-1">
-            {contactedCount > 0 && <span className="text-[#10B981] font-bold">{contactedCount} contactados</span>}
-            {contactedCount > 0 && ' · '}
-            {skippedInvalid > 0 && <span className="text-amber-400">{skippedInvalid} inválidos · </span>}
-            {remaining} restantes
+          <p className="text-sm text-[#71717A] mt-1.5 flex items-center gap-2">
+            {contactedCount > 0 && (
+              <span className="flex items-center gap-1 text-[#10B981] font-bold">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
+                {contactedCount} contactados
+              </span>
+            )}
+            {contactedCount > 0 && <span className="text-[#27272A]">·</span>}
+            {skippedInvalid > 0 && (
+              <>
+                <span className="text-amber-400">{skippedInvalid} inválidos</span>
+                <span className="text-[#27272A]">·</span>
+              </>
+            )}
+            <span className="tabular-nums">{remaining} restantes</span>
           </p>
         </div>
         <div className="flex items-center gap-1.5">
@@ -627,11 +637,27 @@ export default function ProspeccaoPage() {
       {!loading && lead && (
         <div className="space-y-4">
           {/* Main card */}
-          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl overflow-hidden card-hover">
-            {/* Score bar top */}
-            <div className="h-1.5 w-full" style={{
-              background: lead.score === 'HOT' ? '#EF4444' : lead.score === 'WARM' ? '#F59E0B' : '#27272A'
-            }} />
+          <div className="relative bg-gradient-to-br from-[#0F0F12] to-[#0A0A0D] border border-[#27272A] rounded-2xl overflow-hidden card-hover shadow-xl shadow-black/40">
+            {/* Score bar top — gradient version */}
+            <div className="h-1 w-full relative overflow-hidden">
+              <div
+                className="h-full w-full"
+                style={{
+                  background: lead.score === 'HOT'
+                    ? 'linear-gradient(90deg, #EF4444, #DC2626, #EF4444)'
+                    : lead.score === 'WARM'
+                    ? 'linear-gradient(90deg, #F59E0B, #D97706, #F59E0B)'
+                    : 'linear-gradient(90deg, #3F3F46, #27272A, #3F3F46)',
+                }}
+              />
+            </div>
+            {/* Subtle ambient glow based on score */}
+            <div
+              className="absolute -top-20 -right-20 w-48 h-48 rounded-full opacity-20 blur-3xl pointer-events-none"
+              style={{
+                background: lead.score === 'HOT' ? '#EF4444' : lead.score === 'WARM' ? '#F59E0B' : '#8B5CF6',
+              }}
+            />
 
             <div className="p-5">
               {/* Name + badges */}
@@ -641,21 +667,29 @@ export default function ProspeccaoPage() {
                     {lead.pais && COUNTRY_INFO[lead.pais] && (
                       <span className="text-lg">{COUNTRY_INFO[lead.pais].flag}</span>
                     )}
-                    <h2 className="text-lg font-black text-[#F0F0F3]">{leadName}</h2>
+                    <h2 className="text-xl font-black text-[#F0F0F3] tracking-tight">{leadName}</h2>
                   </div>
-                  <div className="text-sm text-[#71717A]">
-                    {[lead.nicho, lead.cidade].filter(Boolean).join(' · ') || '—'}
+                  <div className="text-sm text-[#71717A] flex items-center gap-1.5">
+                    {lead.nicho && <span>{lead.nicho}</span>}
+                    {lead.nicho && lead.cidade && <span className="text-[#27272A]">·</span>}
+                    {lead.cidade && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-[#52525B]" />
+                        {lead.cidade}
+                      </span>
+                    )}
+                    {!lead.nicho && !lead.cidade && '—'}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-xs font-black px-2.5 py-1 rounded-full ${
-                    lead.score === 'HOT' ? 'bg-red-500/15 text-red-400' :
-                    lead.score === 'WARM' ? 'bg-amber-500/15 text-amber-400' :
-                    'bg-gray-500/15 text-gray-400'
+                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider border ${
+                    lead.score === 'HOT' ? 'bg-red-500/15 text-red-400 border-red-500/30' :
+                    lead.score === 'WARM' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' :
+                    'bg-gray-500/15 text-gray-400 border-gray-500/30'
                   }`}>
                     {lead.score}
                   </span>
-                  <span className="text-xs font-bold text-[#8B5CF6] bg-[#8B5CF6]/12 px-2.5 py-1 rounded-full tabular-nums">
+                  <span className="text-[10px] font-black text-[#8B5CF6] bg-[#8B5CF6]/12 border border-[#8B5CF6]/25 px-2.5 py-1 rounded-full tabular-nums uppercase tracking-wider">
                     {lead.opportunityScore}pts
                   </span>
                 </div>

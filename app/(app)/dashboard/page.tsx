@@ -83,23 +83,40 @@ interface KPICardProps {
 function KPICard({ label, value, sub, icon: Icon, color = '#8B5CF6', alert = false, href }: KPICardProps) {
   const inner = (
     <div
-      className={`bg-[#0F0F12] border rounded-xl p-4 h-full transition-all duration-200 group
-        ${alert ? 'border-red-500/40 hover:border-red-500/60' : 'border-[#27272A] hover:border-[#8B5CF6]/30'}
+      className={`relative overflow-hidden bg-gradient-to-br from-[#0F0F12] to-[#0A0A0D] border rounded-2xl p-4 h-full transition-all duration-300 group card-hover
+        ${alert ? 'border-red-500/40 hover:border-red-500/60' : 'border-[#27272A]'}
         ${href ? 'cursor-pointer' : ''}`}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `${color}20` }}>
+      {/* Top gradient accent line */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px] opacity-60"
+        style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }}
+      />
+      {/* Subtle glow on hover */}
+      <div
+        className="absolute -top-12 -right-12 w-32 h-32 rounded-full opacity-0 group-hover:opacity-30 transition-opacity duration-500 blur-3xl"
+        style={{ background: color }}
+      />
+
+      <div className="relative flex items-start justify-between mb-3">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+          style={{
+            background: `linear-gradient(135deg, ${color}25, ${color}10)`,
+            boxShadow: `0 0 20px ${color}15, inset 0 0 0 1px ${color}20`,
+          }}
+        >
           <Icon className="w-4 h-4" style={{ color }} />
         </div>
         {alert && (
-          <span className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full font-medium">
+          <span className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">
             Atenção
           </span>
         )}
       </div>
-      <div className="text-2xl font-black text-[#F0F0F3] tracking-tight mb-0.5">{value}</div>
-      <div className="text-xs text-[#71717A] leading-snug">{label}</div>
-      {sub && <div className="text-[10px] text-[#52525B] mt-1">{sub}</div>}
+      <div className="relative text-2xl font-black text-[#F0F0F3] tracking-tight mb-0.5 tabular-nums">{value}</div>
+      <div className="relative text-xs text-[#71717A] leading-snug font-medium">{label}</div>
+      {sub && <div className="relative text-[10px] text-[#52525B] mt-1">{sub}</div>}
     </div>
   )
   return href ? <Link href={href} className="block h-full">{inner}</Link> : inner
@@ -335,8 +352,13 @@ export default function DashboardPage() {
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3] tracking-tight">Dashboard</h1>
-          <p className="text-xs text-[#52525B] mt-0.5">
+          <h1 className="text-2xl md:text-3xl font-black text-[#F0F0F3] tracking-tight">
+            <span className="gradient-text">Dashboard</span>
+          </h1>
+          <p className="text-xs text-[#52525B] mt-1 flex items-center gap-1.5">
+            {lastUpdated && (
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
+            )}
             {lastUpdated
               ? `Atualizado às ${lastUpdated.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}`
               : 'Inteligência comercial em tempo real'}
@@ -372,7 +394,10 @@ export default function DashboardPage() {
 
       {/* ── KPI Row 1 — Revenue ── */}
       <div>
-        <div className="text-[10px] text-[#3F3F46] uppercase tracking-widest font-bold mb-2.5">Receita</div>
+        <div className="flex items-center gap-2 mb-2.5">
+          <div className="w-1 h-3 rounded-full bg-gradient-to-b from-[#10B981] to-[#059669]" />
+          <div className="text-[10px] text-[#52525B] uppercase tracking-widest font-bold">Receita</div>
+        </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <KPICard
             icon={Euro}
@@ -406,7 +431,10 @@ export default function DashboardPage() {
 
       {/* ── KPI Row 2 — Acção ── */}
       <div>
-        <div className="text-[10px] text-[#3F3F46] uppercase tracking-widest font-bold mb-2.5">Acção imediata</div>
+        <div className="flex items-center gap-2 mb-2.5">
+          <div className="w-1 h-3 rounded-full bg-gradient-to-b from-[#EF4444] to-[#DC2626]" />
+          <div className="text-[10px] text-[#52525B] uppercase tracking-widest font-bold">Acção imediata</div>
+        </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <KPICard
             icon={Flame}
