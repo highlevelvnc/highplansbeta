@@ -21,11 +21,6 @@ export async function GET(req: NextRequest) {
         { AND: [{ whatsappRaw: { not: null } }, { whatsappRaw: { not: '' } }] },
         { AND: [{ telefoneRaw: { not: null } }, { telefoneRaw: { not: '' } }] },
       ],
-      NOT: [
-        // Exclude leads already flagged as invalid
-        { tags: { contains: 'numero invalido', mode: 'insensitive' } },
-        { tags: { contains: 'invalid', mode: 'insensitive' } },
-      ],
       // Not closed/lost
       pipelineStatus: { notIn: ['CLOSED', 'LOST'] },
     }
@@ -34,7 +29,7 @@ export async function GET(req: NextRequest) {
     if (pais) where.pais = pais
     if (agentId) where.agentId = agentId
     if (skipId) {
-      where.NOT = [...where.NOT, { id: skipId }]
+      where.id = { not: skipId }
     }
 
     // Fetch candidates in batch and filter by valid WhatsApp number in-memory

@@ -94,24 +94,12 @@ export default function ProspeccaoPage() {
 
   useEffect(() => { loadNext() }, [loadNext])
 
-  // Auto-skip leads with invalid WhatsApp numbers (they can't be contacted anyway)
+  // Auto-skip leads with invalid WhatsApp numbers (no tagging — backend handles filtering)
   useEffect(() => {
     if (!lead || loading) return
     const num = getWhatsAppNumber(lead)
     if (!num || num.length < 9) {
-      // Mark as invalid and skip
       setSkippedInvalid(c => c + 1)
-      fetch(`/api/leads/${lead.id}/activity`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo: 'SISTEMA', descricao: 'Número inválido — saltado automaticamente na prospecção' }),
-      }).catch(() => {})
-      // Tag the lead as invalid to exclude from future prospecting
-      fetch(`/api/leads/${lead.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...lead, tags: [lead.tags, 'numero invalido'].filter(Boolean).join(',') }),
-      }).catch(() => {})
       loadNext(lead.id)
     }
   }, [lead?.id, loading]) // eslint-disable-line react-hooks/exhaustive-deps
