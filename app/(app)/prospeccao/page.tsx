@@ -3,7 +3,8 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   MessageCircle, Phone, ChevronRight, Zap, Globe, MapPin,
   RefreshCw, Loader2, Tag, X, CheckCircle, PhoneOff,
-  PhoneIncoming, UserX, Star, Clock,
+  PhoneIncoming, UserX, Star, Clock, Keyboard, ExternalLink,
+  AlertTriangle,
 } from 'lucide-react'
 import { useToast } from '@/components/Toast'
 import { displayName, getWhatsAppNumber, buildWhatsAppUrl, COUNTRY_INFO } from '@/lib/lead-utils'
@@ -60,6 +61,8 @@ export default function ProspeccaoPage() {
   const [contactedCount, setContactedCount] = useState(0)
   const [showCallLog, setShowCallLog] = useState(false)
   const [callNotes, setCallNotes] = useState('')
+  const [skippedInvalid, setSkippedInvalid] = useState(0)
+  const [showHotkeys, setShowHotkeys] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -91,9 +94,40 @@ export default function ProspeccaoPage() {
 
   useEffect(() => { loadNext() }, [loadNext])
 
-  const handleWhatsApp = () => {
+  // Auto-skip leads with invalid WhatsApp numbers (they can't be contacted anyway)
+  useEffect(() => {
+    if (!lead || loading) return
+    const num = getWhatsAppNumber(lead)
+    if (!num || num.length < 9) {
+      // Mark as invalid and skip
+      setSkippedInvalid(c => c + 1)
+      fetch(`/api/leads/${lead.id}/activity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: 'SISTEMA', descricao: 'Número inválido — saltado automaticamente na prospecção' }),
+      }).catch(() => {})
+      // Tag the lead as invalid to exclude from future prospecting
+      fetch(`/api/leads/${lead.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...lead, tags: [lead.tags, 'numero invalido'].filter(Boolean).join(',') }),
+      }).catch(() => {})
+      loadNext(lead.id)
+    }
+  }, [lead?.id, loading]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleWhatsApp = (useWeb = false) => {
     if (!lead) return
-    const url = buildWhatsAppUrl(lead)
+    const num = getWhatsAppNumber(lead)
+    if (!num) {
+      toast('Número inválido — saltando', 'info')
+      loadNext(lead.id)
+      return
+    }
+    // Use WhatsApp Web (web.whatsapp.com) or wa.me
+    const url = useWeb
+      ? `https://web.whatsapp.com/send?phone=${num}`
+      : buildWhatsAppUrl(lead)
     if (url) {
       window.open(url, '_blank')
       fetch('/api/messages/send', {
@@ -101,11 +135,9 @@ export default function ProspeccaoPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadId: lead.id, canal: 'WHATSAPP', corpo: '(aberto via prospecção)' }),
       }).catch(() => {})
-      // Recalc score
       fetch(`/api/leads/${lead.id}/recalc-score`, { method: 'POST' }).catch(() => {})
       setContactedCount(c => c + 1)
-      toast(`WA aberto · ${displayName(lead)}`, 'success')
-      // Auto-advance after 1.5s
+      toast(`WA ${useWeb ? 'Web' : ''} aberto · ${displayName(lead)}`, 'success')
       setTimeout(() => loadNext(lead.id), 1500)
     }
   }
@@ -113,7 +145,12 @@ export default function ProspeccaoPage() {
   const handleCall = () => {
     if (!lead) return
     const num = getWhatsAppNumber(lead)
-    if (num) window.open(`tel:+${num}`, '_blank')
+    if (!num) {
+      toast('Número inválido — saltando', 'info')
+      loadNext(lead.id)
+      return
+    }
+    window.open(`tel:+${num}`, '_blank')
     setShowCallLog(true)
   }
 
@@ -137,6 +174,38 @@ export default function ProspeccaoPage() {
     if (lead) loadNext(lead.id)
   }
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea/select
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return
+      if (!lead || loading) return
+
+      const k = e.key.toLowerCase()
+
+      // Main actions (when NOT in call log)
+      if (!showCallLog) {
+        if (k === 'w') { e.preventDefault(); handleWhatsApp(false) }
+        else if (k === 'e') { e.preventDefault(); handleWhatsApp(true) } // WhatsApp Web
+        else if (k === 'l') { e.preventDefault(); handleCall() }
+        else if (k === 's' || k === 'arrowright' || k === ' ') { e.preventDefault(); skip() }
+        else if (k === '?' || k === 'h') { e.preventDefault(); setShowHotkeys(v => !v) }
+      }
+      // Call log actions
+      else {
+        if (k === '1') { e.preventDefault(); logCall('atendeu') }
+        else if (k === '2') { e.preventDefault(); logCall('interessado') }
+        else if (k === '3') { e.preventDefault(); logCall('nao_atendeu') }
+        else if (k === '4') { e.preventDefault(); logCall('ocupado') }
+        else if (k === '5') { e.preventDefault(); logCall('sem_interesse') }
+        else if (k === 'escape') { e.preventDefault(); setShowCallLog(false) }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [lead, loading, showCallLog]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const waNum = lead ? getWhatsAppNumber(lead) : ''
   const hasWA = !!waNum
   const leadName = lead ? displayName(lead) : ''
@@ -145,16 +214,71 @@ export default function ProspeccaoPage() {
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
       {/* Header */}
-      <div className="mb-5">
-        <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">
-          Modo <span className="gradient-text">Prospecção</span>
-        </h1>
-        <p className="text-sm text-[#71717A] mt-1">
-          {contactedCount > 0 && <span className="text-[#10B981] font-bold">{contactedCount} contactados</span>}
-          {contactedCount > 0 && ' · '}
-          {remaining} leads por contactar
-        </p>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">
+            Modo <span className="gradient-text">Prospecção</span>
+          </h1>
+          <p className="text-sm text-[#71717A] mt-1">
+            {contactedCount > 0 && <span className="text-[#10B981] font-bold">{contactedCount} contactados</span>}
+            {contactedCount > 0 && ' · '}
+            {skippedInvalid > 0 && <span className="text-amber-400">{skippedInvalid} inválidos · </span>}
+            {remaining} restantes
+          </p>
+        </div>
+        <button
+          onClick={() => setShowHotkeys(v => !v)}
+          title="Atalhos do teclado (H)"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#27272A] text-[#71717A] hover:border-[#8B5CF6]/40 hover:text-[#F0F0F3] text-xs transition-all"
+        >
+          <Keyboard className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Atalhos</span>
+        </button>
       </div>
+
+      {/* Hotkeys panel */}
+      {showHotkeys && (
+        <div className="mb-4 bg-[#0F0F12] border border-[#8B5CF6]/30 rounded-xl p-4 animate-fade-in">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-bold text-[#F0F0F3] uppercase tracking-wider">Atalhos do Teclado</div>
+            <button onClick={() => setShowHotkeys(false)} className="text-[#52525B] hover:text-[#F0F0F3]">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {[
+              { k: 'W', label: 'Abrir WhatsApp' },
+              { k: 'E', label: 'WhatsApp Web' },
+              { k: 'L', label: 'Ligar' },
+              { k: 'S / →', label: 'Saltar lead' },
+              { k: 'H / ?', label: 'Mostrar atalhos' },
+              { k: 'Esc', label: 'Fechar call log' },
+            ].map(h => (
+              <div key={h.k} className="flex items-center gap-2 text-[#71717A]">
+                <kbd className="flex-shrink-0 bg-[#27272A] border border-[#3F3F46] rounded px-1.5 py-0.5 font-mono text-[10px] text-[#A78BFA] min-w-[32px] text-center">{h.k}</kbd>
+                <span>{h.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 pt-3 border-t border-[#27272A]">
+            <div className="text-[10px] text-[#52525B] uppercase tracking-wider font-bold mb-2">Durante chamada</div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {[
+                { k: '1', label: 'Atendeu' },
+                { k: '2', label: 'Interessado' },
+                { k: '3', label: 'Não atendeu' },
+                { k: '4', label: 'Ocupado' },
+                { k: '5', label: 'Sem interesse' },
+              ].map(h => (
+                <div key={h.k} className="flex items-center gap-2 text-[#71717A]">
+                  <kbd className="flex-shrink-0 bg-[#27272A] border border-[#3F3F46] rounded px-1.5 py-0.5 font-mono text-[10px] text-[#A78BFA] min-w-[32px] text-center">{h.k}</kbd>
+                  <span>{h.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
@@ -291,51 +415,68 @@ export default function ProspeccaoPage() {
             {/* Action buttons */}
             <div className="border-t border-[#27272A]">
               {!showCallLog ? (
-                <div className="grid grid-cols-3 divide-x divide-[#27272A]">
-                  {/* WhatsApp — main action */}
-                  <button
-                    onClick={handleWhatsApp}
-                    disabled={!hasWA}
-                    className="flex flex-col items-center justify-center gap-1.5 py-5 text-[#25D366] hover:bg-[#25D366]/8 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <MessageCircle className="w-6 h-6" />
-                    <span className="text-xs font-bold">WhatsApp</span>
-                  </button>
+                <>
+                  <div className="grid grid-cols-3 divide-x divide-[#27272A]">
+                    {/* WhatsApp — main action */}
+                    <button
+                      onClick={() => handleWhatsApp(false)}
+                      disabled={!hasWA}
+                      className="relative flex flex-col items-center justify-center gap-1.5 py-5 text-[#25D366] hover:bg-[#25D366]/8 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed group"
+                    >
+                      <MessageCircle className="w-6 h-6" />
+                      <span className="text-xs font-bold">WhatsApp</span>
+                      <kbd className="absolute top-2 right-2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">W</kbd>
+                    </button>
 
-                  {/* Call */}
-                  <button
-                    onClick={handleCall}
-                    disabled={!hasWA}
-                    className="flex flex-col items-center justify-center gap-1.5 py-5 text-[#8B5CF6] hover:bg-[#8B5CF6]/8 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <Phone className="w-6 h-6" />
-                    <span className="text-xs font-bold">Ligar</span>
-                  </button>
+                    {/* Call */}
+                    <button
+                      onClick={handleCall}
+                      disabled={!hasWA}
+                      className="relative flex flex-col items-center justify-center gap-1.5 py-5 text-[#8B5CF6] hover:bg-[#8B5CF6]/8 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed group"
+                    >
+                      <Phone className="w-6 h-6" />
+                      <span className="text-xs font-bold">Ligar</span>
+                      <kbd className="absolute top-2 right-2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">L</kbd>
+                    </button>
 
-                  {/* Skip */}
-                  <button
-                    onClick={skip}
-                    className="flex flex-col items-center justify-center gap-1.5 py-5 text-[#71717A] hover:bg-[#16161A] active:scale-95 transition-all"
-                  >
-                    <ChevronRight className="w-6 h-6" />
-                    <span className="text-xs font-bold">Saltar</span>
-                  </button>
-                </div>
+                    {/* Skip */}
+                    <button
+                      onClick={skip}
+                      className="relative flex flex-col items-center justify-center gap-1.5 py-5 text-[#71717A] hover:bg-[#16161A] active:scale-95 transition-all group"
+                    >
+                      <ChevronRight className="w-6 h-6" />
+                      <span className="text-xs font-bold">Saltar</span>
+                      <kbd className="absolute top-2 right-2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">S</kbd>
+                    </button>
+                  </div>
+                  {/* Secondary action: WhatsApp Web */}
+                  {hasWA && (
+                    <button
+                      onClick={() => handleWhatsApp(true)}
+                      className="relative w-full flex items-center justify-center gap-2 py-2.5 text-[#25D366]/70 hover:text-[#25D366] hover:bg-[#25D366]/5 border-t border-[#27272A] text-xs font-medium transition-all group"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Abrir no WhatsApp Web (desktop)</span>
+                      <kbd className="absolute right-3 top-1/2 -translate-y-1/2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">E</kbd>
+                    </button>
+                  )}
+                </>
               ) : (
                 /* Call log */
                 <div className="p-4 space-y-3">
                   <div className="text-xs text-[#71717A] font-medium uppercase tracking-wider">Resultado da chamada</div>
                   <div className="grid grid-cols-5 gap-1.5">
-                    {CALL_RESULTS.map(r => {
+                    {CALL_RESULTS.map((r, i) => {
                       const Icon = r.icon
                       return (
                         <button
                           key={r.id}
                           onClick={() => logCall(r.id)}
-                          className="flex flex-col items-center gap-1 py-2.5 rounded-xl border border-[#27272A] hover:border-[#52525B] transition-all active:scale-95"
+                          className="relative flex flex-col items-center gap-1 py-2.5 rounded-xl border border-[#27272A] hover:border-[#52525B] transition-all active:scale-95 group"
                         >
                           <Icon className="w-4 h-4" style={{ color: r.color }} />
                           <span className="text-[9px] font-medium text-[#71717A]">{r.label.split(' ')[0]}</span>
+                          <kbd className="absolute -top-1 -right-1 bg-[#27272A] border border-[#3F3F46] rounded px-1 py-0 font-mono text-[9px] text-[#A78BFA]">{i + 1}</kbd>
                         </button>
                       )
                     })}
