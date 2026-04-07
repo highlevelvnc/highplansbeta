@@ -54,7 +54,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
-    return NextResponse.json({ success: true, activity })
+    // Auto-schedule second attempt if no answer or busy (2 days later, 10am)
+    let autoFollowUp = null
+    if (resultado === 'nao_atendeu' || resultado === 'ocupado') {
+      const futureDate = new Date()
+      futureDate.setDate(futureDate.getDate() + 2)
+      futureDate.setHours(10, 0, 0, 0)
+
+      autoFollowUp = await prisma.followUp.create({
+        data: {
+          leadId: id,
+          tipo: 'LIGACAO',
+          mensagem: `Segunda tentativa — anteriormente: ${label}`,
+          agendadoPara: futureDate,
+        },
+      })
+    }
+
+    return NextResponse.json({ success: true, activity, autoFollowUp })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'
     return NextResponse.json({ error: msg }, { status: 500 })

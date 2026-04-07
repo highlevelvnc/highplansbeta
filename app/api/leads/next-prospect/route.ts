@@ -12,14 +12,20 @@ export async function GET(req: NextRequest) {
     const skipId = searchParams.get('skipId') ?? ''
 
     const where: any = {
-      // Never contacted
-      messages: { none: {} },
+      // Never contacted (no outgoing messages)
+      messages: { none: { status: { not: 'RECEIVED' } } },
       // Has ANY phone/whatsapp field populated (validation happens in JS below)
       OR: [
         { AND: [{ whatsapp: { not: null } }, { whatsapp: { not: '' } }] },
         { AND: [{ telefone: { not: null } }, { telefone: { not: '' } }] },
         { AND: [{ whatsappRaw: { not: null } }, { whatsappRaw: { not: '' } }] },
         { AND: [{ telefoneRaw: { not: null } }, { telefoneRaw: { not: '' } }] },
+      ],
+      NOT: [
+        // Exclude manually marked invalid
+        { tags: { contains: 'numero invalido', mode: 'insensitive' } },
+        // Exclude snoozed (will reappear when snooze follow-up activates)
+        { tags: { contains: 'snoozed', mode: 'insensitive' } },
       ],
       // Not closed/lost
       pipelineStatus: { notIn: ['CLOSED', 'LOST'] },
@@ -29,7 +35,7 @@ export async function GET(req: NextRequest) {
     if (pais) where.pais = pais
     if (agentId) where.agentId = agentId
     if (skipId) {
-      where.id = { not: skipId }
+      where.NOT = [...where.NOT, { id: skipId }]
     }
 
     // Fetch candidates in batch and filter by valid WhatsApp number in-memory

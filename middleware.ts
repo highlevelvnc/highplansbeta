@@ -38,6 +38,7 @@ setInterval(() => {
 const PUBLIC_PATHS = [
   '/login',
   '/api/auth',  // NextAuth routes
+  '/api/webhooks',  // External webhook endpoints (Evolution, etc.)
 ]
 
 function isPublic(pathname: string): boolean {

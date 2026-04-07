@@ -4,7 +4,7 @@ import {
   MessageCircle, Phone, ChevronRight, Zap, Globe, MapPin,
   RefreshCw, Loader2, Tag, X, CheckCircle, PhoneOff,
   PhoneIncoming, UserX, Star, Clock, Keyboard, ExternalLink,
-  AlertTriangle,
+  AlertTriangle, Ban, Moon, BarChart3,
 } from 'lucide-react'
 import { useToast } from '@/components/Toast'
 import { displayName, getWhatsAppNumber, buildWhatsAppUrl, COUNTRY_INFO } from '@/lib/lead-utils'
@@ -63,6 +63,18 @@ export default function ProspeccaoPage() {
   const [callNotes, setCallNotes] = useState('')
   const [skippedInvalid, setSkippedInvalid] = useState(0)
   const [showHotkeys, setShowHotkeys] = useState(false)
+  // Session stats
+  const [sessionStats, setSessionStats] = useState({
+    waOpened: 0,
+    called: 0,
+    answered: 0,
+    interested: 0,
+    notAnswered: 0,
+    snoozed: 0,
+    invalidated: 0,
+    skipped: 0,
+  })
+  const [showSession, setShowSession] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -112,7 +124,6 @@ export default function ProspeccaoPage() {
       loadNext(lead.id)
       return
     }
-    // Use WhatsApp Web (web.whatsapp.com) or wa.me
     const url = useWeb
       ? `https://web.whatsapp.com/send?phone=${num}`
       : buildWhatsAppUrl(lead)
@@ -125,9 +136,30 @@ export default function ProspeccaoPage() {
       }).catch(() => {})
       fetch(`/api/leads/${lead.id}/recalc-score`, { method: 'POST' }).catch(() => {})
       setContactedCount(c => c + 1)
+      setSessionStats(s => ({ ...s, waOpened: s.waOpened + 1 }))
       toast(`WA ${useWeb ? 'Web' : ''} aberto · ${displayName(lead)}`, 'success')
       setTimeout(() => loadNext(lead.id), 1500)
     }
+  }
+
+  const markInvalid = async () => {
+    if (!lead) return
+    await fetch(`/api/leads/${lead.id}/mark-invalid`, { method: 'POST' }).catch(() => {})
+    setSessionStats(s => ({ ...s, invalidated: s.invalidated + 1 }))
+    toast('Marcado como inválido', 'info')
+    loadNext(lead.id)
+  }
+
+  const snooze = async (days: number) => {
+    if (!lead) return
+    await fetch(`/api/leads/${lead.id}/snooze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days }),
+    }).catch(() => {})
+    setSessionStats(s => ({ ...s, snoozed: s.snoozed + 1 }))
+    toast(`Snooze ${days} dia${days > 1 ? 's' : ''} — voltar depois`, 'success')
+    loadNext(lead.id)
   }
 
   const handleCall = () => {
@@ -149,17 +181,26 @@ export default function ProspeccaoPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resultado, notas: callNotes || undefined }),
     }).catch(() => {})
-    // Recalc score
     fetch(`/api/leads/${lead.id}/recalc-score`, { method: 'POST' }).catch(() => {})
     setContactedCount(c => c + 1)
-    toast(`Chamada registada · ${resultado}`, 'success')
+    setSessionStats(s => ({
+      ...s,
+      called: s.called + 1,
+      answered: s.answered + (resultado === 'atendeu' || resultado === 'interessado' ? 1 : 0),
+      interested: s.interested + (resultado === 'interessado' ? 1 : 0),
+      notAnswered: s.notAnswered + (resultado === 'nao_atendeu' || resultado === 'ocupado' ? 1 : 0),
+    }))
+    const isAutoFU = resultado === 'nao_atendeu' || resultado === 'ocupado'
+    toast(isAutoFU ? `Registada — segunda tentativa agendada para 2 dias` : `Chamada registada · ${resultado}`, 'success')
     setShowCallLog(false)
     setCallNotes('')
     loadNext(lead.id)
   }
 
   const skip = () => {
-    if (lead) loadNext(lead.id)
+    if (!lead) return
+    setSessionStats(s => ({ ...s, skipped: s.skipped + 1 }))
+    loadNext(lead.id)
   }
 
   // Keyboard shortcuts
@@ -175,9 +216,11 @@ export default function ProspeccaoPage() {
       // Main actions (when NOT in call log)
       if (!showCallLog) {
         if (k === 'w') { e.preventDefault(); handleWhatsApp(false) }
-        else if (k === 'e') { e.preventDefault(); handleWhatsApp(true) } // WhatsApp Web
+        else if (k === 'e') { e.preventDefault(); handleWhatsApp(true) }
         else if (k === 'l') { e.preventDefault(); handleCall() }
         else if (k === 's' || k === 'arrowright' || k === ' ') { e.preventDefault(); skip() }
+        else if (k === 'i') { e.preventDefault(); markInvalid() }
+        else if (k === 'z') { e.preventDefault(); snooze(2) }
         else if (k === '?' || k === 'h') { e.preventDefault(); setShowHotkeys(v => !v) }
       }
       // Call log actions
@@ -214,15 +257,61 @@ export default function ProspeccaoPage() {
             {remaining} restantes
           </p>
         </div>
-        <button
-          onClick={() => setShowHotkeys(v => !v)}
-          title="Atalhos do teclado (H)"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#27272A] text-[#71717A] hover:border-[#8B5CF6]/40 hover:text-[#F0F0F3] text-xs transition-all"
-        >
-          <Keyboard className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Atalhos</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShowSession(v => !v)}
+            title="Resumo da sessão"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#27272A] text-[#71717A] hover:border-[#8B5CF6]/40 hover:text-[#F0F0F3] text-xs transition-all"
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Sessão</span>
+          </button>
+          <button
+            onClick={() => setShowHotkeys(v => !v)}
+            title="Atalhos do teclado (H)"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#27272A] text-[#71717A] hover:border-[#8B5CF6]/40 hover:text-[#F0F0F3] text-xs transition-all"
+          >
+            <Keyboard className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Atalhos</span>
+          </button>
+        </div>
       </div>
+
+      {/* Session stats panel */}
+      {showSession && (
+        <div className="mb-4 bg-[#0F0F12] border border-[#10B981]/30 rounded-xl p-4 animate-fade-in">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-bold text-[#F0F0F3] uppercase tracking-wider">Sessão Atual</div>
+            <button onClick={() => setShowSession(false)} className="text-[#52525B] hover:text-[#F0F0F3]">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { label: 'WA abertos', value: sessionStats.waOpened, color: '#25D366' },
+              { label: 'Chamadas', value: sessionStats.called, color: '#8B5CF6' },
+              { label: 'Atendeu', value: sessionStats.answered, color: '#10B981' },
+              { label: 'Interessados', value: sessionStats.interested, color: '#F59E0B' },
+              { label: 'Não atendeu', value: sessionStats.notAnswered, color: '#71717A' },
+              { label: 'Snooze', value: sessionStats.snoozed, color: '#3B82F6' },
+              { label: 'Inválidos', value: sessionStats.invalidated, color: '#EF4444' },
+              { label: 'Saltados', value: sessionStats.skipped, color: '#52525B' },
+            ].map(s => (
+              <div key={s.label} className="bg-[#09090B] rounded-lg p-2.5">
+                <div className="text-lg font-black tabular-nums" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-[10px] text-[#52525B]">{s.label}</div>
+              </div>
+            ))}
+          </div>
+          {sessionStats.called > 0 && (
+            <div className="mt-3 pt-3 border-t border-[#27272A] text-[11px] text-[#71717A]">
+              Taxa de atendimento: <span className="text-[#10B981] font-bold">{Math.round((sessionStats.answered / sessionStats.called) * 100)}%</span>
+              {' · '}
+              Conversão para interessado: <span className="text-amber-400 font-bold">{sessionStats.called > 0 ? Math.round((sessionStats.interested / sessionStats.called) * 100) : 0}%</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Hotkeys panel */}
       {showHotkeys && (
@@ -239,6 +328,8 @@ export default function ProspeccaoPage() {
               { k: 'E', label: 'WhatsApp Web' },
               { k: 'L', label: 'Ligar' },
               { k: 'S / →', label: 'Saltar lead' },
+              { k: 'I', label: 'Marcar inválido' },
+              { k: 'Z', label: 'Snooze 2 dias' },
               { k: 'H / ?', label: 'Mostrar atalhos' },
               { k: 'Esc', label: 'Fechar call log' },
             ].map(h => (
@@ -448,6 +539,44 @@ export default function ProspeccaoPage() {
                       <kbd className="absolute right-3 top-1/2 -translate-y-1/2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">E</kbd>
                     </button>
                   )}
+
+                  {/* Snooze + Mark Invalid actions */}
+                  <div className="grid grid-cols-4 divide-x divide-[#27272A] border-t border-[#27272A]">
+                    <button
+                      onClick={() => snooze(2)}
+                      title="Voltar a este lead em 2 dias (Z)"
+                      className="relative flex items-center justify-center gap-1 py-2.5 text-[#3B82F6]/70 hover:text-[#3B82F6] hover:bg-[#3B82F6]/5 text-[11px] font-medium transition-all group"
+                    >
+                      <Moon className="w-3 h-3" />
+                      <span>2d</span>
+                      <kbd className="absolute top-1 right-1 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-0.5 font-mono text-[8px] text-[#52525B] group-hover:text-[#A78BFA]">Z</kbd>
+                    </button>
+                    <button
+                      onClick={() => snooze(7)}
+                      title="Voltar a este lead em 7 dias"
+                      className="flex items-center justify-center gap-1 py-2.5 text-[#3B82F6]/70 hover:text-[#3B82F6] hover:bg-[#3B82F6]/5 text-[11px] font-medium transition-all"
+                    >
+                      <Moon className="w-3 h-3" />
+                      <span>7d</span>
+                    </button>
+                    <button
+                      onClick={() => snooze(30)}
+                      title="Voltar a este lead em 30 dias"
+                      className="flex items-center justify-center gap-1 py-2.5 text-[#3B82F6]/70 hover:text-[#3B82F6] hover:bg-[#3B82F6]/5 text-[11px] font-medium transition-all"
+                    >
+                      <Moon className="w-3 h-3" />
+                      <span>30d</span>
+                    </button>
+                    <button
+                      onClick={markInvalid}
+                      title="Marcar número como inválido (I)"
+                      className="relative flex items-center justify-center gap-1 py-2.5 text-red-400/70 hover:text-red-400 hover:bg-red-500/5 text-[11px] font-medium transition-all group"
+                    >
+                      <Ban className="w-3 h-3" />
+                      <span>Inválido</span>
+                      <kbd className="absolute top-1 right-1 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-0.5 font-mono text-[8px] text-[#52525B] group-hover:text-[#A78BFA]">I</kbd>
+                    </button>
+                  </div>
                 </>
               ) : (
                 /* Call log */
