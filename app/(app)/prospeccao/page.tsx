@@ -4,7 +4,7 @@ import {
   MessageCircle, Phone, ChevronRight, Zap, Globe, MapPin,
   RefreshCw, Loader2, Tag, X, CheckCircle, PhoneOff,
   PhoneIncoming, UserX, Star, Clock, Keyboard, ExternalLink,
-  AlertTriangle, Ban, Moon, BarChart3,
+  AlertTriangle, Ban, Moon, BarChart3, Sparkles, Copy, Target,
 } from 'lucide-react'
 import { useToast } from '@/components/Toast'
 import { displayName, getWhatsAppNumber, buildWhatsAppUrl, COUNTRY_INFO } from '@/lib/lead-utils'
@@ -75,7 +75,56 @@ export default function ProspeccaoPage() {
     skipped: 0,
   })
   const [showSession, setShowSession] = useState(false)
+  // Prefetch: keep next lead in memory for instant transitions
+  const [nextLead, setNextLead] = useState<Lead | null>(null)
+  // Daily goal
+  const [dailyGoal, setDailyGoal] = useState(50)
+  const [dailyDone, setDailyDone] = useState(0)
+  const [editingGoal, setEditingGoal] = useState(false)
+  // AI message panel
+  const [showAiMessage, setShowAiMessage] = useState(false)
+  const [aiMessage, setAiMessage] = useState('')
+  const [aiCopied, setAiCopied] = useState(false)
   const { toast } = useToast()
+
+  // Load daily goal from localStorage (resets at midnight)
+  useEffect(() => {
+    const today = new Date().toDateString()
+    const stored = localStorage.getItem('prospeccao_daily')
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        if (parsed.date === today) {
+          setDailyDone(parsed.done || 0)
+          setDailyGoal(parsed.goal || 50)
+        } else {
+          // New day — reset done, keep goal
+          setDailyGoal(parsed.goal || 50)
+          setDailyDone(0)
+          localStorage.setItem('prospeccao_daily', JSON.stringify({ date: today, done: 0, goal: parsed.goal || 50 }))
+        }
+      } catch {}
+    }
+  }, [])
+
+  // Persist daily progress
+  const incrementDaily = useCallback(() => {
+    setDailyDone(d => {
+      const next = d + 1
+      const today = new Date().toDateString()
+      localStorage.setItem('prospeccao_daily', JSON.stringify({ date: today, done: next, goal: dailyGoal }))
+      // Celebrate milestones
+      if (next === dailyGoal) toast(`🎉 Meta diária atingida! ${next}/${dailyGoal}`, 'success')
+      return next
+    })
+  }, [dailyGoal, toast])
+
+  const updateGoal = (newGoal: number) => {
+    setDailyGoal(newGoal)
+    const today = new Date().toDateString()
+    localStorage.setItem('prospeccao_daily', JSON.stringify({ date: today, done: dailyDone, goal: newGoal }))
+    setEditingGoal(false)
+  }
 
   useEffect(() => {
     fetch('/api/leads/nichos').then(r => r.json()).then(d => {
@@ -83,10 +132,8 @@ export default function ProspeccaoPage() {
     }).catch(() => {})
   }, [])
 
-  const loadNext = useCallback(async (skipId?: string) => {
-    setLoading(true)
-    setShowCallLog(false)
-    setCallNotes('')
+  // Internal: fetch one lead from API (used for both current and prefetch)
+  const fetchOne = useCallback(async (skipId?: string) => {
     const params = new URLSearchParams()
     if (nicho) params.set('nicho', nicho)
     if (pais) params.set('pais', pais)
@@ -94,17 +141,57 @@ export default function ProspeccaoPage() {
     try {
       const res = await fetch(`/api/leads/next-prospect?${params}`)
       const data = await res.json()
-      setLead(data.lead || null)
-      setRemaining(data.remaining || 0)
+      return { lead: data.lead || null, remaining: data.remaining || 0 }
     } catch {
-      setLead(null)
-      setRemaining(0)
-    } finally {
-      setLoading(false)
+      return { lead: null, remaining: 0 }
     }
   }, [nicho, pais])
 
-  useEffect(() => { loadNext() }, [loadNext])
+  const loadNext = useCallback(async (skipId?: string) => {
+    setShowCallLog(false)
+    setCallNotes('')
+    setShowAiMessage(false)
+    setAiMessage('')
+
+    // Use prefetched lead if available and not the one being skipped
+    if (nextLead && nextLead.id !== skipId) {
+      setLead(nextLead)
+      setNextLead(null)
+      // Prefetch the NEXT one in background
+      fetchOne(nextLead.id).then(d => {
+        setNextLead(d.lead)
+        setRemaining(d.remaining)
+      })
+      return
+    }
+
+    // Fallback: fresh fetch
+    setLoading(true)
+    const data = await fetchOne(skipId)
+    setLead(data.lead)
+    setRemaining(data.remaining)
+    setLoading(false)
+
+    // Prefetch next in background
+    if (data.lead) {
+      fetchOne(data.lead.id).then(d => setNextLead(d.lead))
+    }
+  }, [nextLead, fetchOne])
+
+  useEffect(() => {
+    // Initial load when filters change — reset prefetch
+    setNextLead(null)
+    setLoading(true)
+    fetchOne().then(data => {
+      setLead(data.lead)
+      setRemaining(data.remaining)
+      setLoading(false)
+      // Prefetch next
+      if (data.lead) {
+        fetchOne(data.lead.id).then(d => setNextLead(d.lead))
+      }
+    })
+  }, [nicho, pais]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-skip leads with invalid WhatsApp numbers (no tagging — backend handles filtering)
   useEffect(() => {
@@ -116,6 +203,77 @@ export default function ProspeccaoPage() {
     }
   }, [lead?.id, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── AI-style personalized message generator ──
+  const generateAiMessage = useCallback((l: Lead): string => {
+    const firstName = (l.nome || '').split(' ')[0] || l.nome || ''
+    const empresa = l.empresa || l.nome || 'a vossa empresa'
+    const cidade = l.cidade || ''
+    const nicho = l.nicho || ''
+    const lang = l.pais === 'DE' ? 'de' : l.pais === 'NL' ? 'en' : 'pt'
+
+    // Identify the strongest digital weakness as the angle
+    let problema = ''
+    if (!l.temSite) problema = 'sem site'
+    else if (l.siteFraco) problema = 'site fraco'
+    else if (!l.instagramAtivo) problema = 'instagram inativo'
+    else if (!l.gmbOtimizado) problema = 'google maps por otimizar'
+    else if (!l.anunciosAtivos) problema = 'sem anúncios'
+
+    // Build personalized message based on language + problem
+    if (lang === 'de') {
+      const problems: Record<string, string> = {
+        'sem site': `Ich habe gesehen, dass ${empresa} keine Website hat`,
+        'site fraco': `Ich habe ${empresa}'s Website angesehen — es gibt einiges zu verbessern`,
+        'instagram inativo': `Ich habe gesehen, dass ${empresa} auf Instagram inaktiv ist`,
+        'google maps por otimizar': `Ich habe gesehen, dass ${empresa} bei Google Maps optimiert werden könnte`,
+        'sem anúncios': `Ich habe gesehen, dass ${empresa} keine Online-Werbung schaltet`,
+      }
+      const intro = problems[problema] || `Ich habe ${empresa} entdeckt`
+      return `Hallo ${firstName}, guten Tag! 👋\n\n${intro}${cidade ? ` in ${cidade}` : ''}.\n\nIch helfe ${nicho || 'Unternehmen'} dabei, mehr Kunden online zu gewinnen. Hätten Sie 5 Minuten für ein kurzes Gespräch diese Woche?`
+    }
+
+    if (lang === 'en') {
+      const problems: Record<string, string> = {
+        'sem site': `I noticed ${empresa} doesn't have a website yet`,
+        'site fraco': `I checked ${empresa}'s website — there's room for improvement`,
+        'instagram inativo': `I noticed ${empresa}'s Instagram is inactive`,
+        'google maps por otimizar': `I noticed ${empresa}'s Google Maps profile could be optimized`,
+        'sem anúncios': `I noticed ${empresa} isn't running any online ads`,
+      }
+      const intro = problems[problema] || `I came across ${empresa}`
+      return `Hi ${firstName}, good afternoon! 👋\n\n${intro}${cidade ? ` in ${cidade}` : ''}.\n\nI help ${nicho || 'businesses'} get more customers online. Do you have 5 minutes for a quick chat this week?`
+    }
+
+    // Portuguese (default)
+    const problems: Record<string, string> = {
+      'sem site': `Reparei que ${empresa} ainda não tem site`,
+      'site fraco': `Vi o site da ${empresa} — há espaço para melhorias claras`,
+      'instagram inativo': `Vi que o Instagram da ${empresa} está parado há algum tempo`,
+      'google maps por otimizar': `Vi que o perfil da ${empresa} no Google Maps tem espaço para otimização`,
+      'sem anúncios': `Reparei que ${empresa} não está a fazer publicidade online`,
+    }
+    const intro = problems[problema] || `Encontrei o ${empresa}`
+    return `Olá ${firstName}, boa tarde! 👋\n\n${intro}${cidade ? ` em ${cidade}` : ''}.\n\nAjudo ${nicho || 'negócios'} como o vosso a captar mais clientes online. Tem 5 minutos para uma conversa rápida esta semana?`
+  }, [])
+
+  const handleAiGenerate = () => {
+    if (!lead) return
+    setAiMessage(generateAiMessage(lead))
+    setShowAiMessage(true)
+    setAiCopied(false)
+  }
+
+  const handleAiCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(aiMessage)
+      setAiCopied(true)
+      toast('Mensagem copiada', 'success')
+      setTimeout(() => setAiCopied(false), 2000)
+    } catch {
+      toast('Erro ao copiar', 'error')
+    }
+  }
+
   const handleWhatsApp = (useWeb = false) => {
     if (!lead) return
     const num = getWhatsAppNumber(lead)
@@ -124,18 +282,22 @@ export default function ProspeccaoPage() {
       loadNext(lead.id)
       return
     }
+    // If AI message is generated, use it as prefilled body
+    const messageBody = aiMessage || ''
+    const encoded = messageBody ? encodeURIComponent(messageBody) : ''
     const url = useWeb
-      ? `https://web.whatsapp.com/send?phone=${num}`
-      : buildWhatsAppUrl(lead)
+      ? `https://web.whatsapp.com/send?phone=${num}${encoded ? `&text=${encoded}` : ''}`
+      : (messageBody ? `https://wa.me/${num}?text=${encoded}` : buildWhatsAppUrl(lead))
     if (url) {
       window.open(url, '_blank')
       fetch('/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId: lead.id, canal: 'WHATSAPP', corpo: '(aberto via prospecção)' }),
+        body: JSON.stringify({ leadId: lead.id, canal: 'WHATSAPP', corpo: messageBody || '(aberto via prospecção)' }),
       }).catch(() => {})
       fetch(`/api/leads/${lead.id}/recalc-score`, { method: 'POST' }).catch(() => {})
       setContactedCount(c => c + 1)
+      incrementDaily()
       setSessionStats(s => ({ ...s, waOpened: s.waOpened + 1 }))
       toast(`WA ${useWeb ? 'Web' : ''} aberto · ${displayName(lead)}`, 'success')
       setTimeout(() => loadNext(lead.id), 1500)
@@ -183,6 +345,7 @@ export default function ProspeccaoPage() {
     }).catch(() => {})
     fetch(`/api/leads/${lead.id}/recalc-score`, { method: 'POST' }).catch(() => {})
     setContactedCount(c => c + 1)
+    incrementDaily()
     setSessionStats(s => ({
       ...s,
       called: s.called + 1,
@@ -221,6 +384,7 @@ export default function ProspeccaoPage() {
         else if (k === 's' || k === 'arrowright' || k === ' ') { e.preventDefault(); skip() }
         else if (k === 'i') { e.preventDefault(); markInvalid() }
         else if (k === 'z') { e.preventDefault(); snooze(2) }
+        else if (k === 'g') { e.preventDefault(); handleAiGenerate() }
         else if (k === '?' || k === 'h') { e.preventDefault(); setShowHotkeys(v => !v) }
       }
       // Call log actions
@@ -327,6 +491,7 @@ export default function ProspeccaoPage() {
               { k: 'W', label: 'Abrir WhatsApp' },
               { k: 'E', label: 'WhatsApp Web' },
               { k: 'L', label: 'Ligar' },
+              { k: 'G', label: 'Gerar mensagem AI' },
               { k: 'S / →', label: 'Saltar lead' },
               { k: 'I', label: 'Marcar inválido' },
               { k: 'Z', label: 'Snooze 2 dias' },
@@ -360,6 +525,55 @@ export default function ProspeccaoPage() {
       )}
 
       {/* Filters */}
+      {/* Daily progress bar */}
+      <div className="mb-4 bg-[#0F0F12] border border-[#27272A] rounded-xl p-3.5">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Target className="w-3.5 h-3.5 text-[#8B5CF6]" />
+            <span className="text-xs font-bold text-[#F0F0F3]">Meta Diária</span>
+            {dailyDone >= dailyGoal && (
+              <span className="text-[10px] bg-[#10B981]/15 text-[#10B981] px-1.5 py-0.5 rounded-full font-bold">✓ ATINGIDA</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-[#F0F0F3] font-bold tabular-nums">{dailyDone}</span>
+            <span className="text-[#52525B]">/</span>
+            {editingGoal ? (
+              <input
+                type="number"
+                defaultValue={dailyGoal}
+                autoFocus
+                onBlur={e => updateGoal(parseInt(e.target.value, 10) || 50)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') updateGoal(parseInt((e.target as HTMLInputElement).value, 10) || 50)
+                  if (e.key === 'Escape') setEditingGoal(false)
+                }}
+                className="w-14 bg-[#09090B] border border-[#27272A] rounded px-1.5 py-0.5 text-xs text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] tabular-nums"
+              />
+            ) : (
+              <button
+                onClick={() => setEditingGoal(true)}
+                className="text-[#A1A1AA] hover:text-[#F0F0F3] tabular-nums underline decoration-dotted underline-offset-2"
+                title="Clique para alterar"
+              >
+                {dailyGoal}
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="h-1.5 bg-[#27272A] rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${Math.min(100, (dailyDone / dailyGoal) * 100)}%`,
+              background: dailyDone >= dailyGoal
+                ? 'linear-gradient(90deg, #10B981, #34D399)'
+                : 'linear-gradient(90deg, #8B5CF6, #A78BFA)',
+            }}
+          />
+        </div>
+      </div>
+
       <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
         <select
           value={pais}
@@ -487,6 +701,58 @@ export default function ProspeccaoPage() {
                   {lead.tags.split(',').filter(Boolean).map(t => (
                     <span key={t} className="text-[9px] bg-[#27272A] text-[#A1A1AA] px-2 py-0.5 rounded-full">{t.trim()}</span>
                   ))}
+                </div>
+              )}
+
+              {/* AI Message Generator */}
+              {!showAiMessage ? (
+                <button
+                  onClick={handleAiGenerate}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-[#8B5CF6]/30 hover:border-[#8B5CF6]/60 hover:bg-[#8B5CF6]/5 text-[#8B5CF6] text-xs font-medium transition-all group"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Gerar mensagem personalizada</span>
+                  <kbd className="bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">G</kbd>
+                </button>
+              ) : (
+                <div className="bg-[#09090B] border border-[#8B5CF6]/30 rounded-xl p-3 space-y-2 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-[#8B5CF6]" />
+                      <span className="text-[10px] font-bold text-[#8B5CF6] uppercase tracking-wider">Mensagem gerada</span>
+                    </div>
+                    <button
+                      onClick={() => { setShowAiMessage(false); setAiMessage('') }}
+                      className="text-[#52525B] hover:text-[#F0F0F3]"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <textarea
+                    value={aiMessage}
+                    onChange={e => setAiMessage(e.target.value)}
+                    rows={5}
+                    className="w-full bg-transparent border border-[#27272A] rounded-lg px-2.5 py-2 text-xs text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] resize-none leading-relaxed"
+                  />
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={handleAiCopy}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#27272A] hover:border-[#52525B] text-[10px] text-[#71717A] hover:text-[#F0F0F3] transition-all"
+                    >
+                      {aiCopied ? <CheckCircle className="w-3 h-3 text-[#10B981]" /> : <Copy className="w-3 h-3" />}
+                      {aiCopied ? 'Copiado' : 'Copiar'}
+                    </button>
+                    <button
+                      onClick={handleAiGenerate}
+                      title="Regenerar"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#27272A] hover:border-[#52525B] text-[10px] text-[#71717A] hover:text-[#F0F0F3] transition-all"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                    </button>
+                    <div className="flex-1 text-[10px] text-[#52525B] self-center text-right">
+                      A mensagem será pré-preenchida no WhatsApp
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
