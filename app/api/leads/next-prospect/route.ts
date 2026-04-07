@@ -14,10 +14,14 @@ export async function GET(req: NextRequest) {
     const where: any = {
       // Never contacted
       messages: { none: {} },
-      // Has a WhatsApp number (not just any phone)
-      whatsapp: { not: null },
+      // Has ANY phone/whatsapp field populated (validation happens in JS below)
+      OR: [
+        { AND: [{ whatsapp: { not: null } }, { whatsapp: { not: '' } }] },
+        { AND: [{ telefone: { not: null } }, { telefone: { not: '' } }] },
+        { AND: [{ whatsappRaw: { not: null } }, { whatsappRaw: { not: '' } }] },
+        { AND: [{ telefoneRaw: { not: null } }, { telefoneRaw: { not: '' } }] },
+      ],
       NOT: [
-        { whatsapp: '' },
         // Exclude leads already flagged as invalid
         { tags: { contains: 'numero invalido', mode: 'insensitive' } },
         { tags: { contains: 'invalid', mode: 'insensitive' } },
@@ -41,7 +45,7 @@ export async function GET(req: NextRequest) {
         { opportunityScore: 'desc' },
         { createdAt: 'asc' },
       ],
-      take: 100, // Grab enough to find at least one valid
+      take: 300, // Grab enough to find at least one valid and get good ratio
       select: {
         id: true,
         nome: true,
