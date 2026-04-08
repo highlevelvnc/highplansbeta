@@ -52,9 +52,11 @@ const TIMEZONE_HINTS: Record<string, { tz: string; range: string }> = {
 }
 
 export default function ProspeccaoPage() {
-  const [lead, setLead] = useState<Lead | null>(null)
-  const [remaining, setRemaining] = useState(0)
+  const [queue, setQueue] = useState<Lead[]>([])          // in-memory batch of validated leads
+  const [currentIdx, setCurrentIdx] = useState(0)         // position in the queue
+  const [totalRemaining, setTotalRemaining] = useState(0) // total leads matching filters (from API)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [nicho, setNicho] = useState('')
   const [pais, setPais] = useState('')
   const [nichoList, setNichoList] = useState<{ nicho: string; count: number }[]>([])
@@ -75,8 +77,9 @@ export default function ProspeccaoPage() {
     skipped: 0,
   })
   const [showSession, setShowSession] = useState(false)
-  // Prefetch: keep next lead in memory for instant transitions
-  const [nextLead, setNextLead] = useState<Lead | null>(null)
+  // Derived: current lead
+  const lead = queue[currentIdx] || null
+  const remaining = Math.max(0, totalRemaining - currentIdx)
   // Daily goal
   const [dailyGoal, setDailyGoal] = useState(50)
   const [dailyDone, setDailyDone] = useState(0)
@@ -132,76 +135,64 @@ export default function ProspeccaoPage() {
     }).catch(() => {})
   }, [])
 
-  // Internal: fetch one lead from API (used for both current and prefetch)
-  const fetchOne = useCallback(async (skipId?: string) => {
+  // Fetch a batch of validated leads from the queue endpoint
+  const fetchQueue = useCallback(async (excludeIds: string[] = []): Promise<{ leads: Lead[]; total: number }> => {
     const params = new URLSearchParams()
     if (nicho) params.set('nicho', nicho)
     if (pais) params.set('pais', pais)
-    if (skipId) params.set('skipId', skipId)
+    params.set('limit', '100')
+    if (excludeIds.length > 0) params.set('exclude', excludeIds.join(','))
     try {
-      const res = await fetch(`/api/leads/next-prospect?${params}`)
+      const res = await fetch(`/api/leads/prospect-queue?${params}`)
       const data = await res.json()
-      return { lead: data.lead || null, remaining: data.remaining || 0 }
+      return { leads: data.leads || [], total: data.total || 0 }
     } catch {
-      return { lead: null, remaining: 0 }
+      return { leads: [], total: 0 }
     }
   }, [nicho, pais])
 
-  const loadNext = useCallback(async (skipId?: string) => {
+  // Move to next lead in queue (or fetch more if we hit the end)
+  const loadNext = useCallback(async () => {
     setShowCallLog(false)
     setCallNotes('')
     setShowAiMessage(false)
     setAiMessage('')
 
-    // Use prefetched lead if available and not the one being skipped
-    if (nextLead && nextLead.id !== skipId) {
-      setLead(nextLead)
-      setNextLead(null)
-      // Prefetch the NEXT one in background
-      fetchOne(nextLead.id).then(d => {
-        setNextLead(d.lead)
-        setRemaining(d.remaining)
-      })
+    const nextIdx = currentIdx + 1
+
+    // Still have leads in queue → just advance cursor
+    if (nextIdx < queue.length) {
+      setCurrentIdx(nextIdx)
       return
     }
 
-    // Fallback: fresh fetch
-    setLoading(true)
-    const data = await fetchOne(skipId)
-    setLead(data.lead)
-    setRemaining(data.remaining)
-    setLoading(false)
+    // Need to fetch more — exclude all queue ids so we don't get duplicates
+    setLoadingMore(true)
+    const excludeIds = queue.map(l => l.id)
+    const { leads: newLeads, total } = await fetchQueue(excludeIds)
+    setLoadingMore(false)
 
-    // Prefetch next in background
-    if (data.lead) {
-      fetchOne(data.lead.id).then(d => setNextLead(d.lead))
+    if (newLeads.length > 0) {
+      setQueue(prev => [...prev, ...newLeads])
+      setCurrentIdx(nextIdx)
+      setTotalRemaining(total + queue.length) // approximation
+    } else {
+      // No more leads
+      setCurrentIdx(nextIdx) // will show "Todos contactados" state
     }
-  }, [nextLead, fetchOne])
+  }, [currentIdx, queue, fetchQueue])
 
+  // Initial load + filter changes
   useEffect(() => {
-    // Initial load when filters change — reset prefetch
-    setNextLead(null)
     setLoading(true)
-    fetchOne().then(data => {
-      setLead(data.lead)
-      setRemaining(data.remaining)
+    setCurrentIdx(0)
+    setQueue([])
+    fetchQueue().then(({ leads, total }) => {
+      setQueue(leads)
+      setTotalRemaining(total)
       setLoading(false)
-      // Prefetch next
-      if (data.lead) {
-        fetchOne(data.lead.id).then(d => setNextLead(d.lead))
-      }
     })
   }, [nicho, pais]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-skip leads with invalid WhatsApp numbers (no tagging — backend handles filtering)
-  useEffect(() => {
-    if (!lead || loading) return
-    const num = getWhatsAppNumber(lead)
-    if (!num || num.length < 9) {
-      setSkippedInvalid(c => c + 1)
-      loadNext(lead.id)
-    }
-  }, [lead?.id, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── AI-style personalized message generator ──
   const generateAiMessage = useCallback((l: Lead): string => {
@@ -279,7 +270,7 @@ export default function ProspeccaoPage() {
     const num = getWhatsAppNumber(lead)
     if (!num) {
       toast('Número inválido — saltando', 'info')
-      loadNext(lead.id)
+      loadNext()
       return
     }
     // If AI message is generated, use it as prefilled body
@@ -300,7 +291,7 @@ export default function ProspeccaoPage() {
       incrementDaily()
       setSessionStats(s => ({ ...s, waOpened: s.waOpened + 1 }))
       toast(`WA ${useWeb ? 'Web' : ''} aberto · ${displayName(lead)}`, 'success')
-      setTimeout(() => loadNext(lead.id), 1500)
+      setTimeout(() => loadNext(), 1500)
     }
   }
 
@@ -309,7 +300,7 @@ export default function ProspeccaoPage() {
     await fetch(`/api/leads/${lead.id}/mark-invalid`, { method: 'POST' }).catch(() => {})
     setSessionStats(s => ({ ...s, invalidated: s.invalidated + 1 }))
     toast('Marcado como inválido', 'info')
-    loadNext(lead.id)
+    loadNext()
   }
 
   const snooze = async (days: number) => {
@@ -321,7 +312,7 @@ export default function ProspeccaoPage() {
     }).catch(() => {})
     setSessionStats(s => ({ ...s, snoozed: s.snoozed + 1 }))
     toast(`Snooze ${days} dia${days > 1 ? 's' : ''} — voltar depois`, 'success')
-    loadNext(lead.id)
+    loadNext()
   }
 
   const handleCall = () => {
@@ -329,7 +320,7 @@ export default function ProspeccaoPage() {
     const num = getWhatsAppNumber(lead)
     if (!num) {
       toast('Número inválido — saltando', 'info')
-      loadNext(lead.id)
+      loadNext()
       return
     }
     window.open(`tel:+${num}`, '_blank')
@@ -357,13 +348,13 @@ export default function ProspeccaoPage() {
     toast(isAutoFU ? `Registada — segunda tentativa agendada para 2 dias` : `Chamada registada · ${resultado}`, 'success')
     setShowCallLog(false)
     setCallNotes('')
-    loadNext(lead.id)
+    loadNext()
   }
 
   const skip = () => {
     if (!lead) return
     setSessionStats(s => ({ ...s, skipped: s.skipped + 1 }))
-    loadNext(lead.id)
+    loadNext()
   }
 
   // Keyboard shortcuts
