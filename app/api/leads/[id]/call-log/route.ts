@@ -35,6 +35,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       },
     })
 
+    // Also create a Message record so the lead is marked as "contacted"
+    // This prevents the lead from reappearing in the prospect queue
+    const leadData = await prisma.lead.findUnique({
+      where: { id },
+      select: { telefone: true, whatsapp: true, telefoneRaw: true },
+    })
+    await prisma.message.create({
+      data: {
+        leadId: id,
+        canal: 'PHONE',
+        destinatario: leadData?.telefone || leadData?.whatsapp || leadData?.telefoneRaw || '',
+        corpo: descricao,
+        status: 'SENT',
+      },
+    })
+
     // If interested, update pipeline
     if (resultado === 'interessado') {
       await prisma.lead.update({

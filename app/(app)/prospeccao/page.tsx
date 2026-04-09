@@ -265,7 +265,7 @@ export default function ProspeccaoPage() {
     }
   }
 
-  const handleWhatsApp = (useWeb = false) => {
+  const handleWhatsApp = async (useWeb = false) => {
     if (!lead) return
     const num = getWhatsAppNumber(lead)
     if (!num) {
@@ -273,7 +273,6 @@ export default function ProspeccaoPage() {
       loadNext()
       return
     }
-    // If AI message is generated, use it as prefilled body
     const messageBody = aiMessage || ''
     const encoded = messageBody ? encodeURIComponent(messageBody) : ''
     const url = useWeb
@@ -281,7 +280,9 @@ export default function ProspeccaoPage() {
       : (messageBody ? `https://wa.me/${num}?text=${encoded}` : buildWhatsAppUrl(lead))
     if (url) {
       window.open(url, '_blank')
-      fetch('/api/messages/send', {
+      // AWAIT: registar mensagem no DB ANTES de avançar
+      // Isto garante que o lead não volta a aparecer na queue
+      await fetch('/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadId: lead.id, canal: 'WHATSAPP', corpo: messageBody || '(aberto via prospecção)' }),
@@ -291,7 +292,7 @@ export default function ProspeccaoPage() {
       incrementDaily()
       setSessionStats(s => ({ ...s, waOpened: s.waOpened + 1 }))
       toast(`WA ${useWeb ? 'Web' : ''} aberto · ${displayName(lead)}`, 'success')
-      setTimeout(() => loadNext(), 1500)
+      loadNext()
     }
   }
 
