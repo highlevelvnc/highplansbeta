@@ -5,7 +5,9 @@ import {
   RefreshCw, Loader2, Tag, X, CheckCircle, PhoneOff,
   PhoneIncoming, UserX, Star, Clock, Keyboard, ExternalLink,
   AlertTriangle, Ban, Moon, BarChart3, Sparkles, Copy, Target,
+  History, ChevronDown, ChevronUp, Reply,
 } from 'lucide-react'
+import Link from 'next/link'
 import { useToast } from '@/components/Toast'
 import { displayName, getWhatsAppNumber, buildWhatsAppUrl, COUNTRY_INFO } from '@/lib/lead-utils'
 
@@ -77,6 +79,12 @@ export default function ProspeccaoPage() {
     skipped: 0,
   })
   const [showSession, setShowSession] = useState(false)
+  // History panel
+  const [showHistory, setShowHistory] = useState(false)
+  const [historyLeads, setHistoryLeads] = useState<any[]>([])
+  const [historyStats, setHistoryStats] = useState({ totalContacted: 0, contactedToday: 0, responded: 0 })
+  const [historyLoading, setHistoryLoading] = useState(false)
+
   // Derived: current lead
   const lead = queue[currentIdx] || null
   const remaining = Math.max(0, totalRemaining - currentIdx)
@@ -134,6 +142,25 @@ export default function ProspeccaoPage() {
       if (Array.isArray(d?.nichos)) setNichoList(d.nichos)
     }).catch(() => {})
   }, [])
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true)
+    const params = new URLSearchParams()
+    if (nicho) params.set('nicho', nicho)
+    if (pais) params.set('pais', pais)
+    try {
+      const res = await fetch(`/api/leads/contacted-history?${params}`)
+      const data = await res.json()
+      setHistoryLeads(data.leads || [])
+      setHistoryStats(data.stats || { totalContacted: 0, contactedToday: 0, responded: 0 })
+    } catch {}
+    setHistoryLoading(false)
+  }, [nicho, pais])
+
+  const toggleHistory = () => {
+    if (!showHistory) loadHistory()
+    setShowHistory(v => !v)
+  }
 
   // Fetch a batch of validated leads from the queue endpoint
   const fetchQueue = useCallback(async (excludeIds: string[] = []): Promise<{ leads: Lead[]; total: number }> => {
@@ -291,6 +318,7 @@ export default function ProspeccaoPage() {
       setContactedCount(c => c + 1)
       incrementDaily()
       setSessionStats(s => ({ ...s, waOpened: s.waOpened + 1 }))
+      if (showHistory) loadHistory() // refresh history if panel is open
       toast(`WA ${useWeb ? 'Web' : ''} aberto · ${displayName(lead)}`, 'success')
       loadNext()
     }
@@ -347,6 +375,7 @@ export default function ProspeccaoPage() {
     }))
     const isAutoFU = resultado === 'nao_atendeu' || resultado === 'ocupado'
     toast(isAutoFU ? `Registada — segunda tentativa agendada para 2 dias` : `Chamada registada · ${resultado}`, 'success')
+    if (showHistory) loadHistory()
     setShowCallLog(false)
     setCallNotes('')
     loadNext()
@@ -424,6 +453,16 @@ export default function ProspeccaoPage() {
           </p>
         </div>
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={toggleHistory}
+            title="Histórico de contactados"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${
+              showHistory ? 'border-[#10B981]/40 text-[#10B981] bg-[#10B981]/8' : 'border-[#27272A] text-[#71717A] hover:border-[#10B981]/40 hover:text-[#F0F0F3]'
+            }`}
+          >
+            <History className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Histórico</span>
+          </button>
           <button
             onClick={() => setShowSession(v => !v)}
             title="Resumo da sessão"
@@ -522,6 +561,131 @@ export default function ProspeccaoPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* History panel */}
+      {showHistory && (
+        <div className="mb-4 bg-[#0F0F12] border border-[#10B981]/25 rounded-xl overflow-hidden animate-fade-in">
+          {/* Header + stats */}
+          <div className="p-4 border-b border-[#27272A]">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <History className="w-4 h-4 text-[#10B981]" />
+                <span className="text-xs font-bold text-[#F0F0F3] uppercase tracking-wider">Contactados</span>
+              </div>
+              <button onClick={() => setShowHistory(false)} className="text-[#52525B] hover:text-[#F0F0F3]">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-[#09090B] rounded-lg p-2.5 text-center">
+                <div className="text-lg font-black text-[#F0F0F3] tabular-nums">{historyStats.totalContacted}</div>
+                <div className="text-[9px] text-[#52525B]">Total contactados</div>
+              </div>
+              <div className="bg-[#09090B] rounded-lg p-2.5 text-center">
+                <div className="text-lg font-black text-[#10B981] tabular-nums">{historyStats.contactedToday}</div>
+                <div className="text-[9px] text-[#52525B]">Hoje</div>
+              </div>
+              <div className="bg-[#09090B] rounded-lg p-2.5 text-center">
+                <div className="text-lg font-black text-[#F59E0B] tabular-nums">{historyStats.responded}</div>
+                <div className="text-[9px] text-[#52525B]">Responderam</div>
+              </div>
+            </div>
+          </div>
+
+          {/* List */}
+          {historyLoading ? (
+            <div className="p-6 text-center">
+              <Loader2 className="w-5 h-5 text-[#52525B] mx-auto animate-spin" />
+            </div>
+          ) : historyLeads.length === 0 ? (
+            <div className="p-6 text-center text-sm text-[#52525B]">Nenhum contacto registado ainda</div>
+          ) : (
+            <div className="max-h-80 overflow-y-auto divide-y divide-[#16161A]">
+              {historyLeads.map(l => {
+                const PIPELINE_COLORS: Record<string, string> = {
+                  NEW: '#71717A', CONTACTED: '#3B82F6', INTERESTED: '#8B5CF6',
+                  PROPOSAL_SENT: '#F59E0B', NEGOTIATION: '#A78BFA', CLOSED: '#10B981', LOST: '#EF4444',
+                }
+                const PIPELINE_LABELS: Record<string, string> = {
+                  NEW: 'Novo', CONTACTED: 'Contactado', INTERESTED: 'Interessado',
+                  PROPOSAL_SENT: 'Proposta', NEGOTIATION: 'Negociação', CLOSED: 'Fechado', LOST: 'Perdido',
+                }
+                const COUNTRY_FLAGS: Record<string, string> = { PT: '🇵🇹', BR: '🇧🇷', DE: '🇩🇪', NL: '🇳🇱' }
+                const contactDate = l.lastContactDate ? new Date(l.lastContactDate) : null
+                const isToday = contactDate?.toDateString() === new Date().toDateString()
+                const timeStr = contactDate
+                  ? isToday
+                    ? contactDate.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+                    : contactDate.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })
+                  : ''
+
+                return (
+                  <Link
+                    key={l.id}
+                    href={`/leads/${l.id}`}
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#16161A] transition-colors"
+                  >
+                    {/* Pipeline dot */}
+                    <div
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ background: PIPELINE_COLORS[l.pipelineStatus] || '#52525B' }}
+                    />
+
+                    {/* Lead info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        {l.pais && COUNTRY_FLAGS[l.pais] && (
+                          <span className="text-xs">{COUNTRY_FLAGS[l.pais]}</span>
+                        )}
+                        <span className="text-xs font-semibold text-[#F0F0F3] truncate">{l.empresa || l.nome}</span>
+                        {l.hasResponse && (
+                          <Reply className="w-3 h-3 text-[#F59E0B] flex-shrink-0" />
+                        )}
+                      </div>
+                      <div className="text-[10px] text-[#52525B] truncate">
+                        {[l.nicho, l.cidade].filter(Boolean).join(' · ') || '—'}
+                      </div>
+                    </div>
+
+                    {/* Status badges */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {/* Canal icon */}
+                      {l.lastContactCanal === 'WHATSAPP' && <MessageCircle className="w-3 h-3 text-[#25D366]" />}
+                      {l.lastContactCanal === 'PHONE' && <Phone className="w-3 h-3 text-[#8B5CF6]" />}
+                      {l.lastContactCanal === 'EMAIL' && <Globe className="w-3 h-3 text-[#3B82F6]" />}
+
+                      {/* Pipeline badge */}
+                      <span
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{
+                          color: PIPELINE_COLORS[l.pipelineStatus] || '#52525B',
+                          background: `${PIPELINE_COLORS[l.pipelineStatus] || '#52525B'}18`,
+                        }}
+                      >
+                        {PIPELINE_LABELS[l.pipelineStatus] || l.pipelineStatus}
+                      </span>
+
+                      {/* Time */}
+                      <span className="text-[10px] text-[#52525B] tabular-nums w-10 text-right">{timeStr}</span>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Refresh */}
+          <div className="p-2 border-t border-[#27272A] flex justify-center">
+            <button
+              onClick={loadHistory}
+              className="flex items-center gap-1.5 text-[10px] text-[#52525B] hover:text-[#F0F0F3] transition-colors"
+            >
+              <RefreshCw className={`w-3 h-3 ${historyLoading ? 'animate-spin' : ''}`} />
+              Atualizar lista
+            </button>
           </div>
         </div>
       )}
