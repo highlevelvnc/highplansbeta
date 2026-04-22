@@ -39,6 +39,14 @@ export default function TarefasPage() {
 
   useEffect(()=>{load()},[])
 
+  // Escape closes new-task modal
+  useEffect(() => {
+    if (!showNew) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowNew(false) }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [showNew])
+
   const create = async () => {
     if (!form.titulo.trim()) return
     setCreating(true)

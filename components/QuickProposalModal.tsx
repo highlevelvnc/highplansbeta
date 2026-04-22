@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, FileText, Loader2, Check } from 'lucide-react'
 import { FollowUpSuggestion } from '@/components/FollowUpSuggestion'
 
@@ -44,6 +44,14 @@ export function QuickProposalModal({ lead, onClose, onSuccess }: Props) {
   const [error,  setError]    = useState<string | null>(null)
   const [created, setCreated] = useState(false)
   const [fuDismissed, setFuDismissed] = useState(false)
+
+  // Escape closes modal
+  useEffect(() => {
+    if (!lead) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [lead, onClose])
 
   if (!lead) return null
 

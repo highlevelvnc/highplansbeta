@@ -35,12 +35,17 @@ const PIPELINE_LABELS: Record<string, { label: string; color: string }> = {
 export default function RelatoriosPage() {
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    setError(null)
     fetch('/api/reports/weekly')
-      .then(r => r.json())
+      .then(async r => {
+        if (!r.ok) throw new Error(`Erro ${r.status}`)
+        return r.json()
+      })
       .then(setData)
-      .catch(() => {})
+      .catch(err => setError(err instanceof Error ? err.message : 'Erro ao carregar'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -53,10 +58,19 @@ export default function RelatoriosPage() {
     </div>
   )
 
-  if (!data) return (
-    <div className="p-4 md:p-6 max-w-6xl text-center py-20">
-      <AlertTriangle className="w-8 h-8 text-[#52525B] mx-auto mb-3" />
-      <p className="text-sm text-[#71717A]">Erro ao carregar relatórios</p>
+  if (error || !data) return (
+    <div className="p-4 md:p-6 max-w-6xl">
+      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-8 text-center">
+        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-3" />
+        <p className="text-red-300 text-sm mb-1">Erro ao carregar relatórios</p>
+        <p className="text-[#71717A] text-xs mb-4">{error || 'Sem dados disponíveis'}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors"
+        >
+          Tentar novamente
+        </button>
+      </div>
     </div>
   )
 

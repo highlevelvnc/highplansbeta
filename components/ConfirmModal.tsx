@@ -1,4 +1,5 @@
 'use client'
+import { useEffect } from 'react'
 import { AlertTriangle } from 'lucide-react'
 
 interface ConfirmModalProps {
@@ -29,6 +30,14 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  // Escape cancels (unless loading)
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) onCancel() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [open, loading, onCancel])
+
   if (!open) return null
 
   const colors =

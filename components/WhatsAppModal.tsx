@@ -159,6 +159,14 @@ export function WhatsAppModal({ lead, onClose, onSuccess, initialTemplate }: Pro
       .catch(() => setWaConfigured(false))
   }, [])
 
+  // Escape closes modal (unless sending)
+  useEffect(() => {
+    if (!lead) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && !sending) onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [lead, sending, onClose])
+
   if (!lead) return null
 
   const phoneNum = getWhatsAppNumber(lead)

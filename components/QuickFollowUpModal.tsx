@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Bell, Loader2 } from 'lucide-react'
 
 interface Lead {
@@ -48,6 +48,14 @@ export function QuickFollowUpModal({ lead, onClose, onSuccess }: Props) {
     agendadoPara: todayPlus(1),
     mensagem: '',
   })
+
+  // Escape closes modal
+  useEffect(() => {
+    if (!lead) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [lead, onClose])
   const [saving, setSaving]   = useState(false)
   const [error,  setError]    = useState<string | null>(null)
 

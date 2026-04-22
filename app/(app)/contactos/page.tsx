@@ -82,6 +82,20 @@ export default function ContactosPage() {
     fetch('/api/messages/status').then(r => r.json()).then(setIntegrationStatus).catch(() => {})
   }, [])
 
+  // Escape closes any open modal
+  useEffect(() => {
+    if (!sendModal && !editModal && !showNewTemplate) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (sendModal) setSendModal(null)
+        else if (editModal) setEditModal(null)
+        else if (showNewTemplate) setShowNewTemplate(false)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [sendModal, editModal, showNewTemplate])
+
   const filteredTemplates = templates.filter(t => {
     const matchCanal = canal === 'TODOS' || t.canal === canal
     const matchSearch = !search || t.nome.toLowerCase().includes(search.toLowerCase()) || t.corpo.toLowerCase().includes(search.toLowerCase())

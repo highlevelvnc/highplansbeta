@@ -349,6 +349,8 @@ export default function LeadsPage() {
     origem: '',
     observacaoPerfil: '',
   })
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [creating, setCreating] = useState(false)
 
   const [imp, setImp] = useState<ImportState>({
     step: 'idle',
@@ -460,33 +462,70 @@ export default function LeadsPage() {
     setPage(1)
   }, [search, scoreFilter, quickFilter, nichoFilter, paisFilter, agentFilter, pageSize])
 
+  // Escape closes new-lead or import modal
+  useEffect(() => {
+    if (!showNew && !showImport) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showNew) { setShowNew(false); setFormErrors({}) }
+        else if (showImport && imp.step !== 'importing') closeImport()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [showNew, showImport, imp.step]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleCreate = async () => {
-    if (!form.nome) return
+    // Client-side validation with clear errors
+    const errs: Record<string, string> = {}
+    if (!form.nome || !form.nome.trim()) errs.nome = 'Nome obrigatório'
+    else if (form.nome.trim().length < 2) errs.nome = 'Mínimo 2 caracteres'
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email inválido'
+    if (form.telefone && form.telefone.replace(/\D/g, '').length < 7) errs.telefone = 'Telefone demasiado curto'
 
-    await fetch('/api/leads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
+    if (Object.keys(errs).length > 0) {
+      setFormErrors(errs)
+      toast('Corrige os campos marcados', 'error')
+      return
+    }
 
-    setShowNew(false)
-    setForm({
-      nome: '',
-      empresa: '',
-      nicho: '',
-      cidade: '',
-      telefone: '',
-      whatsapp: '',
-      email: '',
-      temSite: false,
-      siteFraco: false,
-      instagramAtivo: false,
-      gmbOtimizado: false,
-      anunciosAtivos: false,
-      origem: '',
-      observacaoPerfil: '',
-    })
-    load()
+    setCreating(true)
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `Erro ${res.status}`)
+      }
+
+      toast(`Lead "${form.nome}" criado`, 'success')
+      setShowNew(false)
+      setFormErrors({})
+      setForm({
+        nome: '',
+        empresa: '',
+        nicho: '',
+        cidade: '',
+        telefone: '',
+        whatsapp: '',
+        email: '',
+        temSite: false,
+        siteFraco: false,
+        instagramAtivo: false,
+        gmbOtimizado: false,
+        anunciosAtivos: false,
+        origem: '',
+        observacaoPerfil: '',
+      })
+      load()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao criar lead', 'error')
+    } finally {
+      setCreating(false)
+    }
   }
 
   const handleFile = (file: File) => {
@@ -496,7 +535,7 @@ export default function LeadsPage() {
       const rawRows = parseCSV(text)
 
       if (rawRows.length === 0) {
-        alert('CSV vazio ou sem dados válidos')
+        toast('CSV vazio ou sem dados válidos', 'error')
         return
       }
 
@@ -505,7 +544,7 @@ export default function LeadsPage() {
         .filter(row => row.nome || row.empresa || row.telefone || row.whatsapp || row.site)
 
       if (normalized.length === 0) {
-        alert('Não foi possível identificar colunas válidas no CSV')
+        toast('Não foi possível identificar colunas válidas no CSV', 'error')
         return
       }
 
@@ -1874,16 +1913,25 @@ export default function LeadsPage() {
                 { key: 'whatsapp', label: 'WhatsApp' },
                 { key: 'email', label: 'Email', full: true },
                 { key: 'origem', label: 'Origem' },
-              ].map(({ key, label, full }) => (
-                <div key={key} className={full ? 'col-span-2' : ''}>
-                  <label className="text-xs text-[#71717A] mb-1 block">{label}</label>
-                  <input
-                    value={form[key] || ''}
-                    onChange={e => setForm({ ...form, [key]: e.target.value })}
-                    className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]"
-                  />
-                </div>
-              ))}
+              ].map(({ key, label, full }) => {
+                const err = formErrors[key]
+                return (
+                  <div key={key} className={full ? 'col-span-2' : ''}>
+                    <label className="text-xs text-[#71717A] mb-1 block">{label}</label>
+                    <input
+                      value={form[key] || ''}
+                      onChange={e => {
+                        setForm({ ...form, [key]: e.target.value })
+                        if (err) setFormErrors({ ...formErrors, [key]: '' })
+                      }}
+                      className={`w-full bg-[#09090B] border rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none ${
+                        err ? 'border-red-500/50 focus:border-red-500' : 'border-[#27272A] focus:border-[#8B5CF6]'
+                      }`}
+                    />
+                    {err && <div className="text-[11px] text-red-400 mt-1">{err}</div>}
+                  </div>
+                )
+              })}
             </div>
 
             <div className="mt-4">
@@ -1921,17 +1969,19 @@ export default function LeadsPage() {
 
             <div className="flex gap-3 mt-5">
               <button
-                onClick={() => setShowNew(false)}
-                className="flex-1 py-2 rounded-lg border border-[#27272A] text-sm text-[#71717A] hover:border-[#71717A]"
+                onClick={() => { setShowNew(false); setFormErrors({}) }}
+                disabled={creating}
+                className="flex-1 py-2 rounded-lg border border-[#27272A] text-sm text-[#71717A] hover:border-[#71717A] disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCreate}
-                disabled={!form.nome}
-                className="flex-1 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={!form.nome || creating}
+                className="flex-1 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Criar Lead
+                {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+                {creating ? 'A criar...' : 'Criar Lead'}
               </button>
             </div>
           </div>
