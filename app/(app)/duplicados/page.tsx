@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Copy, Trash2, ChevronDown, ChevronRight, Check, Loader2, AlertTriangle } from 'lucide-react'
+import { Copy, Trash2, ChevronDown, ChevronRight, Check, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 
 interface DupeLead {
   id: string
@@ -78,9 +78,15 @@ export default function DuplicadosPage() {
   )
 
   if (!data) return (
-    <div className="p-4 md:p-6 max-w-4xl text-center py-20">
-      <AlertTriangle className="w-8 h-8 text-[#52525B] mx-auto mb-3" />
-      <p className="text-sm text-[#71717A]">Erro ao carregar duplicados</p>
+    <div className="p-4 md:p-6 max-w-4xl">
+      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-8 text-center">
+        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-3" />
+        <p className="text-red-300 text-sm mb-1">Erro ao carregar duplicados</p>
+        <p className="text-[#71717A] text-xs mb-4">Não foi possível obter os dados do servidor</p>
+        <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors">
+          <RefreshCw className="w-4 h-4" /> Tentar novamente
+        </button>
+      </div>
     </div>
   )
 

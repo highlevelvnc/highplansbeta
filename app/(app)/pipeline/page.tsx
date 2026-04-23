@@ -260,6 +260,19 @@ export default function PipelinePage() {
     window.open(`tel:+${num}`, '_blank')
   }
 
+  // Escape closes inline note editor
+  useEffect(() => {
+    if (!noteLeadId) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !savingNote) {
+        setNoteLeadId(null)
+        setNoteText('')
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [noteLeadId, savingNote])
+
   const saveNote = async (leadId: string) => {
     if (!noteText.trim()) return
     setSavingNote(true)
@@ -282,19 +295,16 @@ export default function PipelinePage() {
   if (loading) return (
     <div className="p-4 md:p-6 h-full flex flex-col">
       <div className="mb-5">
-        <div className="h-7 w-44 bg-[#27272A] rounded animate-pulse mb-1" />
-        <div className="h-4 w-64 bg-[#16161A] rounded animate-pulse" />
+        <div className="h-7 w-44 rounded mb-2 animate-shimmer" />
+        <div className="h-3.5 w-64 rounded animate-shimmer" />
       </div>
-      <div className="flex gap-3 flex-1">
+      <div className="flex gap-3 flex-1 overflow-x-auto">
         {STAGES.map(s => (
           <div key={s.id} className="flex-shrink-0 w-60">
-            <div className="h-4 w-24 bg-[#27272A] rounded animate-pulse mb-2.5" />
+            <div className="h-4 w-24 rounded mb-2.5 animate-shimmer" />
             <div className="min-h-[200px] rounded-xl bg-[#0F0F12] border border-[#27272A] p-2 space-y-2">
               {Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="bg-[#16161A] rounded-xl p-3 animate-pulse">
-                  <div className="h-3 w-24 bg-[#27272A] rounded mb-2" />
-                  <div className="h-2 w-16 bg-[#27272A] rounded" />
-                </div>
+                <div key={i} className="h-20 rounded-xl animate-shimmer" />
               ))}
             </div>
           </div>
@@ -411,7 +421,7 @@ export default function PipelinePage() {
             <button
               onClick={() => setPaisFilter('')}
               className={`flex-shrink-0 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${
-                !paisFilter ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B]'
+                !paisFilter ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
               }`}
             >
               Todos
@@ -421,7 +431,7 @@ export default function PipelinePage() {
                 key={p.pais}
                 onClick={() => setPaisFilter(prev => prev === p.pais ? '' : p.pais)}
                 className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${
-                  paisFilter === p.pais ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B]'
+                  paisFilter === p.pais ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
                 }`}
               >
                 <span>{COUNTRY_INFO[p.pais]?.flag || '🌍'}</span>
@@ -435,7 +445,7 @@ export default function PipelinePage() {
             <button
               onClick={() => setAgentFilter('')}
               className={`flex-shrink-0 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${
-                !agentFilter ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B]'
+                !agentFilter ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
               }`}
             >
               Todos
@@ -445,7 +455,7 @@ export default function PipelinePage() {
                 key={a.id}
                 onClick={() => setAgentFilter(prev => prev === a.id ? '' : a.id)}
                 className={`flex-shrink-0 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${
-                  agentFilter === a.id ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B]'
+                  agentFilter === a.id ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
                 }`}
               >
                 {a.nome}
@@ -454,7 +464,7 @@ export default function PipelinePage() {
             <button
               onClick={() => setAgentFilter(prev => prev === '_none' ? '' : '_none')}
               className={`flex-shrink-0 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${
-                agentFilter === '_none' ? 'bg-amber-500/15 border-amber-500/40 text-amber-400' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B]'
+                agentFilter === '_none' ? 'bg-amber-500/15 border-amber-500/40 text-amber-400' : 'border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#F0F0F3]'
               }`}
             >
               Sem agente
