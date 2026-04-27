@@ -17,6 +17,16 @@
   --border-hover: #3F3F46;
 }
 
+/* OLED true black on iOS — saves battery + better contrast on iPhone OLED screens */
+@supports (-webkit-touch-callout: none) {
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-primary: #000000;
+      --bg-secondary: #0A0A0C;
+    }
+  }
+}
+
 * { box-sizing: border-box; }
 
 body {
@@ -101,17 +111,27 @@ h1, h2, h3, h4 {
   border-radius: 2px;
 }
 
-/* ── Glass effect ── */
+/* ── Glass effect — fallback opaque on low-end Android, blur on iOS/desktop ── */
 .glass {
-  background: rgba(15, 15, 18, 0.7);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(15, 15, 18, 0.92);
   border: 1px solid rgba(39, 39, 42, 0.6);
 }
 .glass-card {
-  background: rgba(22, 22, 26, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(22, 22, 26, 0.92);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  @media (hover: hover), (-webkit-touch-callout: none) {
+    .glass {
+      background: rgba(15, 15, 18, 0.7);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    .glass-card {
+      background: rgba(22, 22, 26, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+  }
 }
 
 /* ── Animations ── */
@@ -151,33 +171,20 @@ h1, h2, h3, h4 {
 }
 .animate-scale-in { animation: scale-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
-/* ── Card hover effect — refined ── */
+/* ── Card hover effect — only on devices with real hover (saves mobile GPU) ── */
 .card-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   position: relative;
 }
-.card-hover::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, transparent, rgba(139, 92, 246, 0), transparent);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-  transition: opacity 0.3s;
-  opacity: 0;
-}
-.card-hover:hover {
-  border-color: rgba(139, 92, 246, 0.35);
-  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.1), 0 0 0 1px rgba(139, 92, 246, 0.05);
-  transform: translateY(-2px);
-}
-.card-hover:hover::after {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(139, 92, 246, 0), rgba(139, 92, 246, 0.2));
-  opacity: 1;
+@media (hover: hover) and (pointer: fine) {
+  .card-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .card-hover:hover {
+    border-color: rgba(139, 92, 246, 0.35);
+    box-shadow: 0 8px 32px rgba(139, 92, 246, 0.1), 0 0 0 1px rgba(139, 92, 246, 0.05);
+    transform: translateY(-2px);
+  }
 }
 
 /* Premium card with elevated feel */
@@ -281,4 +288,75 @@ kbd {
 /* ── Tabular numbers for KPIs ── */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Modal entrance animation ── */
+@keyframes modal-enter {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-modal-enter {
+  animation: modal-enter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center center;
+}
+
+@keyframes overlay-enter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-overlay-enter {
+  animation: overlay-enter 0.2s ease-out;
+}
+
+/* ── Bottom sheet entrance (iOS-feel) ── */
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.animate-sheet-up {
+  animation: sheet-up 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ── Count-up KPI numbers (subtle scale + fade on appear) ── */
+@keyframes count-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-count-in {
+  animation: count-in 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Page view transitions (Next.js 16 native) ── */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: fade-out 0.18s ease-in forwards; }
+::view-transition-new(root) { animation: page-enter 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Respect user's reduced motion preference ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  body::before { display: none; }
+  .animate-pulse-glow,
+  .animate-shimmer {
+    animation: none !important;
+  }
+}
+
+/* ── Disable expensive ambient gradient on small low-end screens ── */
+@media (max-width: 480px) and (max-device-width: 480px) and (-webkit-min-device-pixel-ratio: 1.5) {
+  /* Only on Android (no Apple touch callout) */
+  @supports not (-webkit-touch-callout: none) {
+    body::before { display: none; }
+  }
 }

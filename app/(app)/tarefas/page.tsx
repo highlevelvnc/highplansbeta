@@ -224,8 +224,8 @@ export default function TarefasPage() {
       />
 
       {showNew&&(
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={e=>e.target===e.currentTarget&&!creating&&setShowNew(false)}>
-          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-overlay-enter" onClick={e=>e.target===e.currentTarget&&!creating&&setShowNew(false)}>
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-md animate-modal-enter">
             <h2 className="font-bold text-lg text-[#F0F0F3] mb-4">Nova Tarefa</h2>
             <div className="space-y-3">
               <div>

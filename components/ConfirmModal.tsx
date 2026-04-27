@@ -47,10 +47,10 @@ export function ConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[200] p-4"
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[200] p-4 animate-overlay-enter"
       onClick={e => { if (e.target === e.currentTarget && !loading) onCancel() }}
     >
-      <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+      <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-modal-enter">
         <div className="flex items-start gap-4 mb-5">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${colors.iconBg}`}>
             <AlertTriangle className={`w-5 h-5 ${colors.icon}`} />

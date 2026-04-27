@@ -10,6 +10,7 @@ import {
 import Link from 'next/link'
 import { useToast } from '@/components/Toast'
 import { displayName, getWhatsAppNumber, buildWhatsAppUrl, COUNTRY_INFO } from '@/lib/lead-utils'
+import { haptic } from '@/lib/haptics'
 
 interface Lead {
   id: string
@@ -306,6 +307,7 @@ export default function ProspeccaoPage() {
       ? `https://web.whatsapp.com/send?phone=${num}${encoded ? `&text=${encoded}` : ''}`
       : (messageBody ? `https://wa.me/${num}?text=${encoded}` : buildWhatsAppUrl(lead))
     if (url) {
+      haptic('medium')
       window.open(url, '_blank')
       // AWAIT: registar mensagem no DB ANTES de avançar
       // Isto garante que o lead não volta a aparecer na queue
@@ -326,6 +328,7 @@ export default function ProspeccaoPage() {
 
   const markInvalid = async () => {
     if (!lead) return
+    haptic('warning')
     await fetch(`/api/leads/${lead.id}/mark-invalid`, { method: 'POST' }).catch(() => {})
     setSessionStats(s => ({ ...s, invalidated: s.invalidated + 1 }))
     toast('Marcado como inválido', 'info')
@@ -334,6 +337,7 @@ export default function ProspeccaoPage() {
 
   const snooze = async (days: number) => {
     if (!lead) return
+    haptic('tick')
     await fetch(`/api/leads/${lead.id}/snooze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -352,12 +356,15 @@ export default function ProspeccaoPage() {
       loadNext()
       return
     }
+    haptic('medium')
     window.open(`tel:+${num}`, '_blank')
     setShowCallLog(true)
   }
 
   const logCall = async (resultado: string) => {
     if (!lead) return
+    // Different haptic based on result importance
+    haptic(resultado === 'interessado' ? 'success' : resultado === 'sem_interesse' ? 'error' : 'tick')
     await fetch(`/api/leads/${lead.id}/call-log`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -383,6 +390,7 @@ export default function ProspeccaoPage() {
 
   const skip = () => {
     if (!lead) return
+    haptic('tap')
     setSessionStats(s => ({ ...s, skipped: s.skipped + 1 }))
     loadNext()
   }
@@ -902,7 +910,7 @@ export default function ProspeccaoPage() {
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Gerar mensagem personalizada</span>
-                  <kbd className="bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">G</kbd>
+                  <kbd className="hidden md:flex bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">G</kbd>
                 </button>
               ) : (
                 <div className="bg-[#09090B] border border-[#8B5CF6]/30 rounded-xl p-3 space-y-2 animate-fade-in">
@@ -960,7 +968,7 @@ export default function ProspeccaoPage() {
                     >
                       <MessageCircle className="w-6 h-6" />
                       <span className="text-xs font-bold">WhatsApp</span>
-                      <kbd className="absolute top-2 right-2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">W</kbd>
+                      <kbd className="hidden md:flex absolute top-2 right-2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">W</kbd>
                     </button>
 
                     {/* Call */}
@@ -971,7 +979,7 @@ export default function ProspeccaoPage() {
                     >
                       <Phone className="w-6 h-6" />
                       <span className="text-xs font-bold">Ligar</span>
-                      <kbd className="absolute top-2 right-2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">L</kbd>
+                      <kbd className="hidden md:flex absolute top-2 right-2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">L</kbd>
                     </button>
 
                     {/* Skip */}
@@ -981,7 +989,7 @@ export default function ProspeccaoPage() {
                     >
                       <ChevronRight className="w-6 h-6" />
                       <span className="text-xs font-bold">Saltar</span>
-                      <kbd className="absolute top-2 right-2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">S</kbd>
+                      <kbd className="hidden md:flex absolute top-2 right-2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">S</kbd>
                     </button>
                   </div>
                   {/* Secondary action: WhatsApp Web */}
@@ -992,7 +1000,7 @@ export default function ProspeccaoPage() {
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Abrir no WhatsApp Web (desktop)</span>
-                      <kbd className="absolute right-3 top-1/2 -translate-y-1/2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">E</kbd>
+                      <kbd className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">E</kbd>
                     </button>
                   )}
 
@@ -1005,7 +1013,7 @@ export default function ProspeccaoPage() {
                     >
                       <Moon className="w-3 h-3" />
                       <span>2d</span>
-                      <kbd className="absolute top-1 right-1 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-0.5 font-mono text-[8px] text-[#52525B] group-hover:text-[#A78BFA]">Z</kbd>
+                      <kbd className="hidden md:flex absolute top-1 right-1 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-0.5 font-mono text-[8px] text-[#52525B] group-hover:text-[#A78BFA]">Z</kbd>
                     </button>
                     <button
                       onClick={() => snooze(7)}
@@ -1030,7 +1038,7 @@ export default function ProspeccaoPage() {
                     >
                       <Ban className="w-3 h-3" />
                       <span>Inválido</span>
-                      <kbd className="absolute top-1 right-1 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-0.5 font-mono text-[8px] text-[#52525B] group-hover:text-[#A78BFA]">I</kbd>
+                      <kbd className="hidden md:flex absolute top-1 right-1 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-0.5 font-mono text-[8px] text-[#52525B] group-hover:text-[#A78BFA]">I</kbd>
                     </button>
                   </div>
                 </>
@@ -1049,7 +1057,7 @@ export default function ProspeccaoPage() {
                         >
                           <Icon className="w-4 h-4" style={{ color: r.color }} />
                           <span className="text-[9px] font-medium text-[#71717A]">{r.label.split(' ')[0]}</span>
-                          <kbd className="absolute -top-1 -right-1 bg-[#27272A] border border-[#3F3F46] rounded px-1 py-0 font-mono text-[9px] text-[#A78BFA]">{i + 1}</kbd>
+                          <kbd className="hidden md:flex absolute -top-1 -right-1 bg-[#27272A] border border-[#3F3F46] rounded px-1 py-0 font-mono text-[9px] text-[#A78BFA]">{i + 1}</kbd>
                         </button>
                       )
                     })}

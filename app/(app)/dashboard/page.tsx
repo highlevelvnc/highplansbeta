@@ -10,6 +10,7 @@ import {
   LineChart, Line, CartesianGrid, PieChart, Pie, Cell,
 } from 'recharts'
 import Link from 'next/link'
+import { useCountUp } from '@/lib/use-count-up'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,9 +79,21 @@ interface KPICardProps {
   color?: string
   alert?: boolean
   href?: string
+  /** When true, animates count-up for numeric values. Use for primary KPIs. */
+  animated?: boolean
+  /** Currency prefix for animated numeric values (e.g. "€"). */
+  currency?: string
 }
 
-function KPICard({ label, value, sub, icon: Icon, color = '#8B5CF6', alert = false, href }: KPICardProps) {
+function KPICard({ label, value, sub, icon: Icon, color = '#8B5CF6', alert = false, href, animated, currency }: KPICardProps) {
+  // Animate numeric value if explicitly requested
+  const numericTarget = typeof value === 'number'
+    ? value
+    : parseInt(String(value).replace(/[^0-9-]/g, ''), 10) || 0
+  const animValue = useCountUp(animated ? numericTarget : 0, 800)
+  const display = animated
+    ? `${currency || ''}${Math.round(animValue).toLocaleString('pt-PT')}`
+    : value
   const inner = (
     <div
       className={`relative overflow-hidden bg-gradient-to-br from-[#0F0F12] to-[#0A0A0D] border rounded-2xl p-4 h-full transition-all duration-300 group card-hover
@@ -114,7 +127,7 @@ function KPICard({ label, value, sub, icon: Icon, color = '#8B5CF6', alert = fal
           </span>
         )}
       </div>
-      <div className="relative text-2xl font-black text-[#F0F0F3] tracking-tight mb-0.5 tabular-nums">{value}</div>
+      <div className="relative text-2xl font-black text-[#F0F0F3] tracking-tight mb-0.5 tabular-nums">{display}</div>
       <div className="relative text-xs text-[#71717A] leading-snug font-medium">{label}</div>
       {sub && <div className="relative text-[10px] text-[#52525B] mt-1">{sub}</div>}
     </div>
@@ -402,28 +415,35 @@ export default function DashboardPage() {
           <KPICard
             icon={Euro}
             label="MRR Ativo"
-            value={`€${data.receitaAtiva.toLocaleString('pt-PT')}`}
+            value={data.receitaAtiva}
+            animated
+            currency="€"
             sub={`${data.activeClients} cliente${data.activeClients !== 1 ? 's' : ''} ativo${data.activeClients !== 1 ? 's' : ''}`}
             color="#10B981"
           />
           <KPICard
             icon={Target}
             label="Receita Potencial"
-            value={`€${data.receitaPotencial.toLocaleString('pt-PT')}`}
+            value={data.receitaPotencial}
+            animated
+            currency="€"
             sub="Leads com plano alvo definido"
             color="#8B5CF6"
           />
           <KPICard
             icon={TrendingUp}
             label="Receita Total Projetada"
-            value={`€${data.receitaFutura.toLocaleString('pt-PT')}`}
+            value={data.receitaFutura}
+            animated
+            currency="€"
             sub="Ativa + Potencial"
             color="#A78BFA"
           />
           <KPICard
             icon={Users}
             label="Total de Leads"
-            value={data.totalLeads.toLocaleString('pt-PT')}
+            value={data.totalLeads}
+            animated
             sub={`${data.leadsHot} HOT · ${data.oportunidadesAltas} oport. altas`}
           />
         </div>
@@ -440,6 +460,7 @@ export default function DashboardPage() {
             icon={Flame}
             label="Leads HOT"
             value={data.leadsHot}
+            animated
             sub="Score alto — contactar agora"
             color="#EF4444"
             href="/leads?score=HOT"
@@ -448,6 +469,7 @@ export default function DashboardPage() {
             icon={Zap}
             label="Oportunidades Altas"
             value={data.oportunidadesAltas}
+            animated
             sub="Score ≥ 60 pontos"
             color="#F59E0B"
             href="/leads"
@@ -456,6 +478,7 @@ export default function DashboardPage() {
             icon={Calendar}
             label="Follow-ups Atrasados"
             value={data.followUpsAtrasados}
+            animated
             sub="Precisam atenção"
             color="#EF4444"
             alert={data.followUpsAtrasados > 0}
@@ -465,6 +488,7 @@ export default function DashboardPage() {
             icon={CheckSquare}
             label="Tarefas Atrasadas"
             value={data.tasksAtrasadas}
+            animated
             sub={`${data.tasksPendentes} pendentes no total`}
             color={data.tasksAtrasadas > 0 ? '#EF4444' : '#71717A'}
             alert={data.tasksAtrasadas > 0}

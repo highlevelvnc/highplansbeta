@@ -1897,10 +1897,10 @@ export default function LeadsPage() {
       {/* NEW LEAD MODAL */}
       {showNew && (
         <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-overlay-enter"
           onClick={e => e.target === e.currentTarget && setShowNew(false)}
         >
-          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-lg animate-modal-enter max-h-[85vh] overflow-y-auto">
             <h2 className="font-bold text-lg text-[#F0F0F3] mb-5">Novo Lead</h2>
 
             <div className="grid grid-cols-2 gap-3">
