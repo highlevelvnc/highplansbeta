@@ -127,7 +127,7 @@ function KPICard({ label, value, sub, icon: Icon, color = '#8B5CF6', alert = fal
           </span>
         )}
       </div>
-      <div className="relative text-2xl font-black text-[#F0F0F3] tracking-tight mb-0.5 tabular-nums">{display}</div>
+      <div className="relative text-xl sm:text-2xl font-black text-[#F0F0F3] tracking-tight mb-0.5 tabular-nums truncate">{display}</div>
       <div className="relative text-xs text-[#71717A] leading-snug font-medium">{label}</div>
       {sub && <div className="relative text-[10px] text-[#52525B] mt-1">{sub}</div>}
     </div>

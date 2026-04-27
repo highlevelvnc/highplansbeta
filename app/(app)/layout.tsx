@@ -154,7 +154,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden bg-[#09090B]">
       {/* Mobile header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-[#0F0F12]/80 backdrop-blur-xl border-b border-[#27272A]/80 flex items-center justify-between px-4 relative">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-[#0F0F12]/80 backdrop-blur-xl border-b border-[#27272A]/80 flex items-center justify-between px-4">
         <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#8B5CF6]/20 to-transparent" />
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg gradient-accent flex items-center justify-center">
