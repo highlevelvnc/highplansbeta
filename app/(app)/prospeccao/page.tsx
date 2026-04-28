@@ -119,18 +119,21 @@ export default function ProspeccaoPage() {
   useEffect(() => {
     const today = new Date().toDateString()
     const stored = localStorage.getItem('prospeccao_daily')
+    // Migration: bump old default (50) to new default (200)
+    // Users who manually picked another value (10, 30, 100, 150, 250, etc.) are respected
+    const migrate = (g: number | undefined) => (g === 50 || !g ? 200 : g)
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
+        const goal = migrate(parsed.goal)
         if (parsed.date === today) {
           setDailyDone(parsed.done || 0)
-          setDailyGoal(parsed.goal || 200)
+          setDailyGoal(goal)
         } else {
-          // New day — reset done, keep goal
-          setDailyGoal(parsed.goal || 200)
+          setDailyGoal(goal)
           setDailyDone(0)
-          localStorage.setItem('prospeccao_daily', JSON.stringify({ date: today, done: 0, goal: parsed.goal || 200 }))
         }
+        localStorage.setItem('prospeccao_daily', JSON.stringify({ date: today, done: parsed.date === today ? (parsed.done || 0) : 0, goal }))
       } catch {}
     }
   }, [])
