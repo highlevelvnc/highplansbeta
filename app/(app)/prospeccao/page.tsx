@@ -1,11 +1,11 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   MessageCircle, Phone, ChevronRight, Zap, Globe, MapPin,
   RefreshCw, Loader2, Tag, X, CheckCircle, PhoneOff,
   PhoneIncoming, UserX, Star, Clock, Keyboard, ExternalLink,
   AlertTriangle, Ban, Moon, BarChart3, Sparkles, Copy, Target,
-  History, ChevronDown, ChevronUp, Reply,
+  History, ChevronDown, ChevronUp, Reply, ChevronLeft,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/components/Toast'
@@ -86,9 +86,25 @@ export default function ProspeccaoPage() {
   const [historyStats, setHistoryStats] = useState({ totalContacted: 0, contactedToday: 0, responded: 0 })
   const [historyLoading, setHistoryLoading] = useState(false)
 
-  // Derived: current lead
+  // Derived: current lead + next lead (for stack peek)
   const lead = queue[currentIdx] || null
+  const nextLeadInQueue = queue[currentIdx + 1] || null
   const remaining = Math.max(0, totalRemaining - currentIdx)
+
+  // Undo system: tracks last destructive action so user can revert within 5s
+  const [undoState, setUndoState] = useState<{
+    leadId: string
+    leadName: string
+    prev: { tags: string; pipelineStatus: string }
+    actionLabel: string
+  } | null>(null)
+
+  // Swipe gesture state (mobile)
+  const [swipeDelta, setSwipeDelta] = useState(0)
+  const swipeStartX = useRef<number | null>(null)
+  const swipeStartY = useRef<number | null>(null)
+  const swipeLocked = useRef<'h' | 'v' | null>(null)
+
   // Daily goal
   const [dailyGoal, setDailyGoal] = useState(200)
   const [dailyDone, setDailyDone] = useState(0)
@@ -343,23 +359,64 @@ export default function ProspeccaoPage() {
   const markInvalid = async () => {
     if (!lead) return
     haptic('warning')
+    // Capture state BEFORE the action for undo
+    const prev = { tags: lead.tags || '', pipelineStatus: lead.pipelineStatus }
+    setUndoState({
+      leadId: lead.id,
+      leadName: displayName(lead),
+      prev,
+      actionLabel: 'Marcado inválido',
+    })
     await fetch(`/api/leads/${lead.id}/mark-invalid`, { method: 'POST' }).catch(() => {})
     setSessionStats(s => ({ ...s, invalidated: s.invalidated + 1 }))
-    toast('Marcado como inválido', 'info')
     loadNext()
   }
 
   const snooze = async (days: number) => {
     if (!lead) return
     haptic('tick')
+    const prev = { tags: lead.tags || '', pipelineStatus: lead.pipelineStatus }
+    setUndoState({
+      leadId: lead.id,
+      leadName: displayName(lead),
+      prev,
+      actionLabel: `Snooze ${days}d`,
+    })
     await fetch(`/api/leads/${lead.id}/snooze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ days }),
     }).catch(() => {})
     setSessionStats(s => ({ ...s, snoozed: s.snoozed + 1 }))
-    toast(`Snooze ${days} dia${days > 1 ? 's' : ''} — voltar depois`, 'success')
     loadNext()
+  }
+
+  // Auto-dismiss undo banner after 5s
+  useEffect(() => {
+    if (!undoState) return
+    const t = setTimeout(() => setUndoState(null), 5000)
+    return () => clearTimeout(t)
+  }, [undoState])
+
+  const performUndo = async () => {
+    if (!undoState) return
+    haptic('tick')
+    try {
+      const res = await fetch(`/api/leads/${undoState.leadId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...undoState.prev,
+          // PUT recalcs score; pass the lead's current core fields too
+          id: undoState.leadId,
+        }),
+      })
+      if (res.ok) toast(`Desfeito · ${undoState.leadName}`, 'success')
+      else toast('Erro ao desfazer', 'error')
+    } catch {
+      toast('Erro ao desfazer', 'error')
+    }
+    setUndoState(null)
   }
 
   const handleCall = () => {
@@ -816,8 +873,97 @@ export default function ProspeccaoPage() {
       {/* Lead card */}
       {!loading && lead && (
         <div className="space-y-4">
+          {/* Position indicator */}
+          <div className="flex items-center justify-between text-xs text-[#52525B] tabular-nums px-1">
+            <button
+              onClick={loadPrevious}
+              disabled={currentIdx === 0}
+              className="flex items-center gap-1 text-[#52525B] hover:text-[#A78BFA] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Voltar ao lead anterior (B / ←)"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Anterior</span>
+            </button>
+            <span className="font-bold text-[#71717A]">
+              {currentIdx + 1} / {Math.max(queue.length, totalRemaining)}
+            </span>
+            <button
+              onClick={skip}
+              className="flex items-center gap-1 text-[#52525B] hover:text-[#71717A] transition-colors"
+              title="Saltar (S / →)"
+            >
+              <span className="hidden sm:inline">Saltar</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Card stack: next lead peek (shown 8px behind current) */}
+          <div className="relative">
+            {nextLeadInQueue && (
+              <div
+                aria-hidden
+                className="absolute inset-x-3 -bottom-2 h-3 bg-gradient-to-br from-[#0F0F12] to-[#0A0A0D] border border-[#27272A] rounded-2xl opacity-60"
+              />
+            )}
           {/* Main card */}
-          <div className="relative bg-gradient-to-br from-[#0F0F12] to-[#0A0A0D] border border-[#27272A] rounded-2xl overflow-hidden card-hover shadow-xl shadow-black/40">
+          <div
+            onTouchStart={(e) => {
+              swipeStartX.current = e.touches[0].clientX
+              swipeStartY.current = e.touches[0].clientY
+              swipeLocked.current = null
+            }}
+            onTouchMove={(e) => {
+              if (swipeStartX.current === null || swipeStartY.current === null) return
+              const dx = e.touches[0].clientX - swipeStartX.current
+              const dy = e.touches[0].clientY - swipeStartY.current
+              // Lock direction on first significant move (avoid hijacking vertical scroll)
+              if (swipeLocked.current === null) {
+                if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                  swipeLocked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
+                }
+              }
+              if (swipeLocked.current === 'h') {
+                e.preventDefault()
+                setSwipeDelta(dx)
+              }
+            }}
+            onTouchEnd={() => {
+              if (swipeLocked.current === 'h') {
+                if (swipeDelta > 100 && hasWA) {
+                  // Swipe right → WhatsApp
+                  setSwipeDelta(0)
+                  handleWhatsApp(false)
+                } else if (swipeDelta < -100) {
+                  // Swipe left → skip
+                  setSwipeDelta(0)
+                  skip()
+                } else {
+                  // Snap back
+                  setSwipeDelta(0)
+                }
+              }
+              swipeStartX.current = null
+              swipeStartY.current = null
+              swipeLocked.current = null
+            }}
+            style={{
+              transform: swipeDelta !== 0 ? `translateX(${swipeDelta}px) rotate(${swipeDelta * 0.05}deg)` : undefined,
+              transition: swipeDelta === 0 ? 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' : undefined,
+            }}
+            className="relative bg-gradient-to-br from-[#0F0F12] to-[#0A0A0D] border border-[#27272A] rounded-2xl overflow-hidden card-hover shadow-xl shadow-black/40 touch-pan-y"
+          >
+            {/* Swipe direction hint overlay */}
+            {Math.abs(swipeDelta) > 30 && (
+              <div className={`absolute inset-0 z-10 flex items-center justify-center pointer-events-none transition-opacity ${
+                swipeDelta > 0 ? 'bg-[#25D366]/15' : 'bg-red-500/15'
+              }`} style={{ opacity: Math.min(1, Math.abs(swipeDelta) / 150) }}>
+                <div className={`text-2xl font-black uppercase tracking-widest ${
+                  swipeDelta > 0 ? 'text-[#25D366]' : 'text-red-400'
+                }`}>
+                  {swipeDelta > 0 ? '→ WhatsApp' : 'Saltar ←'}
+                </div>
+              </div>
+            )}
             {/* Score bar top — gradient version */}
             <div className="h-1 w-full relative overflow-hidden">
               <div
@@ -1094,11 +1240,37 @@ export default function ProspeccaoPage() {
               )}
             </div>
           </div>
+          </div>
 
           {/* Progress indicator */}
           <div className="text-center text-xs text-[#52525B]">
             {remaining > 0 ? `${remaining} leads restantes` : 'Último lead'}
             {contactedCount > 0 && ` · ${contactedCount} contactados nesta sessão`}
+          </div>
+        </div>
+      )}
+
+      {/* Undo banner — slides up after destructive action */}
+      {undoState && (
+        <div className="fixed bottom-20 md:bottom-4 left-1/2 -translate-x-1/2 z-[60] animate-fade-in">
+          <div className="flex items-center gap-3 bg-[#0F0F12] border border-[#8B5CF6]/40 rounded-xl shadow-2xl shadow-black/60 px-4 py-3">
+            <div className="flex flex-col">
+              <span className="text-xs text-[#71717A]">{undoState.actionLabel}</span>
+              <span className="text-sm font-medium text-[#F0F0F3] truncate max-w-[200px]">{undoState.leadName}</span>
+            </div>
+            <button
+              onClick={performUndo}
+              className="px-3 py-1.5 rounded-lg bg-[#8B5CF6]/15 border border-[#8B5CF6]/30 text-[#A78BFA] text-xs font-bold hover:bg-[#8B5CF6]/25 transition-colors"
+            >
+              Desfazer
+            </button>
+            <button
+              onClick={() => setUndoState(null)}
+              className="text-[#52525B] hover:text-[#F0F0F3]"
+              aria-label="Fechar"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       )}

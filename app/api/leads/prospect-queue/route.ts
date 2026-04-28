@@ -13,8 +13,10 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') ?? '100', 10)
     const excludeIds = (searchParams.get('exclude') ?? '').split(',').filter(Boolean)
 
+    const now = new Date()
+
     const where: any = {
-      // NEVER contacted — this is the core filter that prevents repeats
+      // NEVER contacted — core rule
       messages: { none: {} },
       // Has phone
       OR: [
@@ -25,6 +27,18 @@ export async function GET(req: NextRequest) {
       ],
       // Not dead pipeline
       pipelineStatus: { notIn: ['CLOSED', 'LOST'] },
+      // Smart snooze exclusion: only skip if there's an ACTIVE future snooze followup.
+      // Once the snooze date passes, the lead becomes prospectable again automatically.
+      NOT: [
+        {
+          AND: [
+            { tags: { contains: 'snoozed', mode: 'insensitive' } },
+            { followUps: { some: { enviado: false, agendadoPara: { gt: now } } } },
+          ],
+        },
+        // Manually invalidated leads stay out
+        { tags: { contains: 'numero invalido', mode: 'insensitive' } },
+      ],
     }
 
     if (nicho) where.nicho = { contains: nicho, mode: 'insensitive' }
@@ -77,6 +91,27 @@ export async function GET(req: NextRequest) {
         return num && num.length >= 9
       })
       .slice(0, limit)
+
+    // Auto-cleanup: remove "snoozed" tag from leads whose snooze expired (so they
+    // show clean in the UI). Fire-and-forget — doesn't block the response.
+    const expiredSnoozeIds = validLeads
+      .filter(l => (l.tags || '').toLowerCase().includes('snoozed'))
+      .map(l => ({ id: l.id, tags: l.tags || '' }))
+    if (expiredSnoozeIds.length > 0) {
+      Promise.all(
+        expiredSnoozeIds.map(({ id, tags }) => {
+          const cleanTags = tags
+            .split(',')
+            .map(t => t.trim())
+            .filter(t => t && t.toLowerCase() !== 'snoozed')
+            .join(',')
+          return prisma.lead.update({
+            where: { id },
+            data: { tags: cleanTags || null },
+          }).catch(() => null)
+        })
+      ).catch(() => null)
+    }
 
     // Total count for progress bar
     const total = await prisma.lead.count({ where })
