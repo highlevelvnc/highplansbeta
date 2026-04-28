@@ -148,10 +148,12 @@ export default function ProspeccaoPage() {
   const [rateState, setRateState] = useState(() =>
     typeof window !== 'undefined' ? getRateState() : { cooldownMs: 0, hourCount: 0, dayCount: 0, level: 'ok' as const, lastTs: null }
   )
-  // Tick every 1s while cooldown is active so countdown UI updates
+  // Tick during cooldown so countdown UI updates smoothly
   useEffect(() => {
     if (rateState.cooldownMs <= 0 && rateState.level === 'ok') return
-    const t = setInterval(() => setRateState(getRateState()), 1000)
+    // Faster tick (500ms) while cooldown active for smoother ring animation
+    const intervalMs = rateState.cooldownMs > 0 ? 500 : 1000
+    const t = setInterval(() => setRateState(getRateState()), intervalMs)
     return () => clearInterval(t)
   }, [rateState.cooldownMs, rateState.level])
 
@@ -389,12 +391,10 @@ export default function ProspeccaoPage() {
       loadNext()
       return
     }
-    // Anti-block rate-limit check
+    // Anti-block soft warning — never blocks, just hints if rapid-fire
     const rl = canSend()
-    if (!rl.ok) {
-      haptic('warning')
-      toast(rl.reason || 'Aguarda antes de outro envio', 'error')
-      return
+    if (rl.warning) {
+      toast(rl.warning, 'info')
     }
     const messageBody = aiMessage || ''
     const encoded = messageBody ? encodeURIComponent(messageBody) : ''
@@ -444,10 +444,8 @@ export default function ProspeccaoPage() {
       return
     }
     const rl = canSend()
-    if (!rl.ok) {
-      haptic('warning')
-      toast(rl.reason || 'Aguarda', 'error')
-      return
+    if (rl.warning) {
+      toast(rl.warning, 'info')
     }
     // Localised greeting based on country
     const greeting = lead.pais === 'DE'
@@ -1112,15 +1110,40 @@ export default function ProspeccaoPage() {
               </span>
             </div>
 
-            {/* Cooldown */}
-            {rateState.cooldownMs > 0 && (
-              <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-[#27272A] animate-cooldown">
-                <Clock className="w-3 h-3 text-[#A78BFA]" />
-                <span className="text-xs font-bold tabular-nums text-[#A78BFA]">
-                  {Math.ceil(rateState.cooldownMs / 1000)}s
-                </span>
-              </div>
-            )}
+            {/* Cooldown — circular countdown ring (informativo, não bloqueia) */}
+            {rateState.cooldownMs > 0 && (() => {
+              // Total cooldown is 25-35s (RL_COOLDOWN_MS + jitter). We don't have the exact total here,
+              // so we approximate the ring fill against 35s max for a visual countdown.
+              const sec = Math.ceil(rateState.cooldownMs / 1000)
+              const totalEstimate = 35
+              const progress = Math.max(0, Math.min(1, 1 - rateState.cooldownMs / (totalEstimate * 1000)))
+              const radius = 14
+              const circ = 2 * Math.PI * radius
+              const offset = circ * (1 - progress)
+              return (
+                <div className="relative flex items-center justify-center" title="Tempo desde o último envio (anti-block)">
+                  <svg width="36" height="36" className="-rotate-90">
+                    <circle
+                      cx="18" cy="18" r={radius}
+                      fill="none" stroke="#27272A" strokeWidth="3"
+                    />
+                    <circle
+                      cx="18" cy="18" r={radius}
+                      fill="none"
+                      stroke={sec <= 5 ? '#10B981' : '#A78BFA'}
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeDasharray={circ}
+                      strokeDashoffset={offset}
+                      style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s' }}
+                    />
+                  </svg>
+                  <span className={`absolute text-[10px] font-black tabular-nums ${sec <= 5 ? 'text-[#10B981]' : 'text-[#A78BFA]'}`}>
+                    {sec}
+                  </span>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Position indicator */}
@@ -1247,7 +1270,7 @@ export default function ProspeccaoPage() {
                     )}
                     <h2 className="text-xl font-black text-[#F0F0F3] tracking-tight truncate">{leadName}</h2>
                   </div>
-                  <div className="text-sm text-[#71717A] flex items-center gap-1.5">
+                  <div className="text-sm text-[#71717A] flex items-center gap-1.5 flex-wrap">
                     {lead.nicho && <span>{lead.nicho}</span>}
                     {lead.nicho && lead.cidade && <span className="text-[#27272A]">·</span>}
                     {lead.cidade && (
@@ -1258,6 +1281,32 @@ export default function ProspeccaoPage() {
                     )}
                     {!lead.nicho && !lead.cidade && '—'}
                   </div>
+                  {/* Phone number preview — landline detection helps decide WA vs call */}
+                  {(() => {
+                    // Prefer raw display value to keep formatting; detect landline patterns
+                    const rawPhone = lead.whatsapp || lead.telefone || lead.whatsappRaw || lead.telefoneRaw || ''
+                    if (!rawPhone) return null
+                    const digits = rawPhone.replace(/\D/g, '')
+                    // PT landlines: 2xx (210-299), excluding 21x mobile prefix overlap = none
+                    // PT mobile: 9xx (91, 92, 93, 96)
+                    // Detect: if digits after country code start with 2 → landline (no WA)
+                    const isPT = digits.startsWith('351')
+                    const local = isPT ? digits.slice(3) : digits.replace(/^00/, '').replace(/^(351|55|49|31)/, '')
+                    const isLandline = local.startsWith('2')
+                    const isMobile = local.startsWith('9')
+                    return (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-xs">
+                        <Phone className={`w-3 h-3 ${isLandline ? 'text-amber-400' : isMobile ? 'text-[#25D366]' : 'text-[#71717A]'}`} />
+                        <span className="font-mono text-[#A1A1AA] tabular-nums">{rawPhone}</span>
+                        {isLandline && (
+                          <span className="text-[9px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">Fixo · sem WA</span>
+                        )}
+                        {isMobile && (
+                          <span className="text-[9px] bg-[#25D366]/15 text-[#25D366] border border-[#25D366]/30 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">Mobile</span>
+                        )}
+                      </div>
+                    )
+                  })()}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">

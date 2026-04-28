@@ -89,20 +89,16 @@ export function getRateState(): RateState {
   return { cooldownMs, hourCount, dayCount, level, lastTs }
 }
 
-/** Should we allow a send right now? Returns reason if blocked. */
-export function canSend(): { ok: boolean; reason?: string; cooldownMs?: number } {
+/**
+ * Returns a soft "you might want to wait" hint.
+ * NEVER blocks — user always controls their flow.
+ * UI uses this to show a warning toast but the action proceeds.
+ */
+export function canSend(): { ok: boolean; warning?: string; cooldownMs?: number } {
   const s = getRateState()
   if (s.cooldownMs > 0) {
     const sec = Math.ceil(s.cooldownMs / 1000)
-    return { ok: false, reason: `Aguarda ${sec}s antes de outro WhatsApp (anti-block)`, cooldownMs: s.cooldownMs }
-  }
-  if (s.level === 'hard') {
-    return {
-      ok: false,
-      reason: s.hourCount >= RL_HOURLY_HARD
-        ? `Limite horário atingido (${s.hourCount}/${RL_HOURLY_HARD}). Pausa para evitar block.`
-        : `Limite diário atingido (${s.dayCount}/${RL_DAILY_HARD}). Continua amanhã.`,
-    }
+    return { ok: true, warning: `⚡ Rapid-fire (${sec}s desde o último). Cuidado com ban.`, cooldownMs: s.cooldownMs }
   }
   return { ok: true }
 }
