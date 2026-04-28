@@ -6,6 +6,7 @@ import { useSession, signOut } from 'next-auth/react'
 import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, LogOut, Menu, X, Bell, BarChart3, Copy, Crosshair, Inbox } from 'lucide-react'
 import { ToastProvider } from '@/components/Toast'
 import { BottomNavBar } from '@/components/BottomNavBar'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 const nav = [
   { section: 'OPERACIONAL' },
@@ -139,6 +140,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         )}
+        <ThemeToggle />
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs text-[#71717A] hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 border border-transparent transition-all"
@@ -162,12 +164,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <span className="font-black text-sm tracking-wider text-[#F0F0F3]">HIGHPLANS</span>
         </div>
-        <button
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="w-10 h-10 rounded-xl bg-[#18181B] border border-[#27272A] flex items-center justify-center text-[#A1A1AA] hover:text-[#F0F0F3] transition-colors"
-        >
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle compact />
+          <button
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="w-10 h-10 rounded-xl bg-[#18181B] border border-[#27272A] flex items-center justify-center text-[#A1A1AA] hover:text-[#F0F0F3] transition-colors"
+          >
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile overlay */}

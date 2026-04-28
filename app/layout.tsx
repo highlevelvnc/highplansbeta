@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import SessionProvider from '@/components/SessionProvider'
+import { ThemeScript } from '@/components/ThemeToggle'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -17,7 +18,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt" className="dark">
+    <html lang="pt" suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body className="bg-[#09090B] text-[#F0F0F3] min-h-screen">
         <SessionProvider>
           {children}
