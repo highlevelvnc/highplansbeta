@@ -1,18 +1,13 @@
 /**
- * WhatsApp anti-ban tracker — multi-number aware.
+ * WhatsApp anti-ban tracker — supports two slots (e.g. business + personal).
  *
- * Tracks send timestamps per WhatsApp number (e.g. "bia", "vinicius") and
- * stores ban events. Uses past bans to compute an adaptive warning threshold:
- * if you got banned at 67 contacts before, warn at 67 - 10 = 57 next time.
+ * Tracks send timestamps per slot ("wa1" / "wa2") and stores ban events.
+ * Uses past bans to compute an adaptive warning threshold:
+ * banned at 67 → warn at 57 next time.
+ *
+ * Labels are user-editable (default "Business" / "Pessoal") via setLabel().
  *
  * Storage key: `wa_rl_v2`
- * {
- *   active: 'bia' | 'vinicius',
- *   numbers: {
- *     bia: { sends: number[], bans: { ts: number; count: number }[] },
- *     ...
- *   }
- * }
  */
 
 const KEY = 'wa_rl_v2'
@@ -26,16 +21,22 @@ export const RL_HOURLY_HARD = 999
 export const RL_DAILY_WARN_DEFAULT = 50
 export const RL_DAILY_HARD = 999
 
-export type NumberKey = 'bia' | 'vinicius'
+// Two slots for tracking different WhatsApp numbers (e.g. business + personal)
+// Keys are stable; labels are user-editable.
+export type NumberKey = 'wa1' | 'wa2'
 
-export const NUMBERS: { key: NumberKey; label: string; emoji: string }[] = [
-  { key: 'bia', label: 'BIA', emoji: '👩' },
-  { key: 'vinicius', label: 'VINI', emoji: '👨' },
-]
+export const NUMBER_KEYS: NumberKey[] = ['wa1', 'wa2']
+
+const DEFAULT_LABELS: Record<NumberKey, { label: string; emoji: string }> = {
+  wa1: { label: 'Business', emoji: '💼' },
+  wa2: { label: 'Pessoal',  emoji: '📱' },
+}
 
 type NumberData = {
   sends: number[]              // timestamps of WA opens
   bans: { ts: number; count: number }[]  // ban events with daily count at that moment
+  label?: string               // user-editable display label
+  emoji?: string               // user-editable emoji
 }
 
 type Storage = {
@@ -45,11 +46,38 @@ type Storage = {
 
 function emptyStorage(): Storage {
   return {
-    active: 'bia',
+    active: 'wa1',
     numbers: {
-      bia: { sends: [], bans: [] },
-      vinicius: { sends: [], bans: [] },
+      wa1: { sends: [], bans: [] },
+      wa2: { sends: [], bans: [] },
     },
+  }
+}
+
+/** Get the display label for a number (custom or default). */
+export function getLabel(key: NumberKey): { label: string; emoji: string } {
+  if (typeof window === 'undefined') return DEFAULT_LABELS[key]
+  try {
+    const raw = localStorage.getItem(KEY)
+    if (!raw) return DEFAULT_LABELS[key]
+    const parsed = JSON.parse(raw) as Storage
+    const n = parsed.numbers?.[key]
+    return {
+      label: n?.label || DEFAULT_LABELS[key].label,
+      emoji: n?.emoji || DEFAULT_LABELS[key].emoji,
+    }
+  } catch {
+    return DEFAULT_LABELS[key]
+  }
+}
+
+/** Update label/emoji for a number. */
+export function setLabel(key: NumberKey, label: string, emoji?: string) {
+  const s = read()
+  if (s.numbers[key]) {
+    s.numbers[key].label = label.trim().slice(0, 20) || DEFAULT_LABELS[key].label
+    if (emoji !== undefined) s.numbers[key].emoji = emoji.slice(0, 4)
+    write(s)
   }
 }
 
@@ -69,10 +97,14 @@ function read(): Storage {
       const banCutoff = Date.now() - 60 * DAY_MS
       if (n) n.bans = (n.bans || []).filter(b => b.ts > banCutoff)
     }
-    // Ensure both keys exist
-    if (!parsed.numbers.bia) parsed.numbers.bia = { sends: [], bans: [] }
-    if (!parsed.numbers.vinicius) parsed.numbers.vinicius = { sends: [], bans: [] }
-    if (!parsed.active) parsed.active = 'bia'
+    // Ensure both keys exist (also migrates from old 'bia'/'vinicius' keys if present)
+    const anyNums = parsed.numbers as any
+    if (anyNums.bia && !anyNums.wa1) { anyNums.wa1 = anyNums.bia; delete anyNums.bia }
+    if (anyNums.vinicius && !anyNums.wa2) { anyNums.wa2 = anyNums.vinicius; delete anyNums.vinicius }
+    if (!parsed.numbers.wa1) parsed.numbers.wa1 = { sends: [], bans: [] }
+    if (!parsed.numbers.wa2) parsed.numbers.wa2 = { sends: [], bans: [] }
+    if (!parsed.active || (parsed.active as any) === 'bia') parsed.active = 'wa1'
+    if ((parsed.active as any) === 'vinicius') parsed.active = 'wa2'
     return parsed
   } catch {
     return emptyStorage()

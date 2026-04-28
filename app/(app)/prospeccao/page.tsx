@@ -13,7 +13,7 @@ import { useToast } from '@/components/Toast'
 import { displayName, getWhatsAppNumber, buildWhatsAppUrl, COUNTRY_INFO } from '@/lib/lead-utils'
 import { haptic, isSilentMode, setSilentMode } from '@/lib/haptics'
 import { LeadAvatar } from '@/components/LeadAvatar'
-import { recordSend, getRateState, canSend, recordBan, getActiveNumber, setActiveNumber, getAllNumberStates, NUMBERS, RL_HOURLY_WARN, type NumberKey } from '@/lib/wa-rate-limiter'
+import { recordSend, getRateState, canSend, recordBan, setActiveNumber, getAllNumberStates, NUMBER_KEYS, getLabel, setLabel, RL_HOURLY_WARN, type NumberKey } from '@/lib/wa-rate-limiter'
 
 interface Lead {
   id: string
@@ -148,10 +148,10 @@ export default function ProspeccaoPage() {
   const [rateState, setRateState] = useState(() =>
     typeof window !== 'undefined'
       ? getRateState()
-      : { active: 'bia' as NumberKey, cooldownMs: 0, hourCount: 0, dayCount: 0, lastTs: null, adaptiveWarn: 50, lastBan: null, banCount: 0 }
+      : { active: 'wa1' as NumberKey, cooldownMs: 0, hourCount: 0, dayCount: 0, lastTs: null, adaptiveWarn: 50, lastBan: null, banCount: 0 }
   )
   const [allNumberStates, setAllNumberStates] = useState(() =>
-    typeof window !== 'undefined' ? getAllNumberStates() : ({ bia: { dayCount: 0, banCount: 0, lastBanTs: null, cooldownMs: 0 }, vinicius: { dayCount: 0, banCount: 0, lastBanTs: null, cooldownMs: 0 } } as ReturnType<typeof getAllNumberStates>)
+    typeof window !== 'undefined' ? getAllNumberStates() : ({ wa1: { dayCount: 0, banCount: 0, lastBanTs: null, cooldownMs: 0 }, wa2: { dayCount: 0, banCount: 0, lastBanTs: null, cooldownMs: 0 } } as ReturnType<typeof getAllNumberStates>)
   )
 
   const switchNumber = (key: NumberKey) => {
@@ -159,7 +159,17 @@ export default function ProspeccaoPage() {
     setRateState(getRateState())
     setAllNumberStates(getAllNumberStates())
     haptic('tick')
-    toast(`Agora a usar: ${NUMBERS.find(n => n.key === key)?.label}`, 'success')
+    toast(`Agora a usar: ${getLabel(key).label}`, 'success')
+  }
+
+  const renameNumber = (key: NumberKey) => {
+    const current = getLabel(key)
+    const newLabel = window.prompt(`Renomear "${current.label}" para:`, current.label)
+    if (!newLabel || !newLabel.trim()) return
+    setLabel(key, newLabel.trim())
+    setRateState(getRateState())
+    setAllNumberStates(getAllNumberStates())
+    toast('Nome atualizado', 'success')
   }
 
   const handleReportBan = () => {
@@ -1088,23 +1098,25 @@ export default function ProspeccaoPage() {
       {/* Lead card */}
       {!loading && lead && (
         <div className="space-y-4">
-          {/* WhatsApp number selector — counts são separados por número */}
-          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-2 flex items-center gap-1.5">
+          {/* WhatsApp number selector — 2 slots editáveis (default Business/Pessoal) */}
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-2 flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] text-[#52525B] uppercase tracking-wider font-bold pl-1.5">WA:</span>
-            {NUMBERS.map(({ key, label, emoji }) => {
+            {NUMBER_KEYS.map(key => {
               const isActive = rateState.active === key
               const numState = allNumberStates[key]
+              const { label, emoji } = getLabel(key)
               const lastBanHrs = numState.lastBanTs ? Math.round((Date.now() - numState.lastBanTs) / (60 * 60 * 1000)) : null
               return (
                 <button
                   key={key}
                   onClick={() => switchNumber(key)}
+                  onDoubleClick={() => renameNumber(key)}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     isActive
                       ? 'bg-[#8B5CF6]/15 border border-[#8B5CF6]/40 text-[#A78BFA]'
                       : 'border border-[#27272A] text-[#71717A] hover:border-[#52525B]'
                   }`}
-                  title={lastBanHrs !== null ? `Último ban há ${lastBanHrs}h` : `${numState.dayCount} contactos hoje`}
+                  title={`${label} — ${numState.dayCount} hoje${lastBanHrs !== null ? ` · ban há ${lastBanHrs}h` : ''} (duplo-clique para renomear)`}
                 >
                   <span>{emoji}</span>
                   <span>{label}</span>
@@ -1115,6 +1127,13 @@ export default function ProspeccaoPage() {
                 </button>
               )
             })}
+            <button
+              onClick={() => renameNumber(rateState.active)}
+              title="Renomear WhatsApp ativo"
+              className="px-2 py-1.5 rounded-lg text-[10px] text-[#52525B] hover:text-[#A78BFA] hover:bg-[#27272A]/50 transition-all"
+            >
+              Renomear
+            </button>
             <button
               onClick={handleReportBan}
               title="Tomei ban — registar agora"
