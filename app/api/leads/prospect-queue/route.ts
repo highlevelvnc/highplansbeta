@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
 
     const now = new Date()
 
+    // Simple SQL filter — only the basics. Tag/snooze logic done in JS below.
     const where: any = {
       // NEVER contacted — core rule
       messages: { none: {} },
@@ -27,18 +28,6 @@ export async function GET(req: NextRequest) {
       ],
       // Not dead pipeline
       pipelineStatus: { notIn: ['CLOSED', 'LOST'] },
-      // Smart snooze exclusion: only skip if there's an ACTIVE future snooze followup.
-      // Once the snooze date passes, the lead becomes prospectable again automatically.
-      NOT: [
-        {
-          AND: [
-            { tags: { contains: 'snoozed', mode: 'insensitive' } },
-            { followUps: { some: { enviado: false, agendadoPara: { gt: now } } } },
-          ],
-        },
-        // Manually invalidated leads stay out
-        { tags: { contains: 'numero invalido', mode: 'insensitive' } },
-      ],
     }
 
     if (nicho) where.nicho = { contains: nicho, mode: 'insensitive' }
@@ -81,14 +70,33 @@ export async function GET(req: NextRequest) {
         observacaoPerfil: true,
         tags: true,
         _count: { select: { messages: true, followUps: true, proposals: true } },
+        // Include unfired followups so we can detect active snoozes in JS
+        followUps: {
+          where: { enviado: false, agendadoPara: { gt: now } },
+          select: { id: true, agendadoPara: true },
+          take: 1,
+        },
       },
     })
 
-    // Validate WhatsApp number in JS (most reliable)
+    // Validate WhatsApp number + apply tag/snooze filters in JS (more reliable than complex SQL NOT)
     const validLeads = candidates
       .filter(c => {
+        // 1. Must have valid WhatsApp number
         const num = getWhatsAppNumber(c as any)
-        return num && num.length >= 9
+        if (!num || num.length < 9) return false
+
+        // 2. Skip leads marked as invalid
+        const tags = (c.tags || '').toLowerCase()
+        if (tags.includes('numero invalido') || tags.includes('invalid')) return false
+
+        // 3. Skip leads with ACTIVE snooze (followup still in future)
+        // If snooze followup expired, lead becomes available again
+        if (tags.includes('snoozed') && c.followUps && c.followUps.length > 0) {
+          return false
+        }
+
+        return true
       })
       .slice(0, limit)
 
@@ -116,8 +124,11 @@ export async function GET(req: NextRequest) {
     // Total count for progress bar
     const total = await prisma.lead.count({ where })
 
+    // Strip followUps from response (only used for filtering, not needed in UI)
+    const cleanLeads = validLeads.map(({ followUps, ...rest }) => rest)
+
     return NextResponse.json({
-      leads: validLeads,
+      leads: cleanLeads,
       total,
     })
   } catch (err: unknown) {
