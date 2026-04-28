@@ -13,7 +13,7 @@ import { useToast } from '@/components/Toast'
 import { displayName, getWhatsAppNumber, buildWhatsAppUrl, COUNTRY_INFO } from '@/lib/lead-utils'
 import { haptic, isSilentMode, setSilentMode } from '@/lib/haptics'
 import { LeadAvatar } from '@/components/LeadAvatar'
-import { recordSend, getRateState, canSend, RL_HOURLY_HARD, RL_HOURLY_WARN } from '@/lib/wa-rate-limiter'
+import { recordSend, getRateState, canSend, recordBan, getActiveNumber, setActiveNumber, getAllNumberStates, NUMBERS, RL_HOURLY_WARN, type NumberKey } from '@/lib/wa-rate-limiter'
 
 interface Lead {
   id: string
@@ -146,16 +146,40 @@ export default function ProspeccaoPage() {
 
   // Rate limiter state — refreshed every second when cooldown is active
   const [rateState, setRateState] = useState(() =>
-    typeof window !== 'undefined' ? getRateState() : { cooldownMs: 0, hourCount: 0, dayCount: 0, level: 'ok' as const, lastTs: null }
+    typeof window !== 'undefined'
+      ? getRateState()
+      : { active: 'bia' as NumberKey, cooldownMs: 0, hourCount: 0, dayCount: 0, lastTs: null, adaptiveWarn: 50, lastBan: null, banCount: 0 }
   )
+  const [allNumberStates, setAllNumberStates] = useState(() =>
+    typeof window !== 'undefined' ? getAllNumberStates() : ({ bia: { dayCount: 0, banCount: 0, lastBanTs: null, cooldownMs: 0 }, vinicius: { dayCount: 0, banCount: 0, lastBanTs: null, cooldownMs: 0 } } as ReturnType<typeof getAllNumberStates>)
+  )
+
+  const switchNumber = (key: NumberKey) => {
+    setActiveNumber(key)
+    setRateState(getRateState())
+    setAllNumberStates(getAllNumberStates())
+    haptic('tick')
+    toast(`Agora a usar: ${NUMBERS.find(n => n.key === key)?.label}`, 'success')
+  }
+
+  const handleReportBan = () => {
+    if (!confirm('Confirmar que tomaste ban no WhatsApp atual?')) return
+    const { count } = recordBan()
+    haptic('error')
+    toast(`Ban registado aos ${count} contactos. Aviso adaptativo ajustado.`, 'error')
+    setRateState(getRateState())
+    setAllNumberStates(getAllNumberStates())
+  }
   // Tick during cooldown so countdown UI updates smoothly
   useEffect(() => {
-    if (rateState.cooldownMs <= 0 && rateState.level === 'ok') return
-    // Faster tick (500ms) while cooldown active for smoother ring animation
-    const intervalMs = rateState.cooldownMs > 0 ? 500 : 1000
-    const t = setInterval(() => setRateState(getRateState()), intervalMs)
+    if (rateState.cooldownMs <= 0) return
+    const intervalMs = 500
+    const t = setInterval(() => {
+      setRateState(getRateState())
+      setAllNumberStates(getAllNumberStates())
+    }, intervalMs)
     return () => clearInterval(t)
-  }, [rateState.cooldownMs, rateState.level])
+  }, [rateState.cooldownMs])
 
   // Daily goal
   const [dailyGoal, setDailyGoal] = useState(200)
@@ -407,11 +431,13 @@ export default function ProspeccaoPage() {
       recordSend()
       const newRate = getRateState()
       setRateState(newRate)
-      // Trigger end-of-day modal once when crossing 70 (RISCO BAN threshold)
-      if (newRate.dayCount >= 70 && !eodFiredRef.current) {
+      // Trigger end-of-day modal once when crossing adaptive ban threshold
+      if (newRate.dayCount >= newRate.adaptiveWarn && !eodFiredRef.current) {
         eodFiredRef.current = true
         setShowEndOfDay(true)
       }
+      // Also refresh per-number summary
+      setAllNumberStates(getAllNumberStates())
       window.open(url, '_blank')
       await fetch('/api/messages/send', {
         method: 'POST',
@@ -1062,6 +1088,43 @@ export default function ProspeccaoPage() {
       {/* Lead card */}
       {!loading && lead && (
         <div className="space-y-4">
+          {/* WhatsApp number selector — counts são separados por número */}
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-2 flex items-center gap-1.5">
+            <span className="text-[10px] text-[#52525B] uppercase tracking-wider font-bold pl-1.5">WA:</span>
+            {NUMBERS.map(({ key, label, emoji }) => {
+              const isActive = rateState.active === key
+              const numState = allNumberStates[key]
+              const lastBanHrs = numState.lastBanTs ? Math.round((Date.now() - numState.lastBanTs) / (60 * 60 * 1000)) : null
+              return (
+                <button
+                  key={key}
+                  onClick={() => switchNumber(key)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    isActive
+                      ? 'bg-[#8B5CF6]/15 border border-[#8B5CF6]/40 text-[#A78BFA]'
+                      : 'border border-[#27272A] text-[#71717A] hover:border-[#52525B]'
+                  }`}
+                  title={lastBanHrs !== null ? `Último ban há ${lastBanHrs}h` : `${numState.dayCount} contactos hoje`}
+                >
+                  <span>{emoji}</span>
+                  <span>{label}</span>
+                  <span className="text-[10px] tabular-nums opacity-70">{numState.dayCount}</span>
+                  {lastBanHrs !== null && lastBanHrs < 24 && (
+                    <span className="text-[9px] bg-red-500/20 text-red-400 px-1 py-0.5 rounded-full">⛔ {lastBanHrs}h</span>
+                  )}
+                </button>
+              )
+            })}
+            <button
+              onClick={handleReportBan}
+              title="Tomei ban — registar agora"
+              className="ml-auto flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-all"
+            >
+              <Ban className="w-3 h-3" />
+              <span>Tomei ban</span>
+            </button>
+          </div>
+
           {/* Anti-ban + streak panel — important for daily prospecting */}
           <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-3 flex items-center gap-3 text-xs">
             {/* Streak */}
@@ -1090,23 +1153,28 @@ export default function ProspeccaoPage() {
 
             <div className="w-px h-8 bg-[#27272A]" />
 
-            {/* Daily count + ban-risk colour */}
+            {/* Daily count + adaptive ban-risk colour */}
             <div className="flex flex-col leading-tight flex-1 min-w-0">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap">
                 <span className="text-[10px] text-[#52525B] uppercase tracking-wider font-bold">Hoje</span>
-                {rateState.dayCount >= 70 && (
+                {rateState.dayCount >= rateState.adaptiveWarn && (
                   <span className="text-[9px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded-full font-bold">RISCO BAN</span>
                 )}
-                {rateState.dayCount >= 50 && rateState.dayCount < 70 && (
+                {rateState.dayCount >= rateState.adaptiveWarn - 10 && rateState.dayCount < rateState.adaptiveWarn && (
                   <span className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">ATENÇÃO</span>
+                )}
+                {rateState.lastBan && (
+                  <span className="text-[9px] text-[#71717A]" title={`Último ban aos ${rateState.lastBan.count} contactos`}>
+                    · ban prévio: {rateState.lastBan.count}
+                  </span>
                 )}
               </div>
               <span className={`text-sm font-black tabular-nums ${
-                rateState.dayCount >= 70 ? 'text-red-400' :
-                rateState.dayCount >= 50 ? 'text-amber-400' :
+                rateState.dayCount >= rateState.adaptiveWarn ? 'text-red-400' :
+                rateState.dayCount >= rateState.adaptiveWarn - 10 ? 'text-amber-400' :
                 'text-[#F0F0F3]'
               }`}>
-                {rateState.dayCount} <span className="text-[10px] text-[#52525B] font-medium">contactos</span>
+                {rateState.dayCount} <span className="text-[10px] text-[#52525B] font-medium">/ ~{rateState.adaptiveWarn} ban</span>
               </span>
             </div>
 
