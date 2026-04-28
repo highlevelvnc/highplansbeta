@@ -6,11 +6,12 @@ import {
   PhoneIncoming, UserX, Star, Clock, Keyboard, ExternalLink,
   AlertTriangle, Ban, Moon, BarChart3, Sparkles, Copy, Target,
   History, ChevronDown, ChevronUp, Reply, ChevronLeft,
+  Volume2, VolumeX, Hand, TrendingUp,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/components/Toast'
 import { displayName, getWhatsAppNumber, buildWhatsAppUrl, COUNTRY_INFO } from '@/lib/lead-utils'
-import { haptic } from '@/lib/haptics'
+import { haptic, isSilentMode, setSilentMode } from '@/lib/haptics'
 import { LeadAvatar } from '@/components/LeadAvatar'
 import { recordSend, getRateState, canSend, RL_HOURLY_HARD, RL_HOURLY_WARN } from '@/lib/wa-rate-limiter'
 
@@ -113,6 +114,35 @@ export default function ProspeccaoPage() {
 
   // Confetti celebration
   const [showConfetti, setShowConfetti] = useState(false)
+
+  // Silent mode (disables haptics + non-essential animations)
+  const [silent, setSilent] = useState(false)
+  useEffect(() => { setSilent(isSilentMode()) }, [])
+  const toggleSilent = () => {
+    const next = !silent
+    setSilent(next)
+    setSilentMode(next)
+    toast(next ? 'Modo silencioso ON' : 'Modo silencioso OFF', 'info')
+  }
+
+  // End-of-day modal (fired once when crossing 70 contacts threshold)
+  const [showEndOfDay, setShowEndOfDay] = useState(false)
+  const eodFiredRef = useRef(false)
+
+  // Heatmap response hours
+  const [heatmap, setHeatmap] = useState<{ sent: number[]; received: number[]; bestHour: number; bestRate: number; totalSent: number; totalReceived: number } | null>(null)
+  const [showHeatmap, setShowHeatmap] = useState(false)
+  const loadHeatmap = useCallback(async () => {
+    try {
+      const res = await fetch('/api/reports/response-hours')
+      const data = await res.json()
+      setHeatmap(data)
+    } catch {}
+  }, [])
+  const toggleHeatmap = () => {
+    if (!showHeatmap && !heatmap) loadHeatmap()
+    setShowHeatmap(v => !v)
+  }
 
   // Rate limiter state — refreshed every second when cooldown is active
   const [rateState, setRateState] = useState(() =>
@@ -375,7 +405,13 @@ export default function ProspeccaoPage() {
       haptic('medium')
       // Record send for rate limiter BEFORE opening (so rapid-fire is blocked)
       recordSend()
-      setRateState(getRateState())
+      const newRate = getRateState()
+      setRateState(newRate)
+      // Trigger end-of-day modal once when crossing 70 (RISCO BAN threshold)
+      if (newRate.dayCount >= 70 && !eodFiredRef.current) {
+        eodFiredRef.current = true
+        setShowEndOfDay(true)
+      }
       window.open(url, '_blank')
       await fetch('/api/messages/send', {
         method: 'POST',
@@ -396,6 +432,42 @@ export default function ProspeccaoPage() {
       toast(`WA ${useWeb ? 'Web' : ''} aberto · ${displayName(lead)}`, 'success')
       loadNext()
     }
+  }
+
+  // Quick greeting message — 1st of 2-step prospecting flow
+  const handleGreeting = async () => {
+    if (!lead) return
+    const num = getWhatsAppNumber(lead)
+    if (!num) {
+      toast('Número inválido — saltando', 'info')
+      loadNext()
+      return
+    }
+    const rl = canSend()
+    if (!rl.ok) {
+      haptic('warning')
+      toast(rl.reason || 'Aguarda', 'error')
+      return
+    }
+    // Localised greeting based on country
+    const greeting = lead.pais === 'DE'
+      ? 'Hallo, guten Tag! 👋'
+      : lead.pais === 'NL'
+        ? 'Hi, good morning! 👋'
+        : 'Olá, bom dia! 👋'
+    const url = `https://wa.me/${num}?text=${encodeURIComponent(greeting)}`
+    haptic('tick')
+    recordSend()
+    setRateState(getRateState())
+    window.open(url, '_blank')
+    fetch('/api/messages/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId: lead.id, canal: 'WHATSAPP', corpo: greeting }),
+    }).catch(() => {})
+    setSessionStats(s => ({ ...s, waOpened: s.waOpened + 1 }))
+    toast(`Cumprimento enviado · agora envia o script`, 'success')
+    // Don't loadNext — user wants to send script next on same lead
   }
 
   const markInvalid = async () => {
@@ -588,12 +660,31 @@ export default function ProspeccaoPage() {
             <span className="hidden sm:inline">Histórico</span>
           </button>
           <button
+            onClick={toggleHeatmap}
+            title="Heatmap horário de respostas"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${
+              showHeatmap ? 'border-[#F59E0B]/40 text-amber-400 bg-amber-500/8' : 'border-[#27272A] text-[#71717A] hover:border-[#F59E0B]/40 hover:text-[#F0F0F3]'
+            }`}
+          >
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Picos</span>
+          </button>
+          <button
             onClick={() => setShowSession(v => !v)}
             title="Resumo da sessão"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#27272A] text-[#71717A] hover:border-[#8B5CF6]/40 hover:text-[#F0F0F3] text-xs transition-all"
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Sessão</span>
+          </button>
+          <button
+            onClick={toggleSilent}
+            title={silent ? 'Modo silencioso ON (sem haptic)' : 'Ativar modo silencioso'}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${
+              silent ? 'border-[#8B5CF6]/40 text-[#A78BFA] bg-[#8B5CF6]/8' : 'border-[#27272A] text-[#71717A] hover:border-[#8B5CF6]/40 hover:text-[#F0F0F3]'
+            }`}
+          >
+            {silent ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={() => setShowHotkeys(v => !v)}
@@ -812,6 +903,62 @@ export default function ProspeccaoPage() {
               Atualizar lista
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Heatmap panel — best hours to prospect */}
+      {showHeatmap && heatmap && (
+        <div className="mb-4 bg-[#0F0F12] border border-[#F59E0B]/25 rounded-xl p-4 animate-fade-in">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-bold text-[#F0F0F3] uppercase tracking-wider">Melhores horas (últimos 30 dias)</span>
+            </div>
+            <button onClick={() => setShowHeatmap(false)} className="text-[#52525B] hover:text-[#F0F0F3]">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {heatmap.totalSent === 0 ? (
+            <div className="text-xs text-[#52525B] py-4 text-center">Sem dados ainda — começa a contactar para ver os teus padrões</div>
+          ) : (
+            <>
+              {heatmap.bestHour >= 0 && (
+                <div className="text-xs text-[#A1A1AA] mb-3">
+                  Pico de respostas: <span className="text-amber-400 font-bold">{String(heatmap.bestHour).padStart(2, '0')}:00 - {String(heatmap.bestHour + 1).padStart(2, '0')}:00</span>
+                  {' · '}
+                  <span className="text-[#10B981] font-bold">{heatmap.bestRate}% taxa de resposta</span>
+                </div>
+              )}
+              {/* 24h grid */}
+              <div className="grid grid-cols-12 gap-0.5 mb-2">
+                {Array.from({ length: 24 }).map((_, h) => {
+                  const sent = heatmap.sent[h]
+                  const rec = heatmap.received[h]
+                  const rate = sent > 0 ? rec / sent : 0
+                  const intensity = sent > 0 ? Math.min(1, rate * 4) : 0 // amplify
+                  return (
+                    <div
+                      key={h}
+                      title={`${String(h).padStart(2, '0')}:00 — ${sent} enviadas, ${rec} respostas (${sent > 0 ? Math.round(rate * 100) : 0}%)`}
+                      className="aspect-square rounded flex items-center justify-center text-[8px] font-mono"
+                      style={{
+                        background: sent === 0
+                          ? 'rgba(39, 39, 42, 0.4)'
+                          : `rgba(245, 158, 11, ${0.1 + intensity * 0.7})`,
+                        color: intensity > 0.5 ? '#0F0F12' : '#71717A',
+                      }}
+                    >
+                      {h}
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-[#52525B]">
+                <span>{heatmap.totalSent} enviadas · {heatmap.totalReceived} respostas</span>
+                <span>Sem dados → cinza · Mais respostas → amber escuro</span>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1262,14 +1409,25 @@ export default function ProspeccaoPage() {
                   </div>
                   {/* Secondary action: WhatsApp Web */}
                   {hasWA && (
-                    <button
-                      onClick={() => handleWhatsApp(true)}
-                      className="relative w-full flex items-center justify-center gap-2 py-2.5 text-[#25D366]/70 hover:text-[#25D366] hover:bg-[#25D366]/5 border-t border-[#27272A] text-xs font-medium transition-all group"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Abrir no WhatsApp Web (desktop)</span>
-                      <kbd className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">E</kbd>
-                    </button>
+                    <>
+                      {/* Greeting button — for 2-step sequence (Olá first, then script) */}
+                      <button
+                        onClick={handleGreeting}
+                        className="relative w-full flex items-center justify-center gap-2 py-2.5 text-[#25D366]/85 hover:text-[#25D366] hover:bg-[#25D366]/8 border-t border-[#27272A] text-xs font-medium transition-all"
+                        title="Sequência: enviar 'Olá bom dia' primeiro, depois o script"
+                      >
+                        <Hand className="w-3.5 h-3.5" />
+                        <span>1️⃣ Enviar &quot;Olá, bom dia!&quot; primeiro</span>
+                      </button>
+                      <button
+                        onClick={() => handleWhatsApp(true)}
+                        className="relative w-full flex items-center justify-center gap-2 py-2.5 text-[#25D366]/70 hover:text-[#25D366] hover:bg-[#25D366]/5 border-t border-[#27272A] text-xs font-medium transition-all group"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Abrir no WhatsApp Web (desktop)</span>
+                        <kbd className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 bg-[#27272A]/60 border border-[#3F3F46]/40 rounded px-1 py-0 font-mono text-[9px] text-[#52525B] group-hover:text-[#A78BFA] transition-colors">E</kbd>
+                      </button>
+                    </>
                   )}
 
                   {/* Snooze + Mark Invalid actions */}
@@ -1352,6 +1510,58 @@ export default function ProspeccaoPage() {
           <div className="text-center text-xs text-[#52525B]">
             {remaining > 0 ? `${remaining} leads restantes` : 'Último lead'}
             {contactedCount > 0 && ` · ${contactedCount} contactados nesta sessão`}
+          </div>
+        </div>
+      )}
+
+      {/* End-of-day modal — fires once when crossing 70 contacts (RISCO BAN) */}
+      {showEndOfDay && (
+        <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-[80] p-4 animate-overlay-enter" onClick={() => setShowEndOfDay(false)}>
+          <div onClick={e => e.stopPropagation()} className="bg-gradient-to-br from-[#0F0F12] to-[#0A0A0D] border border-amber-500/30 rounded-2xl p-6 w-full max-w-md animate-modal-enter shadow-2xl">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-[#F0F0F3] mb-1">Boa! {rateState.dayCount} contactos hoje 🎯</h3>
+                <p className="text-sm text-[#A1A1AA] leading-relaxed">
+                  Estás na zona de risco de ban (~70+ contactos/dia, número não-business).
+                  Recomendado parar agora ou alternar para o outro WhatsApp.
+                </p>
+              </div>
+            </div>
+            <div className="bg-[#09090B] border border-[#27272A] rounded-xl p-3 mb-4 space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[#71717A]">Esta hora</span>
+                <span className="font-bold text-[#F0F0F3] tabular-nums">{rateState.hourCount}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[#71717A]">Total hoje</span>
+                <span className="font-bold text-amber-400 tabular-nums">{rateState.dayCount}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[#71717A]">Streak atual</span>
+                <span className="font-bold text-[#F0F0F3] tabular-nums">🔥 {streak}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[#71717A]">Meta diária</span>
+                <span className="font-bold text-[#F0F0F3] tabular-nums">{dailyDone} / {dailyGoal}</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowEndOfDay(false)}
+                className="flex-1 py-2.5 rounded-xl bg-[#16161A] border border-[#27272A] text-sm text-[#A1A1AA] hover:text-[#F0F0F3] font-medium transition-colors"
+              >
+                Continuar mesmo assim
+              </button>
+              <button
+                onClick={() => { setShowEndOfDay(false); toast('Tira uma pausa! 💪', 'success') }}
+                className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold transition-colors"
+              >
+                Parar agora
+              </button>
+            </div>
           </div>
         </div>
       )}

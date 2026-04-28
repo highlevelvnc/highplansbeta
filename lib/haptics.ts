@@ -23,9 +23,29 @@ export function haptic(pattern: HapticPattern = 'tick') {
   if (typeof navigator === 'undefined' || !navigator.vibrate) return
   // Respect reduced-motion preference
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  // Respect user's silent mode preference
+  try {
+    if (localStorage.getItem('silent_mode') === '1') return
+  } catch {}
   try {
     navigator.vibrate(PATTERNS[pattern])
   } catch {
     // ignore
   }
+}
+
+export function isSilentMode(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return localStorage.getItem('silent_mode') === '1'
+  } catch {
+    return false
+  }
+}
+
+export function setSilentMode(silent: boolean) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem('silent_mode', silent ? '1' : '0')
+  } catch {}
 }
