@@ -90,7 +90,7 @@ export default function ProspeccaoPage() {
   const lead = queue[currentIdx] || null
   const remaining = Math.max(0, totalRemaining - currentIdx)
   // Daily goal
-  const [dailyGoal, setDailyGoal] = useState(50)
+  const [dailyGoal, setDailyGoal] = useState(200)
   const [dailyDone, setDailyDone] = useState(0)
   const [editingGoal, setEditingGoal] = useState(false)
   // AI message panel
@@ -108,12 +108,12 @@ export default function ProspeccaoPage() {
         const parsed = JSON.parse(stored)
         if (parsed.date === today) {
           setDailyDone(parsed.done || 0)
-          setDailyGoal(parsed.goal || 50)
+          setDailyGoal(parsed.goal || 200)
         } else {
           // New day — reset done, keep goal
-          setDailyGoal(parsed.goal || 50)
+          setDailyGoal(parsed.goal || 200)
           setDailyDone(0)
-          localStorage.setItem('prospeccao_daily', JSON.stringify({ date: today, done: 0, goal: parsed.goal || 50 }))
+          localStorage.setItem('prospeccao_daily', JSON.stringify({ date: today, done: 0, goal: parsed.goal || 200 }))
         }
       } catch {}
     }
@@ -209,6 +209,20 @@ export default function ProspeccaoPage() {
       setCurrentIdx(nextIdx) // will show "Todos contactados" state
     }
   }, [currentIdx, queue, fetchQueue])
+
+  // Go back to previous lead (B key or back button)
+  const loadPrevious = useCallback(() => {
+    if (currentIdx <= 0) {
+      toast('Já estás no primeiro lead', 'info')
+      return
+    }
+    haptic('tick')
+    setShowCallLog(false)
+    setCallNotes('')
+    setShowAiMessage(false)
+    setAiMessage('')
+    setCurrentIdx(idx => Math.max(0, idx - 1))
+  }, [currentIdx, toast])
 
   // Initial load + filter changes
   useEffect(() => {
@@ -411,6 +425,7 @@ export default function ProspeccaoPage() {
         else if (k === 'e') { e.preventDefault(); handleWhatsApp(true) }
         else if (k === 'l') { e.preventDefault(); handleCall() }
         else if (k === 's' || k === 'arrowright' || k === ' ') { e.preventDefault(); skip() }
+        else if (k === 'b' || k === 'arrowleft') { e.preventDefault(); loadPrevious() }
         else if (k === 'i') { e.preventDefault(); markInvalid() }
         else if (k === 'z') { e.preventDefault(); snooze(2) }
         else if (k === 'g') { e.preventDefault(); handleAiGenerate() }
@@ -542,6 +557,7 @@ export default function ProspeccaoPage() {
               { k: 'L', label: 'Ligar' },
               { k: 'G', label: 'Gerar mensagem AI' },
               { k: 'S / →', label: 'Saltar lead' },
+              { k: 'B / ←', label: 'Voltar ao anterior' },
               { k: 'I', label: 'Marcar inválido' },
               { k: 'Z', label: 'Snooze 2 dias' },
               { k: 'H / ?', label: 'Mostrar atalhos' },
@@ -717,9 +733,9 @@ export default function ProspeccaoPage() {
                 type="number"
                 defaultValue={dailyGoal}
                 autoFocus
-                onBlur={e => updateGoal(parseInt(e.target.value, 10) || 50)}
+                onBlur={e => updateGoal(parseInt(e.target.value, 10) || 200)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter') updateGoal(parseInt((e.target as HTMLInputElement).value, 10) || 50)
+                  if (e.key === 'Enter') updateGoal(parseInt((e.target as HTMLInputElement).value, 10) || 200)
                   if (e.key === 'Escape') setEditingGoal(false)
                 }}
                 className="w-14 bg-[#09090B] border border-[#27272A] rounded px-1.5 py-0.5 text-xs text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] tabular-nums"

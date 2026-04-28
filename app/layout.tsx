@@ -1,10 +1,18 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import SessionProvider from '@/components/SessionProvider'
 import './globals.css'
 
 export const metadata: Metadata = {
   title: 'HIGHPLANS — Sistema Operacional Comercial',
   description: 'CRM & Intelligence para agências de marketing',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
+  themeColor: '#09090B',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

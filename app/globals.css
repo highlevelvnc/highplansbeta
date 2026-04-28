@@ -41,19 +41,22 @@ body {
   overflow-x: hidden;
 }
 
-/* Ambient gradient background — adds depth without distraction */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(139, 92, 246, 0.08), transparent 60%),
-    radial-gradient(ellipse 60% 50% at 80% 80%, rgba(139, 92, 246, 0.04), transparent 50%);
-  pointer-events: none;
-  z-index: 0;
+/* Ambient gradient background — desktop only (saves mobile GPU) */
+@media (hover: hover) and (pointer: fine) {
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(139, 92, 246, 0.08), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 80% 80%, rgba(139, 92, 246, 0.04), transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+    will-change: transform;
+  }
 }
 
 main {
@@ -147,11 +150,26 @@ h1, h2, h3, h4 {
 }
 .animate-fade-in { animation: fade-in 0.3s ease-out; }
 
+/* GPU-friendly pulse glow — uses opacity on a pseudo-element instead of box-shadow */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 15px rgba(139, 92, 246, 0.15); }
-  50% { box-shadow: 0 0 25px rgba(139, 92, 246, 0.3); }
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
-.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-pulse-glow {
+  position: relative;
+  isolation: isolate;
+}
+.animate-pulse-glow::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.3), transparent 70%);
+  z-index: -1;
+  animation: pulse-glow 2s ease-in-out infinite;
+  will-change: opacity;
+  pointer-events: none;
+}
 
 /* Shimmer loading (replaces pulse for a premium feel) */
 @keyframes shimmer {

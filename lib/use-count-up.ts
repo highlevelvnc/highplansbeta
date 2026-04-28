@@ -23,13 +23,20 @@ export function useCountUp(target: number, duration = 800): number {
     const from = fromRef.current
     const start = performance.now()
 
+    let lastUpdate = 0
+    const updateInterval = 33 // ~30fps — smooth enough, half the renders
+
     const tick = (now: number) => {
       const elapsed = now - start
       const t = Math.min(1, elapsed / duration)
-      // easeOutCubic — fast start, gentle finish (premium feel)
       const eased = 1 - Math.pow(1 - t, 3)
       const current = from + (target - from) * eased
-      setValue(current)
+
+      // Throttle setState calls — only update if enough time passed
+      if (now - lastUpdate >= updateInterval || t === 1) {
+        setValue(current)
+        lastUpdate = now
+      }
 
       if (t < 1) {
         rafRef.current = requestAnimationFrame(tick)
