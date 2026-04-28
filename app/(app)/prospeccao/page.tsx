@@ -11,6 +11,8 @@ import Link from 'next/link'
 import { useToast } from '@/components/Toast'
 import { displayName, getWhatsAppNumber, buildWhatsAppUrl, COUNTRY_INFO } from '@/lib/lead-utils'
 import { haptic } from '@/lib/haptics'
+import { LeadAvatar } from '@/components/LeadAvatar'
+import { recordSend, getRateState, canSend, RL_HOURLY_HARD, RL_HOURLY_WARN } from '@/lib/wa-rate-limiter'
 
 interface Lead {
   id: string
@@ -105,6 +107,24 @@ export default function ProspeccaoPage() {
   const swipeStartY = useRef<number | null>(null)
   const swipeLocked = useRef<'h' | 'v' | null>(null)
 
+  // Streak: consecutive contacts (resets on skip)
+  const [streak, setStreak] = useState(0)
+  const [bestStreakToday, setBestStreakToday] = useState(0)
+
+  // Confetti celebration
+  const [showConfetti, setShowConfetti] = useState(false)
+
+  // Rate limiter state — refreshed every second when cooldown is active
+  const [rateState, setRateState] = useState(() =>
+    typeof window !== 'undefined' ? getRateState() : { cooldownMs: 0, hourCount: 0, dayCount: 0, level: 'ok' as const, lastTs: null }
+  )
+  // Tick every 1s while cooldown is active so countdown UI updates
+  useEffect(() => {
+    if (rateState.cooldownMs <= 0 && rateState.level === 'ok') return
+    const t = setInterval(() => setRateState(getRateState()), 1000)
+    return () => clearInterval(t)
+  }, [rateState.cooldownMs, rateState.level])
+
   // Daily goal
   const [dailyGoal, setDailyGoal] = useState(200)
   const [dailyDone, setDailyDone] = useState(0)
@@ -145,7 +165,12 @@ export default function ProspeccaoPage() {
       const today = new Date().toDateString()
       localStorage.setItem('prospeccao_daily', JSON.stringify({ date: today, done: next, goal: dailyGoal }))
       // Celebrate milestones
-      if (next === dailyGoal) toast(`🎉 Meta diária atingida! ${next}/${dailyGoal}`, 'success')
+      if (next === dailyGoal) {
+        toast(`🎉 Meta diária atingida! ${next}/${dailyGoal}`, 'success')
+        setShowConfetti(true)
+        setTimeout(() => setShowConfetti(false), 4000)
+        haptic('success')
+      }
       return next
     })
   }, [dailyGoal, toast])
@@ -334,6 +359,13 @@ export default function ProspeccaoPage() {
       loadNext()
       return
     }
+    // Anti-block rate-limit check
+    const rl = canSend()
+    if (!rl.ok) {
+      haptic('warning')
+      toast(rl.reason || 'Aguarda antes de outro envio', 'error')
+      return
+    }
     const messageBody = aiMessage || ''
     const encoded = messageBody ? encodeURIComponent(messageBody) : ''
     const url = useWeb
@@ -341,9 +373,10 @@ export default function ProspeccaoPage() {
       : (messageBody ? `https://wa.me/${num}?text=${encoded}` : buildWhatsAppUrl(lead))
     if (url) {
       haptic('medium')
+      // Record send for rate limiter BEFORE opening (so rapid-fire is blocked)
+      recordSend()
+      setRateState(getRateState())
       window.open(url, '_blank')
-      // AWAIT: registar mensagem no DB ANTES de avançar
-      // Isto garante que o lead não volta a aparecer na queue
       await fetch('/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -352,8 +385,14 @@ export default function ProspeccaoPage() {
       fetch(`/api/leads/${lead.id}/recalc-score`, { method: 'POST' }).catch(() => {})
       setContactedCount(c => c + 1)
       incrementDaily()
+      // Streak: increment + update best
+      setStreak(s => {
+        const next = s + 1
+        setBestStreakToday(b => Math.max(b, next))
+        return next
+      })
       setSessionStats(s => ({ ...s, waOpened: s.waOpened + 1 }))
-      if (showHistory) loadHistory() // refresh history if panel is open
+      if (showHistory) loadHistory()
       toast(`WA ${useWeb ? 'Web' : ''} aberto · ${displayName(lead)}`, 'success')
       loadNext()
     }
@@ -465,6 +504,8 @@ export default function ProspeccaoPage() {
   const skip = () => {
     if (!lead) return
     haptic('tap')
+    // Reset streak on skip
+    setStreak(0)
     setSessionStats(s => ({ ...s, skipped: s.skipped + 1 }))
     loadNext()
   }
@@ -876,6 +917,65 @@ export default function ProspeccaoPage() {
       {/* Lead card */}
       {!loading && lead && (
         <div className="space-y-4">
+          {/* Anti-ban + streak panel — important for daily prospecting */}
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-3 flex items-center gap-3 text-xs">
+            {/* Streak */}
+            <div className="flex items-center gap-1.5">
+              <span className={streak > 0 ? 'animate-flame' : 'opacity-40'} style={{ fontSize: 14 }}>🔥</span>
+              <div className="flex flex-col leading-tight">
+                <span className="text-[10px] text-[#52525B] uppercase tracking-wider font-bold">Streak</span>
+                <span className="text-sm font-black text-[#F0F0F3] tabular-nums">
+                  {streak}
+                  {bestStreakToday > streak && <span className="text-[10px] text-[#52525B] ml-1">/ {bestStreakToday}</span>}
+                </span>
+              </div>
+            </div>
+
+            <div className="w-px h-8 bg-[#27272A]" />
+
+            {/* Hourly pace */}
+            <div className="flex flex-col leading-tight">
+              <span className="text-[10px] text-[#52525B] uppercase tracking-wider font-bold">Esta hora</span>
+              <span className={`text-sm font-black tabular-nums ${
+                rateState.hourCount >= RL_HOURLY_WARN ? 'text-amber-400' : 'text-[#F0F0F3]'
+              }`}>
+                {rateState.hourCount}
+              </span>
+            </div>
+
+            <div className="w-px h-8 bg-[#27272A]" />
+
+            {/* Daily count + ban-risk colour */}
+            <div className="flex flex-col leading-tight flex-1 min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-[#52525B] uppercase tracking-wider font-bold">Hoje</span>
+                {rateState.dayCount >= 70 && (
+                  <span className="text-[9px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded-full font-bold">RISCO BAN</span>
+                )}
+                {rateState.dayCount >= 50 && rateState.dayCount < 70 && (
+                  <span className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">ATENÇÃO</span>
+                )}
+              </div>
+              <span className={`text-sm font-black tabular-nums ${
+                rateState.dayCount >= 70 ? 'text-red-400' :
+                rateState.dayCount >= 50 ? 'text-amber-400' :
+                'text-[#F0F0F3]'
+              }`}>
+                {rateState.dayCount} <span className="text-[10px] text-[#52525B] font-medium">contactos</span>
+              </span>
+            </div>
+
+            {/* Cooldown */}
+            {rateState.cooldownMs > 0 && (
+              <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-[#27272A] animate-cooldown">
+                <Clock className="w-3 h-3 text-[#A78BFA]" />
+                <span className="text-xs font-bold tabular-nums text-[#A78BFA]">
+                  {Math.ceil(rateState.cooldownMs / 1000)}s
+                </span>
+              </div>
+            )}
+          </div>
+
           {/* Position indicator */}
           <div className="flex items-center justify-between text-xs text-[#52525B] tabular-nums px-1">
             <button
@@ -990,13 +1090,15 @@ export default function ProspeccaoPage() {
 
             <div className="p-5">
               {/* Name + badges */}
-              <div className="flex items-start justify-between mb-3">
-                <div>
+              <div className="flex items-start justify-between mb-3 gap-3">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <LeadAvatar nome={lead.nome} empresa={lead.empresa} size={44} />
+                  <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     {lead.pais && COUNTRY_INFO[lead.pais] && (
                       <span className="text-lg">{COUNTRY_INFO[lead.pais].flag}</span>
                     )}
-                    <h2 className="text-xl font-black text-[#F0F0F3] tracking-tight">{leadName}</h2>
+                    <h2 className="text-xl font-black text-[#F0F0F3] tracking-tight truncate">{leadName}</h2>
                   </div>
                   <div className="text-sm text-[#71717A] flex items-center gap-1.5">
                     {lead.nicho && <span>{lead.nicho}</span>}
@@ -1009,8 +1111,9 @@ export default function ProspeccaoPage() {
                     )}
                     {!lead.nicho && !lead.cidade && '—'}
                   </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider border ${
                     lead.score === 'HOT' ? 'bg-red-500/15 text-red-400 border-red-500/30' :
                     lead.score === 'WARM' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' :
@@ -1250,6 +1353,32 @@ export default function ProspeccaoPage() {
             {remaining > 0 ? `${remaining} leads restantes` : 'Último lead'}
             {contactedCount > 0 && ` · ${contactedCount} contactados nesta sessão`}
           </div>
+        </div>
+      )}
+
+      {/* Confetti celebration when daily goal hit */}
+      {showConfetti && (
+        <div className="fixed inset-0 pointer-events-none z-[9999]" aria-hidden>
+          {Array.from({ length: 60 }).map((_, i) => {
+            const colors = ['#8B5CF6', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#EC4899']
+            const left = Math.random() * 100
+            const delay = Math.random() * 1.5
+            const duration = 2.5 + Math.random() * 1.5
+            const color = colors[i % colors.length]
+            return (
+              <div
+                key={i}
+                className="confetti-piece"
+                style={{
+                  left: `${left}%`,
+                  background: color,
+                  animationDelay: `${delay}s`,
+                  animationDuration: `${duration}s`,
+                  transform: `rotate(${Math.random() * 360}deg)`,
+                }}
+              />
+            )
+          })}
         </div>
       )}
 
