@@ -18,6 +18,10 @@ import { RecentlyViewedDropdown } from '@/components/RecentlyViewedDropdown'
 import { PresetBar } from '@/components/PresetBar'
 import { savePreset, type ProspectPreset } from '@/lib/filter-presets'
 import { hasUnseenWhatsNew } from '@/components/WhatsNewModal'
+import { QuickFilterPills } from '@/components/prospect/QuickFilterPills'
+import { DailyGoalProgress } from '@/components/prospect/DailyGoalProgress'
+import { GamifiedHUD } from '@/components/prospect/GamifiedHUD'
+import { FloatingPoints, popPoints } from '@/components/prospect/FloatingPoints'
 import { isPrivacyModeOn, setPrivacyMode } from '@/lib/privacy-mode'
 import { isSoundEnabled, setSoundEnabled, playSound } from '@/lib/sounds'
 
@@ -765,6 +769,7 @@ export default function ProspeccaoPage() {
         setTimeout(() => setShowConfetti(false), 4000)
         haptic('success')
         playSound('milestone')
+        popPoints('🎯 META ATINGIDA!', { color: '#10B981', size: 64, x: 50, y: 25 })
         // Auto-open daily report 5s after confetti — load fetched directly (loadDailyReport is declared later in file)
         setTimeout(() => {
           setShowDailyReport(true)
@@ -839,34 +844,46 @@ export default function ProspeccaoPage() {
     }
   }, [nicho, pais, mobileOnly, cityBlocklist, scoreFilter, noSiteOnly, weakSiteOnly, minScore, subNicho, bookmarkedOnly, smartBatchEnabled])
 
+  // Guard contra race conditions: se um fetch já está em curso, não dispara outro
+  const loadNextInFlightRef = useRef(false)
+
   // Move to next lead in queue (or fetch more if we hit the end)
   const loadNext = useCallback(async () => {
+    // Reset cleanups: estado de UI cross-lead deve ser limpo
     setShowCallLog(false)
     setCallNotes('')
     setShowAiMessage(false)
     setAiMessage('')
+    setInlineEditField(null)  // ⚠️ FIX: estava a manter inline edit do lead anterior
+    setInlineEditValue('')
 
     const nextIdx = currentIdx + 1
 
-    // Still have leads in queue → just advance cursor
+    // Still have leads in queue → just advance cursor (sem fetch)
     if (nextIdx < queue.length) {
       setCurrentIdx(nextIdx)
       return
     }
 
+    // ⚠️ FIX race condition: se já há fetch a decorrer, ignora cliques duplicados
+    if (loadNextInFlightRef.current) return
+    loadNextInFlightRef.current = true
+
     // Need to fetch more — exclude all queue ids so we don't get duplicates
     setLoadingMore(true)
     const excludeIds = queue.map(l => l.id)
-    const { leads: newLeads, total } = await fetchQueue(excludeIds)
-    setLoadingMore(false)
-
-    if (newLeads.length > 0) {
-      setQueue(prev => [...prev, ...newLeads])
-      setCurrentIdx(nextIdx)
-      setTotalRemaining(total + queue.length) // approximation
-    } else {
-      // No more leads
-      setCurrentIdx(nextIdx) // will show "Todos contactados" state
+    try {
+      const { leads: newLeads, total } = await fetchQueue(excludeIds)
+      if (newLeads.length > 0) {
+        setQueue(prev => [...prev, ...newLeads])
+        setCurrentIdx(nextIdx)
+        setTotalRemaining(total + queue.length)
+      } else {
+        setCurrentIdx(nextIdx) // mostra "Todos contactados"
+      }
+    } finally {
+      setLoadingMore(false)
+      loadNextInFlightRef.current = false
     }
   }, [currentIdx, queue, fetchQueue])
 
@@ -1209,12 +1226,27 @@ export default function ProspeccaoPage() {
     setStreak(s => {
       const next = s + 1
       setBestStreakToday(b => Math.max(b, next))
+      // Floating popup base — sempre +1 no envio
+      popPoints('+1', { color: '#10B981', size: 36, x: 50, y: 55 })
       // Milestone celebrations: bigger feedback at 10/25/50/100
-      if (next === 10) { toast('🔥 Streak 10! Estás a aquecer.', 'success'); haptic('success'); playSound('success') }
-      else if (next === 25) { toast('🔥🔥 Streak 25! Em chamas.', 'success'); haptic('success'); playSound('milestone'); setShowConfetti(true); setTimeout(() => setShowConfetti(false), 3000) }
-      else if (next === 50) { toast('🔥🔥🔥 Streak 50! Imparável.', 'success'); haptic('success'); playSound('milestone'); setShowConfetti(true); setTimeout(() => setShowConfetti(false), 4000) }
-      else if (next === 100) { toast('🏆 Streak 100! Lendário.', 'success'); haptic('success'); playSound('milestone'); setShowConfetti(true); setTimeout(() => setShowConfetti(false), 5000) }
-      else { playSound('send') }
+      if (next === 10) {
+        toast('🔥 Streak 10! Estás a aquecer.', 'success'); haptic('success'); playSound('success')
+        popPoints('🔥 STREAK 10!', { color: '#A78BFA', size: 48, x: 50, y: 40 })
+      } else if (next === 25) {
+        toast('🔥🔥 Streak 25! Em chamas.', 'success'); haptic('success'); playSound('milestone')
+        setShowConfetti(true); setTimeout(() => setShowConfetti(false), 3000)
+        popPoints('🔥🔥 EM CHAMAS!', { color: '#F59E0B', size: 56, x: 50, y: 35 })
+      } else if (next === 50) {
+        toast('🔥🔥🔥 Streak 50! Imparável.', 'success'); haptic('success'); playSound('milestone')
+        setShowConfetti(true); setTimeout(() => setShowConfetti(false), 4000)
+        popPoints('🔥🔥🔥 IMPARÁVEL!', { color: '#EF4444', size: 64, x: 50, y: 30 })
+      } else if (next === 100) {
+        toast('🏆 Streak 100! Lendário.', 'success'); haptic('success'); playSound('milestone')
+        setShowConfetti(true); setTimeout(() => setShowConfetti(false), 5000)
+        popPoints('🏆 LENDÁRIO!', { color: '#F59E0B', size: 72, x: 50, y: 30 })
+      } else {
+        playSound('send')
+      }
       return next
     })
     setSessionStats(s => ({ ...s, waOpened: s.waOpened + 1 }))
@@ -2584,55 +2616,19 @@ export default function ProspeccaoPage() {
         </div>
       )}
 
-      {/* Filters */}
-      {/* Daily progress bar */}
-      <div className="mb-4 bg-[#0F0F12] border border-[#27272A] rounded-xl p-3.5">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Target className="w-3.5 h-3.5 text-[#8B5CF6]" />
-            <span className="text-xs font-bold text-[#F0F0F3]">Meta Diária</span>
-            {dailyDone >= dailyGoal && (
-              <span className="text-[10px] bg-[#10B981]/15 text-[#10B981] px-1.5 py-0.5 rounded-full font-bold">✓ ATINGIDA</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-[#F0F0F3] font-bold tabular-nums">{dailyDone}</span>
-            <span className="text-[#52525B]">/</span>
-            {editingGoal ? (
-              <input
-                type="number"
-                defaultValue={dailyGoal}
-                autoFocus
-                onBlur={e => updateGoal(parseInt(e.target.value, 10) || 200)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') updateGoal(parseInt((e.target as HTMLInputElement).value, 10) || 200)
-                  if (e.key === 'Escape') setEditingGoal(false)
-                }}
-                className="w-14 bg-[#09090B] border border-[#27272A] rounded px-1.5 py-0.5 text-xs text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6] tabular-nums"
-              />
-            ) : (
-              <button
-                onClick={() => setEditingGoal(true)}
-                className="text-[#A1A1AA] hover:text-[#F0F0F3] tabular-nums underline decoration-dotted underline-offset-2"
-                title="Clique para alterar"
-              >
-                {dailyGoal}
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="h-1.5 bg-[#27272A] rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${Math.min(100, (dailyDone / dailyGoal) * 100)}%`,
-              background: dailyDone >= dailyGoal
-                ? 'linear-gradient(90deg, #10B981, #34D399)'
-                : 'linear-gradient(90deg, #8B5CF6, #A78BFA)',
-            }}
-          />
-        </div>
-      </div>
+      {/* HUD gamificado — sempre visível, stats grandes */}
+      <GamifiedHUD
+        contactedSession={contactedCount}
+        streak={streak}
+        bestStreakToday={bestStreakToday}
+        dailyDone={dailyDone}
+        dailyGoal={dailyGoal}
+        totalRemaining={totalRemaining}
+      />
+      {/* Daily progress bar (detalhada — complementa o HUD) */}
+      <DailyGoalProgress dailyDone={dailyDone} dailyGoal={dailyGoal} onUpdateGoal={updateGoal} />
+      {/* Floating "+N" popups gamificados */}
+      <FloatingPoints />
 
       <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
         <select
@@ -2681,36 +2677,19 @@ export default function ProspeccaoPage() {
       />
 
       {/* Quick filter pills — one-click toggles for common queries */}
-      <div className="mb-3 flex items-center gap-1.5 flex-wrap">
-        <span className="text-[10px] text-[#52525B] uppercase tracking-wider font-bold mr-0.5">Rápidos:</span>
-        {([
-          { id: 'hot', label: '🔥 Só HOT', active: scoreFilter === 'HOT', toggle: () => setScoreFilter(scoreFilter === 'HOT' ? '' : 'HOT') },
-          { id: 'warm', label: '⭐ HOT+WARM', active: scoreFilter === 'WARM', toggle: () => setScoreFilter(scoreFilter === 'WARM' ? '' : 'WARM') },
-          { id: '95', label: '💎 95+ pts', active: minScore === 95, toggle: () => setMinScore(minScore === 95 ? 0 : 95) },
-          { id: 'nosite', label: '📵 Sem site', active: noSiteOnly, toggle: () => setNoSiteOnly(v => !v) },
-          { id: 'weaksite', label: '📉 Site fraco', active: weakSiteOnly, toggle: () => setWeakSiteOnly(v => !v) },
-          { id: 'bookmark', label: '⭐ Revisitar', active: bookmarkedOnly, toggle: () => setBookmarkedOnly(v => !v) },
-        ]).map(p => (
-          <button
-            key={p.id}
-            onClick={p.toggle}
-            className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
-              p.active
-                ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/45 text-[#A78BFA]'
-                : 'bg-[#0F0F12] border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#A1A1AA]'
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-        <button
-          onClick={() => setShowSearch(true)}
-          className="ml-auto px-2.5 py-1 rounded-full text-[11px] font-bold border bg-[#0F0F12] border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#A1A1AA] transition-all flex items-center gap-1.5"
-          title="Pesquisar na fila atual (⌘K)"
-        >
-          🔍 Pesquisar <kbd className="font-mono text-[9px] text-[#52525B]">⌘K</kbd>
-        </button>
-      </div>
+      <QuickFilterPills
+        scoreFilter={scoreFilter}
+        setScoreFilter={setScoreFilter}
+        minScore={minScore}
+        setMinScore={setMinScore}
+        noSiteOnly={noSiteOnly}
+        setNoSiteOnly={setNoSiteOnly}
+        weakSiteOnly={weakSiteOnly}
+        setWeakSiteOnly={setWeakSiteOnly}
+        bookmarkedOnly={bookmarkedOnly}
+        setBookmarkedOnly={setBookmarkedOnly}
+        onSearchClick={() => setShowSearch(true)}
+      />
 
       {/* Loading */}
       {loading && (

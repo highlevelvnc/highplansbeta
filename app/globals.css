@@ -607,3 +607,32 @@ kbd {
 .privacy-mode [data-privacy="pii"]:hover {
   filter: blur(0);
 }
+
+/* ── Floating points popup (gamificação) ── */
+@keyframes float-up {
+  0%   { transform: translate(-50%, 0) scale(0.6); opacity: 0; }
+  10%  { transform: translate(-50%, -10px) scale(1.2); opacity: 1; }
+  30%  { transform: translate(-50%, -40px) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -120px) scale(0.85); opacity: 0; }
+}
+.animate-float-up {
+  animation: float-up 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* ── Achievement glow pulse ── */
+@keyframes achievement-glow {
+  0%, 100% { box-shadow: 0 0 16px rgba(245, 158, 11, 0.6), 0 0 32px rgba(245, 158, 11, 0.3); }
+  50%      { box-shadow: 0 0 24px rgba(245, 158, 11, 0.9), 0 0 48px rgba(245, 158, 11, 0.5); }
+}
+.animate-achievement {
+  animation: achievement-glow 2s ease-in-out infinite;
+}
+
+/* ── HUD streak rocket effect ── */
+@keyframes hud-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+.animate-hud-pulse {
+  animation: hud-pulse 1.2s ease-in-out infinite;
+}
