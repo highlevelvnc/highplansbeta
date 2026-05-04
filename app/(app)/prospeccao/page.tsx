@@ -1459,7 +1459,7 @@ export default function ProspeccaoPage() {
   const tzHint = lead?.pais ? TIMEZONE_HINTS[lead.pais] : null
 
   return (
-    <div className="p-4 md:p-6 mx-auto max-w-2xl lg:max-w-[1280px]">
+    <div className="p-4 md:p-6 mx-auto max-w-2xl lg:max-w-[1280px] page-fade-in">
       {/* Header */}
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
@@ -3433,7 +3433,7 @@ export default function ProspeccaoPage() {
                     <button
                       onClick={() => handleWhatsApp(false)}
                       disabled={!hasWA}
-                      className={`relative flex flex-col items-center justify-center gap-1.5 text-[#25D366] hover:bg-[#25D366]/8 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed group ${outdoor ? 'py-9' : 'py-5'}`}
+                      className={`relative flex flex-col items-center justify-center gap-1.5 text-[#25D366] hover:bg-[#25D366]/8 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed group btn-ripple ${outdoor ? 'py-9' : 'py-5'}`}
                       title="Abre WA com 'Olá, bom dia!' e copia o script para colares depois"
                     >
                       <MessageCircle className={outdoor ? 'w-10 h-10' : 'w-6 h-6'} />
@@ -3446,7 +3446,7 @@ export default function ProspeccaoPage() {
                     <button
                       onClick={handleCall}
                       disabled={!hasWA}
-                      className={`relative flex flex-col items-center justify-center gap-1.5 text-[#8B5CF6] hover:bg-[#8B5CF6]/8 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed group ${outdoor ? 'py-9' : 'py-5'}`}
+                      className={`relative flex flex-col items-center justify-center gap-1.5 text-[#8B5CF6] hover:bg-[#8B5CF6]/8 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed group btn-ripple ${outdoor ? 'py-9' : 'py-5'}`}
                     >
                       <Phone className={outdoor ? 'w-10 h-10' : 'w-6 h-6'} />
                       <span className={`font-bold ${outdoor ? 'text-base' : 'text-xs'}`}>Ligar</span>
@@ -3457,7 +3457,7 @@ export default function ProspeccaoPage() {
                     <button
                       onClick={(e) => e.shiftKey ? setShowSkipReason(true) : skip()}
                       onContextMenu={(e) => { e.preventDefault(); setShowSkipReason(true) }}
-                      className={`relative flex flex-col items-center justify-center gap-1.5 text-[#71717A] hover:bg-[#16161A] active:scale-95 transition-all group ${outdoor ? 'py-9' : 'py-5'}`}
+                      className={`relative flex flex-col items-center justify-center gap-1.5 text-[#71717A] hover:bg-[#16161A] active:scale-95 transition-all group btn-ripple ${outdoor ? 'py-9' : 'py-5'}`}
                     >
                       <ChevronRight className={outdoor ? 'w-10 h-10' : 'w-6 h-6'} />
                       <span className={`font-bold ${outdoor ? 'text-base' : 'text-xs'}`}>Saltar</span>

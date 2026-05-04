@@ -134,7 +134,7 @@ export default function ClientesPage() {
   )
 
   return (
-    <div className="p-4 md:p-6">
+    <div className="p-4 md:p-6 page-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 gap-3">
         <div>
@@ -180,7 +180,7 @@ export default function ClientesPage() {
 
       {/* KPIs — multi-currency */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 stagger-in hover-lift hover-shimmer">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base">🇵🇹</span>
             <span className="text-xs text-[#71717A]">MRR Euros</span>
@@ -188,7 +188,7 @@ export default function ClientesPage() {
           <div className="text-xl md:text-2xl font-black text-[#F0F0F3]">{formatCurrency(mrrEur, 'EUR')}</div>
           <div className="text-[10px] text-[#10B981] mt-1">{clients.filter(c => (c.moeda || 'EUR') === 'EUR').length} clientes</div>
         </div>
-        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 stagger-in hover-lift hover-shimmer">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base">🇧🇷</span>
             <span className="text-xs text-[#71717A]">MRR Reais</span>
@@ -196,7 +196,7 @@ export default function ClientesPage() {
           <div className="text-xl md:text-2xl font-black text-[#F0F0F3]">{formatCurrency(mrrBrl, 'BRL')}</div>
           <div className="text-[10px] text-[#10B981] mt-1">{clients.filter(c => c.moeda === 'BRL').length} clientes</div>
         </div>
-        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 stagger-in hover-lift hover-shimmer">
           <div className="flex items-center gap-2 mb-2">
             <Users className="w-4 h-4 text-indigo-400" />
             <span className="text-xs text-[#71717A]">Total ativos</span>

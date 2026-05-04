@@ -98,9 +98,9 @@ function KPICard({ label, value, sub, icon: Icon, color = '#8B5CF6', alert = fal
     : value
   const inner = (
     <div
-      className={`relative overflow-hidden bg-gradient-to-br from-[#0F0F12] to-[#0A0A0D] border rounded-2xl p-4 h-full transition-all duration-300 group card-hover
+      className={`relative overflow-hidden bg-gradient-to-br from-[#0F0F12] to-[#0A0A0D] border rounded-2xl p-4 h-full transition-all duration-300 group card-hover stagger-in hover-lift hover-shimmer
         ${alert ? 'border-red-500/40 hover:border-red-500/60' : 'border-[#27272A]'}
-        ${href ? 'cursor-pointer' : ''}`}
+        ${href ? 'cursor-pointer press-scale' : ''}`}
     >
       {/* Top gradient accent line */}
       <div
@@ -349,7 +349,7 @@ export default function DashboardPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl space-y-5">
+    <div className="p-4 md:p-6 max-w-7xl space-y-5 page-fade-in">
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between">

@@ -115,7 +115,7 @@ export default function FinanceiroPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl">
+    <div className="p-4 md:p-6 max-w-6xl page-fade-in">
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">
@@ -156,7 +156,7 @@ export default function FinanceiroPage() {
       {summary && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           {/* Recebido este mês */}
-          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 stagger-in hover-lift hover-shimmer">
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="w-4 h-4 text-[#10B981]" />
               <span className="text-[10px] uppercase tracking-wider text-[#71717A] font-bold">Este mês</span>
@@ -168,7 +168,7 @@ export default function FinanceiroPage() {
           </div>
 
           {/* Recebido este ano */}
-          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 stagger-in hover-lift hover-shimmer">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-4 h-4 text-[#3B82F6]" />
               <span className="text-[10px] uppercase tracking-wider text-[#71717A] font-bold">Este ano</span>
@@ -180,7 +180,7 @@ export default function FinanceiroPage() {
           </div>
 
           {/* MRR projetado */}
-          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 stagger-in hover-lift hover-shimmer">
             <div className="flex items-center gap-2 mb-2">
               <Euro className="w-4 h-4 text-[#8B5CF6]" />
               <span className="text-[10px] uppercase tracking-wider text-[#71717A] font-bold">MRR projetado</span>
