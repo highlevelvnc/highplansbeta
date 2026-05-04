@@ -12,30 +12,36 @@ export async function GET(req: NextRequest) {
     const agentId = searchParams.get('agentId') ?? ''
     const semAgente = searchParams.get('semAgente') === '1'
     const comWhatsapp = searchParams.get('comWhatsapp') === '1'
+    const ids = (searchParams.get('ids') || '').split(',').filter(Boolean)
 
     const where: any = {}
 
-    if (search) {
-      where.OR = [
-        { nome: { contains: search, mode: 'insensitive' } },
-        { empresa: { contains: search, mode: 'insensitive' } },
-        { cidade: { contains: search, mode: 'insensitive' } },
-        { nicho: { contains: search, mode: 'insensitive' } },
-      ]
-    }
-    if (score) where.score = score
-    if (nicho) where.nicho = { contains: nicho, mode: 'insensitive' }
-    if (pais) where.pais = pais
-    if (semAgente) where.agentId = null
-    else if (agentId) where.agentId = agentId
-    if (comWhatsapp) {
-      where.AND = [
-        ...(where.AND || []),
-        { OR: [
-          { AND: [{ whatsapp: { not: null } }, { whatsapp: { not: '' } }] },
-          { AND: [{ telefone: { not: null } }, { telefone: { not: '' } }] },
-        ] },
-      ]
+    // ids takes priority — if provided, ignore other filters and just export those
+    if (ids.length > 0) {
+      where.id = { in: ids }
+    } else {
+      if (search) {
+        where.OR = [
+          { nome: { contains: search, mode: 'insensitive' } },
+          { empresa: { contains: search, mode: 'insensitive' } },
+          { cidade: { contains: search, mode: 'insensitive' } },
+          { nicho: { contains: search, mode: 'insensitive' } },
+        ]
+      }
+      if (score) where.score = score
+      if (nicho) where.nicho = { contains: nicho, mode: 'insensitive' }
+      if (pais) where.pais = pais
+      if (semAgente) where.agentId = null
+      else if (agentId) where.agentId = agentId
+      if (comWhatsapp) {
+        where.AND = [
+          ...(where.AND || []),
+          { OR: [
+            { AND: [{ whatsapp: { not: null } }, { whatsapp: { not: '' } }] },
+            { AND: [{ telefone: { not: null } }, { telefone: { not: '' } }] },
+          ] },
+        ]
+      }
     }
 
     const leads = await prisma.lead.findMany({

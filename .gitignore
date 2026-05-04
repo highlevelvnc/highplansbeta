@@ -59,3 +59,11 @@ prisma/highplans.db*
 .vscode/
 *.swp
 *.swo
+
+# Lead import data (contém PII — não comitar)
+prisma/migrations/LEADS_*.csv
+prisma/migrations/*_PT.csv
+prisma/migrations/*_BR.csv
+
+# Scripts diagnóstico ad-hoc
+scripts/check-db.ts

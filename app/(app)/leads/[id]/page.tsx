@@ -9,6 +9,8 @@ import { getWhatsAppNumber, buildWhatsAppUrl } from '@/lib/lead-utils'
 import { WhatsAppModal } from '@/components/WhatsAppModal'
 import { QuickFollowUpModal } from '@/components/QuickFollowUpModal'
 import { QuickProposalModal } from '@/components/QuickProposalModal'
+import { LeadEnrichment } from '@/components/LeadEnrichment'
+import { trackLeadView } from '@/lib/recently-viewed'
 
 const PIPELINE_STAGES = ['NEW','CONTACTED','INTERESTED','PROPOSAL_SENT','NEGOTIATION','CLOSED','LOST']
 const PIPELINE_LABELS: Record<string,string> = { NEW:'Novo', CONTACTED:'Contactado', INTERESTED:'Interessado', PROPOSAL_SENT:'Proposta Enviada', NEGOTIATION:'Negociação', CLOSED:'Fechado', LOST:'Perdido' }
@@ -68,7 +70,10 @@ export default function LeadDetailPage() {
     try {
       const res = await fetch(`/api/leads/${id}`)
       if (!res.ok) throw new Error()
-      setLead(await res.json())
+      const data = await res.json()
+      setLead(data)
+      // Track view in localStorage so the Recentes dropdown picks it up
+      trackLeadView({ id: data.id, nome: data.nome, empresa: data.empresa, cidade: data.cidade, score: data.score })
     } catch {
       toast('Erro ao carregar lead', 'error')
     }
@@ -236,6 +241,80 @@ export default function LeadDetailPage() {
           ))}
         </div>
       </div>
+
+      {/* Prospecting status row — sub-nicho, bookmark, skip stats, active follow-ups */}
+      {(lead.subNicho || lead.skipCount > 0 || (lead.tags || '').includes('revisitar') || (lead.followUps && lead.followUps.length > 0)) && (
+        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-3 mb-4 flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] uppercase tracking-wider font-bold text-[#52525B] mr-1">Prospecção:</span>
+          {lead.subNicho && (
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold border ${
+              lead.subNicho === 'Não Construção'
+                ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
+            }`}>
+              {lead.subNicho}
+            </span>
+          )}
+          <button
+            onClick={async () => {
+              const isBookmarked = (lead.tags || '').includes('revisitar')
+              await fetch(`/api/leads/${lead.id}/bookmark`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: !isBookmarked }),
+              })
+              const newTags = isBookmarked
+                ? (lead.tags || '').split(',').map((t: string) => t.trim()).filter((t: string) => t && t !== 'revisitar').join(',')
+                : ((lead.tags || '').split(',').map((t: string) => t.trim()).filter(Boolean).concat('revisitar')).join(',')
+              setLead({ ...lead, tags: newTags })
+              toast(isBookmarked ? 'Removido de Revisitar' : '⭐ Adicionado a Revisitar', 'success')
+            }}
+            className={`text-[11px] px-2 py-0.5 rounded-full font-bold border transition-all ${
+              (lead.tags || '').includes('revisitar')
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                : 'border-[#27272A] text-[#52525B] hover:border-amber-500/40 hover:text-amber-400'
+            }`}
+          >
+            {(lead.tags || '').includes('revisitar') ? '⭐ Revisitar' : '☆ Bookmark'}
+          </button>
+          {lead.skipCount > 0 && (
+            <span
+              className="text-[11px] px-2 py-0.5 rounded-full font-bold border bg-amber-500/10 border-amber-500/30 text-amber-400"
+              title={lead.lastSkippedAt ? `Último skip: ${new Date(lead.lastSkippedAt).toLocaleDateString('pt-PT')}${lead.lastSkipReason ? ` (${lead.lastSkipReason})` : ''}` : ''}
+            >
+              Saltado {lead.skipCount}× {lead.lastSkipReason && `· ${lead.lastSkipReason}`}
+            </span>
+          )}
+          {lead.followUps && lead.followUps.filter((f: any) => !f.enviado && new Date(f.agendadoPara) > new Date()).length > 0 && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full font-bold border bg-[#10B981]/10 border-[#10B981]/30 text-[#10B981]">
+              📅 {lead.followUps.filter((f: any) => !f.enviado && new Date(f.agendadoPara) > new Date()).length} pendente(s)
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Voice notes — extracted from observacaoPerfil for prominence */}
+      {lead.observacaoPerfil && lead.observacaoPerfil.includes('🎙️') && (
+        <div className="bg-amber-500/5 border border-amber-500/25 rounded-xl p-3 mb-4">
+          <div className="text-[10px] uppercase tracking-wider font-bold text-amber-400 mb-2 flex items-center gap-1.5">
+            <span>🎙️</span> Notas de voz
+          </div>
+          <div className="space-y-1.5">
+            {lead.observacaoPerfil
+              .split('\n')
+              .filter((line: string) => line.includes('🎙️'))
+              .map((line: string, i: number) => (
+                <div key={i} className="text-xs text-[#F0F0F3] leading-snug">
+                  {line.replace('🎙️', '').trim()}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+
+      {/* Lead enrichment — fetch site favicon/og-meta/IG handle */}
+      <LeadEnrichment empresa={lead.empresa || lead.nome} cidade={lead.cidade} />
 
       {/* Tabs: Info / Mensagens */}
       <div className="flex gap-1 mb-4 bg-[#0F0F12] border border-[#27272A] rounded-lg p-1 w-fit">

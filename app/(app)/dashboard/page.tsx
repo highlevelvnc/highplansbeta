@@ -11,6 +11,7 @@ import {
 } from 'recharts'
 import Link from 'next/link'
 import { useCountUp } from '@/lib/use-count-up'
+import { ProspectFunnelWidget } from '@/components/ProspectFunnelWidget'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -404,6 +405,9 @@ export default function DashboardPage() {
           )}
         </div>
       )}
+
+      {/* ── Today's prospect funnel ── */}
+      <ProspectFunnelWidget />
 
       {/* ── KPI Row 1 — Revenue ── */}
       <div>

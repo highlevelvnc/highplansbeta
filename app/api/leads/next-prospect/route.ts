@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getWhatsAppNumber } from '@/lib/lead-utils'
+import { getWhatsAppNumber, isPtLandline } from '@/lib/lead-utils'
 
 // Returns the next best lead to prospect based on filters
 export async function GET(req: NextRequest) {
@@ -10,6 +10,15 @@ export async function GET(req: NextRequest) {
     const pais = searchParams.get('pais') ?? ''
     const agentId = searchParams.get('agentId') ?? ''
     const skipId = searchParams.get('skipId') ?? ''
+    const mobileOnly = searchParams.get('mobileOnly') === '1'
+    const excludeCities = (searchParams.get('excludeCities') ?? '')
+      .split(',').map(s => s.trim()).filter(Boolean)
+    const scoreFilter = searchParams.get('score') ?? ''
+    const noSiteOnly = searchParams.get('noSiteOnly') === '1'
+    const weakSiteOnly = searchParams.get('weakSiteOnly') === '1'
+    const minScore = parseInt(searchParams.get('minScore') ?? '0', 10) || 0
+    const subNicho = searchParams.get('subNicho') ?? ''
+    const bookmarkedOnly = searchParams.get('bookmarkedOnly') === '1'
 
     // Build base where: just leads that have ANY phone field and aren't in dead pipeline stages
     const baseWhere: any = {
@@ -25,6 +34,13 @@ export async function GET(req: NextRequest) {
     if (nicho) baseWhere.nicho = { contains: nicho, mode: 'insensitive' }
     if (pais) baseWhere.pais = pais
     if (agentId) baseWhere.agentId = agentId
+    if (excludeCities.length > 0) baseWhere.cidade = { notIn: excludeCities }
+    if (scoreFilter) baseWhere.score = scoreFilter
+    if (noSiteOnly) baseWhere.temSite = false
+    if (weakSiteOnly) baseWhere.siteFraco = true
+    if (minScore > 0) baseWhere.opportunityScore = { gte: minScore }
+    if (subNicho) baseWhere.subNicho = subNicho
+    if (bookmarkedOnly) baseWhere.tags = { contains: 'revisitar' }
 
     // Strict where: never contacted + not tagged as invalid/snoozed
     const strictWhere: any = {
@@ -39,10 +55,12 @@ export async function GET(req: NextRequest) {
       strictWhere.NOT = [...strictWhere.NOT, { id: skipId }]
     }
 
-    // Try strict first, then fall back to base if nothing found
+    // Order: never-skipped first (skipCount asc), then by opportunity score, oldest first.
+    // This pushes skipped leads to the END of the queue across sessions.
     const fetchCandidates = async (whereClause: any) => prisma.lead.findMany({
       where: whereClause,
       orderBy: [
+        { skipCount: 'asc' },
         { opportunityScore: 'desc' },
         { createdAt: 'asc' },
       ],
@@ -71,6 +89,9 @@ export async function GET(req: NextRequest) {
         anunciosAtivos: true,
         observacaoPerfil: true,
         tags: true,
+        skipCount: true,
+        lastSkippedAt: true,
+        subNicho: true,
         _count: { select: { messages: true, followUps: true, proposals: true } },
       },
     })
@@ -82,7 +103,9 @@ export async function GET(req: NextRequest) {
     // Helper to find first valid lead
     const findValidLead = (list: any[]) => list.find(c => {
       const num = getWhatsAppNumber(c)
-      return num && num.length >= 9
+      if (!num || num.length < 9) return false
+      if (mobileOnly && isPtLandline(c)) return false
+      return true
     })
 
     let lead = findValidLead(candidates)

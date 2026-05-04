@@ -6,6 +6,15 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'HIGHPLANS — Sistema Operacional Comercial',
   description: 'CRM & Intelligence para agências de marketing',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'HIGHPLANS',
+  },
+  formatDetection: {
+    telephone: false,
+  },
 }
 
 export const viewport: Viewport = {

@@ -86,11 +86,36 @@ export const updateProposalSchema = createProposalSchema.partial()
 export const createClientSchema = z.object({
   nome: z.string().min(2, 'Nome é obrigatório'),
   empresa: z.string().nullish(),
+  nif: z.string().nullish(),
   nicho: z.string().nullish(),
+  cidade: z.string().nullish(),
+  morada: z.string().nullish(),
+  pais: z.string().default('PT'),
+  moeda: z.enum(['EUR', 'BRL']).default('EUR'),
   telefone: z.string().nullish(),
+  whatsapp: z.string().nullish(),
   email: z.string().email('Email inválido').nullish().or(z.literal('')),
   planoAtual: z.string().nullish(),
+  planoInicio: z.string().or(z.date()).nullish(),
+  mrr: z.number().nonnegative().default(0),
+  diaCobranca: z.number().int().min(1).max(28).nullish(),
   status: z.enum(['ACTIVE', 'PAUSED', 'CHURNED']).default('ACTIVE'),
+  observacoes: z.string().nullish(),
+}).passthrough()
+
+// ─── Payment ─────────────────────────────────────────────────────────────────
+export const createPaymentSchema = z.object({
+  clientId: z.string().min(1, 'clientId é obrigatório'),
+  valor: z.number().positive('Valor tem de ser positivo'),
+  moeda: z.enum(['EUR', 'BRL']).default('EUR'),
+  metodo: z.enum(['MULTIBANCO', 'TRANSFERENCIA', 'MBWAY', 'NUMERARIO', 'STRIPE', 'PIX', 'BOLETO', 'OUTRO']).default('TRANSFERENCIA'),
+  referencia: z.string().nullish(),
+  status: z.enum(['PENDING', 'PAID', 'OVERDUE', 'CANCELLED']).default('PAID'),
+  dataPrevista: z.string().or(z.date()).nullish(),
+  dataPaga: z.string().or(z.date()).nullish(),
+  periodoRef: z.string().nullish(),
+  fatura: z.string().nullish(),
+  notas: z.string().nullish(),
 }).passthrough()
 
 // ─── Message Template ────────────────────────────────────────────────────────

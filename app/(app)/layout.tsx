@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, LogOut, Menu, X, Bell, BarChart3, Copy, Crosshair, Inbox } from 'lucide-react'
+import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, LogOut, Menu, X, Bell, BarChart3, Copy, Crosshair, Inbox, Tag, Activity, Euro } from 'lucide-react'
 import { ToastProvider } from '@/components/Toast'
 import { BottomNavBar } from '@/components/BottomNavBar'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
+import { applySavedPrivacyMode } from '@/lib/privacy-mode'
 
 const nav = [
   { section: 'OPERACIONAL' },
@@ -18,12 +20,15 @@ const nav = [
   { href: '/contactos', label: 'Contactos', icon: MessageCircle },
   { section: 'CLIENTES' },
   { href: '/clientes', label: 'Clientes', icon: UserCheck },
+  { href: '/financeiro', label: 'Financeiro', icon: Euro },
   { href: '/followups', label: 'Follow-ups', icon: Calendar },
   { href: '/propostas', label: 'Propostas', icon: FileText },
   { href: '/tarefas', label: 'Tarefas', icon: CheckSquare },
   { section: 'ANÁLISE' },
   { href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
+  { href: '/atividade', label: 'Atividade', icon: Activity },
   { href: '/duplicados', label: 'Duplicados', icon: Copy },
+  { href: '/tags', label: 'Tags', icon: Tag },
   { section: 'ESTRATÉGIA' },
   { href: '/nichos', label: 'Nichos', icon: TrendingUp },
   { href: '/objecoes', label: 'Objeções', icon: Zap },
@@ -45,6 +50,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       .then(d => { if (d?.followUpsAtrasados > 0) setOverdueFU(d.followUpsAtrasados) })
       .catch(() => {})
   }, [pathname])
+
+  // Register Service Worker globally (handles callback notifications across all pages)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {})
+  }, [])
+
+  // Apply privacy-mode state from localStorage (blurs PII when on)
+  useEffect(() => { applySavedPrivacyMode() }, [])
 
   // Browser push notifications for overdue follow-ups
   useEffect(() => {
@@ -207,6 +221,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           )}
           {children}
+          {/* PWA install prompt (shows non-intrusively when applicable) */}
+          <PWAInstallPrompt />
           {/* Global bottom nav — hidden on lead detail pages (they have their own bar) */}
           {!isLeadDetailPage && <BottomNavBar />}
         </ToastProvider>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getWhatsAppNumber } from '@/lib/lead-utils'
+import { getWhatsAppNumber, isPtLandline } from '@/lib/lead-utils'
 
 // Returns a batch of leads ready for prospecting (with valid WhatsApp numbers)
 // CORE RULE: only returns leads with ZERO messages (never contacted before)
@@ -12,6 +12,18 @@ export async function GET(req: NextRequest) {
     const agentId = searchParams.get('agentId') ?? ''
     const limit = parseInt(searchParams.get('limit') ?? '100', 10)
     const excludeIds = (searchParams.get('exclude') ?? '').split(',').filter(Boolean)
+    const mobileOnly = searchParams.get('mobileOnly') === '1'
+    const excludeCities = (searchParams.get('excludeCities') ?? '')
+      .split(',').map(s => s.trim()).filter(Boolean)
+    const scoreFilter = searchParams.get('score') ?? ''   // 'HOT' | 'WARM' | 'COLD'
+    const noSiteOnly = searchParams.get('noSiteOnly') === '1'
+    const weakSiteOnly = searchParams.get('weakSiteOnly') === '1'
+    const minScore = parseInt(searchParams.get('minScore') ?? '0', 10) || 0
+    const subNicho = searchParams.get('subNicho') ?? ''
+    const bookmarkedOnly = searchParams.get('bookmarkedOnly') === '1'
+    // Smart batching hints: bias the queue toward leads matching last-sent context
+    const preferCity = searchParams.get('preferCity') ?? ''
+    const preferSubNicho = searchParams.get('preferSubNicho') ?? ''
 
     const now = new Date()
 
@@ -36,11 +48,43 @@ export async function GET(req: NextRequest) {
     if (excludeIds.length > 0) {
       where.id = { notIn: excludeIds }
     }
+    if (excludeCities.length > 0) {
+      where.cidade = { notIn: excludeCities }
+    }
+    if (scoreFilter) where.score = scoreFilter
+    if (noSiteOnly) where.temSite = false
+    if (weakSiteOnly) where.siteFraco = true
+    if (minScore > 0) where.opportunityScore = { gte: minScore }
+    if (subNicho) where.subNicho = subNicho
+    if (bookmarkedOnly) where.tags = { contains: 'revisitar' }
 
-    // Fetch 3x limit to account for phone validation filtering in JS
+    // First, fetch PINNED leads (override messages: none rule — pinned can be re-shown)
+    const pinnedWhere: any = { tags: { contains: 'pinned' }, pipelineStatus: { notIn: ['CLOSED', 'LOST'] } }
+    if (nicho) pinnedWhere.nicho = where.nicho
+    if (pais) pinnedWhere.pais = where.pais
+    if (agentId) pinnedWhere.agentId = where.agentId
+    const pinnedLeads = await prisma.lead.findMany({
+      where: pinnedWhere,
+      take: 20,
+      select: {
+        id: true, nome: true, empresa: true, nicho: true, cidade: true, pais: true,
+        telefone: true, whatsapp: true, telefoneRaw: true, whatsappRaw: true, email: true,
+        opportunityScore: true, score: true, pipelineStatus: true, agentId: true,
+        agent: { select: { id: true, nome: true } },
+        temSite: true, siteFraco: true, instagramAtivo: true, gmbOtimizado: true, anunciosAtivos: true,
+        observacaoPerfil: true, tags: true, skipCount: true, lastSkippedAt: true, subNicho: true,
+        _count: { select: { messages: true, followUps: true, proposals: true } },
+        followUps: { where: { enviado: false, agendadoPara: { gt: now } }, select: { id: true, agendadoPara: true }, take: 1 },
+      },
+    })
+
+    // Fetch 3x limit to account for phone validation filtering in JS.
+    // Order: never-skipped first (skipCount asc), then by score, oldest first.
+    // This pushes previously-skipped leads to the END of the queue across sessions.
     const candidates = await prisma.lead.findMany({
       where,
       orderBy: [
+        { skipCount: 'asc' },
         { opportunityScore: 'desc' },
         { createdAt: 'asc' },
       ],
@@ -69,6 +113,9 @@ export async function GET(req: NextRequest) {
         anunciosAtivos: true,
         observacaoPerfil: true,
         tags: true,
+        skipCount: true,
+        lastSkippedAt: true,
+        subNicho: true,
         _count: { select: { messages: true, followUps: true, proposals: true } },
         // Include unfired followups so we can detect active snoozes in JS
         followUps: {
@@ -80,7 +127,7 @@ export async function GET(req: NextRequest) {
     })
 
     // Validate WhatsApp number + apply tag/snooze filters in JS (more reliable than complex SQL NOT)
-    const validLeads = candidates
+    let validLeads = candidates
       .filter(c => {
         // 1. Must have valid WhatsApp number
         const num = getWhatsAppNumber(c as any)
@@ -91,14 +138,38 @@ export async function GET(req: NextRequest) {
         if (tags.includes('numero invalido') || tags.includes('invalid')) return false
 
         // 3. Skip leads with ACTIVE snooze (followup still in future)
-        // If snooze followup expired, lead becomes available again
         if (tags.includes('snoozed') && c.followUps && c.followUps.length > 0) {
           return false
         }
 
+        // 4. Mobile-only filter: drop PT landlines
+        if (mobileOnly && isPtLandline(c as any)) return false
+
         return true
       })
-      .slice(0, limit)
+
+    // Smart batching: bring matching leads to the front (city/subnicho preference)
+    // Doesn't filter — just stable-sorts so similar leads are batched first
+    if (preferCity || preferSubNicho) {
+      validLeads = validLeads.sort((a, b) => {
+        const aMatch = (preferCity && a.cidade === preferCity ? 2 : 0) + (preferSubNicho && a.subNicho === preferSubNicho ? 1 : 0)
+        const bMatch = (preferCity && b.cidade === preferCity ? 2 : 0) + (preferSubNicho && b.subNicho === preferSubNicho ? 1 : 0)
+        return bMatch - aMatch
+      })
+    }
+
+    // Prepend pinned leads (deduped by id) — they always show first
+    if (pinnedLeads.length > 0) {
+      const pinnedValid = pinnedLeads.filter(p => {
+        const num = getWhatsAppNumber(p as any)
+        return num && num.length >= 9 && !excludeIds.includes(p.id)
+      })
+      const validIds = new Set(validLeads.map(l => l.id))
+      const newPinned = pinnedValid.filter(p => !validIds.has(p.id))
+      validLeads = [...newPinned, ...validLeads]
+    }
+
+    validLeads = validLeads.slice(0, limit)
 
     // Auto-cleanup: remove "snoozed" tag from leads whose snooze expired (so they
     // show clean in the UI). Fire-and-forget — doesn't block the response.

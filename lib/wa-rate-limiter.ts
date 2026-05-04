@@ -42,6 +42,7 @@ type NumberData = {
 type Storage = {
   active: NumberKey
   numbers: Record<NumberKey, NumberData>
+  spreadMode?: boolean   // auto-alternate between slots after each send
 }
 
 function emptyStorage(): Storage {
@@ -51,6 +52,7 @@ function emptyStorage(): Storage {
       wa1: { sends: [], bans: [] },
       wa2: { sends: [], bans: [] },
     },
+    spreadMode: false,
   }
 }
 
@@ -178,6 +180,32 @@ export function getRateState(): RateState {
 export function recordSend() {
   const s = read()
   s.numbers[s.active].sends.push(Date.now())
+  write(s)
+}
+
+/**
+ * Record send AND, if spread-mode is on, switch to the other slot
+ * so the NEXT send goes through the alternate number. Returns the
+ * (possibly-updated) active key after rotation.
+ */
+export function recordSendAndMaybeSpread(): { active: NumberKey; spread: boolean } {
+  const s = read()
+  s.numbers[s.active].sends.push(Date.now())
+  if (s.spreadMode) {
+    // alternate: wa1 → wa2 → wa1
+    s.active = s.active === 'wa1' ? 'wa2' : 'wa1'
+  }
+  write(s)
+  return { active: s.active, spread: !!s.spreadMode }
+}
+
+export function getSpreadMode(): boolean {
+  return !!read().spreadMode
+}
+
+export function setSpreadMode(on: boolean) {
+  const s = read()
+  s.spreadMode = on
   write(s)
 }
 

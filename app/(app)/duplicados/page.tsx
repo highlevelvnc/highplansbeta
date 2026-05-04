@@ -14,14 +14,14 @@ interface DupeLead {
 }
 
 interface DupeGroup {
-  type: 'phone' | 'email'
+  type: 'phone' | 'email' | 'empresa'
   key: string
   count: number
   leads: DupeLead[]
 }
 
 interface DupeData {
-  summary: { phoneGroups: number; emailGroups: number; totalDuplicateLeads: number }
+  summary: { phoneGroups: number; empresaGroups?: number; emailGroups: number; totalDuplicateLeads: number; mode?: string; scanned?: number }
   duplicates: DupeGroup[]
 }
 
@@ -93,18 +93,34 @@ export default function DuplicadosPage() {
   return (
     <div className="p-4 md:p-6 max-w-4xl space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">
-          <span className="gradient-text">Duplicados</span>
-        </h1>
-        <p className="text-sm text-[#71717A] mt-1">Leads com telefone ou email duplicado</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">
+            <span className="gradient-text">Duplicados</span>
+          </h1>
+          <p className="text-sm text-[#71717A] mt-1">
+            Detecção fuzzy: normaliza telefones (últimos 9 dígitos) + empresa+cidade
+            {data.summary.scanned && ` · ${data.summary.scanned.toLocaleString('pt-PT')} leads analisados`}
+          </p>
+        </div>
+        <button
+          onClick={load}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#27272A] text-[#71717A] hover:border-[#8B5CF6]/40 hover:text-[#F0F0F3] text-xs transition-all"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          Re-scan
+        </button>
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 text-center gradient-border-top">
           <div className="text-2xl font-black text-[#F0F0F3] tabular-nums">{data.summary.phoneGroups}</div>
           <div className="text-[10px] text-[#52525B] mt-1">Grupos telefone</div>
+        </div>
+        <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 text-center gradient-border-top">
+          <div className="text-2xl font-black text-[#F0F0F3] tabular-nums">{data.summary.empresaGroups || 0}</div>
+          <div className="text-[10px] text-[#52525B] mt-1">Grupos empresa</div>
         </div>
         <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 text-center gradient-border-top">
           <div className="text-2xl font-black text-[#F0F0F3] tabular-nums">{data.summary.emailGroups}</div>
@@ -112,7 +128,7 @@ export default function DuplicadosPage() {
         </div>
         <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 text-center gradient-border-top">
           <div className="text-2xl font-black text-red-400 tabular-nums">{data.summary.totalDuplicateLeads}</div>
-          <div className="text-[10px] text-[#52525B] mt-1">Leads duplicados</div>
+          <div className="text-[10px] text-[#52525B] mt-1">Leads dup. p/ apagar</div>
         </div>
       </div>
 
@@ -136,9 +152,11 @@ export default function DuplicadosPage() {
                 >
                   {isExpanded ? <ChevronDown className="w-4 h-4 text-[#52525B]" /> : <ChevronRight className="w-4 h-4 text-[#52525B]" />}
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    group.type === 'phone' ? 'bg-green-500/12 text-green-400' : 'bg-blue-500/12 text-blue-400'
+                    group.type === 'phone' ? 'bg-green-500/12 text-green-400'
+                    : group.type === 'empresa' ? 'bg-cyan-500/12 text-cyan-400'
+                    : 'bg-blue-500/12 text-blue-400'
                   }`}>
-                    {group.type === 'phone' ? 'TEL' : 'EMAIL'}
+                    {group.type === 'phone' ? 'TEL' : group.type === 'empresa' ? 'EMPRESA' : 'EMAIL'}
                   </span>
                   <span className="text-sm text-[#A1A1AA] font-mono flex-1 truncate">{group.key}</span>
                   <span className="text-xs text-red-400 font-bold">{group.count} leads</span>

@@ -39,6 +39,48 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, deleted: result.count })
       }
 
+      case 'addTag': {
+        // Add a tag to all selected leads (idempotent — won't duplicate existing tag)
+        if (!value || typeof value !== 'string') {
+          return NextResponse.json({ error: 'tag obrigatória' }, { status: 400 })
+        }
+        const tag = value.trim().toLowerCase()
+        if (!tag) return NextResponse.json({ error: 'tag inválida' }, { status: 400 })
+        // Fetch existing tags per lead, append, save in batches
+        const leads = await prisma.lead.findMany({ where, select: { id: true, tags: true } })
+        let updated = 0
+        for (const l of leads) {
+          const tags = (l.tags || '').split(',').map(t => t.trim()).filter(Boolean)
+          if (tags.includes(tag)) continue
+          tags.push(tag)
+          await prisma.lead.update({ where: { id: l.id }, data: { tags: tags.join(',') } })
+          updated++
+        }
+        return NextResponse.json({ success: true, updated })
+      }
+
+      case 'removeTag': {
+        if (!value || typeof value !== 'string') {
+          return NextResponse.json({ error: 'tag obrigatória' }, { status: 400 })
+        }
+        const tag = value.trim().toLowerCase()
+        const leads = await prisma.lead.findMany({ where, select: { id: true, tags: true } })
+        let updated = 0
+        for (const l of leads) {
+          const tags = (l.tags || '').split(',').map(t => t.trim()).filter(Boolean)
+          if (!tags.includes(tag)) continue
+          await prisma.lead.update({ where: { id: l.id }, data: { tags: tags.filter(t => t !== tag).join(',') || null } })
+          updated++
+        }
+        return NextResponse.json({ success: true, updated })
+      }
+
+      case 'subNicho': {
+        // Allow subnicho to be empty (sets to null)
+        const result = await prisma.lead.updateMany({ where, data: { subNicho: value || null } })
+        return NextResponse.json({ success: true, updated: result.count })
+      }
+
       default:
         return NextResponse.json({ error: 'Ação desconhecida' }, { status: 400 })
     }

@@ -1572,6 +1572,54 @@ export default function LeadsPage() {
 
               <span className="w-px h-5 bg-[#27272A]" />
 
+              {/* Add tag */}
+              <button
+                onClick={() => {
+                  const tag = window.prompt('Tag a adicionar (ex: prioridade-alta, lisboa, follow-up):')
+                  if (tag && tag.trim()) bulkAction('addTag', tag.trim().toLowerCase())
+                }}
+                disabled={assigning}
+                className="px-2.5 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 text-[11px] font-bold hover:bg-cyan-500/20 transition-all disabled:opacity-40"
+              >
+                🏷️ Tag
+              </button>
+
+              {/* Bookmark all */}
+              <button
+                onClick={() => bulkAction('addTag', 'revisitar')}
+                disabled={assigning}
+                className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400 text-[11px] font-bold hover:bg-amber-500/20 transition-all disabled:opacity-40"
+              >
+                ⭐ Bookmark
+              </button>
+
+              {/* Export selected to CSV */}
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams()
+                  params.set('ids', Array.from(selectedIds).join(','))
+                  window.open(`/api/leads/export?${params}`, '_blank')
+                }}
+                disabled={assigning || selectedIds.size === 0}
+                className="px-2.5 py-1.5 rounded-lg bg-[#10B981]/10 border border-[#10B981]/25 text-[#10B981] text-[11px] font-bold hover:bg-[#10B981]/20 transition-all disabled:opacity-40"
+              >
+                📥 CSV
+              </button>
+
+              {/* Export observações as Markdown */}
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams()
+                  params.set('ids', Array.from(selectedIds).join(','))
+                  window.open(`/api/leads/export-notes?${params}`, '_blank')
+                }}
+                disabled={assigning || selectedIds.size === 0}
+                className="px-2.5 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 text-[11px] font-bold hover:bg-cyan-500/20 transition-all disabled:opacity-40"
+                title="Exportar todas as observações como Markdown"
+              >
+                📝 Notas
+              </button>
+
               {/* Remove agent */}
               <button
                 onClick={() => assignLeads(null)}

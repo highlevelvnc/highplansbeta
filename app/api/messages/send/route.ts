@@ -12,6 +12,8 @@ const sendMessageSchema = z.object({
   templateId: z.string().optional(),
   // Allow overriding destinatario (for cases where lead doesn't have phone/email)
   destinatario: z.string().optional(),
+  // Optional metadata: { variant: 'v1' | 'v2' | 'v3', ... }
+  metadata: z.record(z.string(), z.any()).optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Dados inválidos', details: errors }, { status: 400 })
     }
 
-    const { leadId, canal, corpo, assunto, templateId, destinatario } = parsed.data
+    const { leadId, canal, corpo, assunto, templateId, destinatario, metadata } = parsed.data
 
     // Buscar lead para obter contacto e dados para template
     const lead = await prisma.lead.findUnique({
@@ -63,6 +65,7 @@ export async function POST(req: NextRequest) {
         to,
         body: filledBody,
         templateId,
+        metadata,
       })
 
       return NextResponse.json(result, { status: result.success ? 200 : 422 })

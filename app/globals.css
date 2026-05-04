@@ -595,3 +595,15 @@ kbd {
     body::before { display: none; }
   }
 }
+
+/* ── Privacy Mode — blurs PII (names, companies, phones, emails) for screen-share/screenshots ── */
+.privacy-mode .privacy-blur,
+.privacy-mode [data-privacy="pii"] {
+  filter: blur(6px);
+  transition: filter 120ms ease;
+  cursor: help;
+}
+.privacy-mode .privacy-blur:hover,
+.privacy-mode [data-privacy="pii"]:hover {
+  filter: blur(0);
+}

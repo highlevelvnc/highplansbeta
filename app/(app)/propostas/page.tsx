@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Plus, FileText, Download, ExternalLink, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react'
+import { Plus, FileText, Download, ExternalLink, AlertTriangle, RefreshCw, Loader2, Search, MessageCircle, Check, X } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/components/Toast'
 
@@ -114,7 +114,40 @@ export default function PropostasPage() {
   const [form, setForm] = useState({ leadId:'', plano:'', titulo:'', conteudo:'' })
   const [creating, setCreating] = useState(false)
   const [preview, setPreview] = useState<any>(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'' | 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED'>('')
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
   const { toast } = useToast()
+
+  // Quick status change for a proposal
+  const updateStatus = async (id: string, status: string) => {
+    setUpdatingId(id)
+    try {
+      const res = await fetch(`/api/proposals/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (!res.ok) throw new Error()
+      toast(`Marcada como ${status}`, 'success')
+      load()
+    } catch {
+      toast('Erro ao atualizar status', 'error')
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  // Send proposal via WhatsApp (opens wa.me with proposal title + lead name)
+  const sendViaWA = (p: any) => {
+    const phone = (p.lead?.whatsapp || p.lead?.telefone || '').replace(/\D/g, '')
+    if (!phone) { toast('Lead sem WhatsApp', 'error'); return }
+    const msg = `Olá ${p.lead?.nome?.split(' ')[0] || ''}, segue a proposta que falamos:\n\n*${p.titulo}*\n\n${p.conteudo.slice(0, 500)}${p.conteudo.length > 500 ? '\n\n[...]' : ''}\n\nQualquer dúvida diga!`
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+    window.open(url, '_blank')
+    // Auto-mark as sent if currently DRAFT
+    if (p.status === 'DRAFT') updateStatus(p.id, 'SENT')
+  }
 
   const load = async () => {
     try {
@@ -176,17 +209,98 @@ export default function PropostasPage() {
     REJECTED:{bg:'bg-red-500/10',text:'text-red-400'},
   }
 
+  // Stats
+  const counts = {
+    total: proposals.length,
+    DRAFT: proposals.filter(p => p.status === 'DRAFT').length,
+    SENT: proposals.filter(p => p.status === 'SENT').length,
+    ACCEPTED: proposals.filter(p => p.status === 'ACCEPTED').length,
+    REJECTED: proposals.filter(p => p.status === 'REJECTED').length,
+  }
+  const acceptanceRate = (counts.SENT + counts.ACCEPTED + counts.REJECTED) > 0
+    ? Math.round((counts.ACCEPTED / (counts.SENT + counts.ACCEPTED + counts.REJECTED)) * 100)
+    : null
+
+  // Apply filters
+  const filteredProposals = proposals.filter(p => {
+    if (statusFilter && p.status !== statusFilter) return false
+    const term = search.trim().toLowerCase()
+    if (!term) return true
+    return (
+      (p.titulo || '').toLowerCase().includes(term) ||
+      (p.lead?.nome || '').toLowerCase().includes(term) ||
+      (p.lead?.empresa || '').toLowerCase().includes(term) ||
+      (p.plano || '').toLowerCase().includes(term)
+    )
+  })
+
   return (
     <div className="p-4 md:p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Propostas</h1>
-          <p className="text-sm text-[#71717A]">{proposals.length} propostas criadas</p>
+          <p className="text-sm text-[#71717A]">
+            {proposals.length} criadas{acceptanceRate !== null && ` · ${acceptanceRate}% aceitação`}
+          </p>
         </div>
         <button onClick={()=>setShowNew(true)} className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <Plus className="w-4 h-4"/> Nova Proposta
         </button>
       </div>
+
+      {/* Stats grid */}
+      {proposals.length > 0 && (
+        <div className="grid grid-cols-4 gap-2 mb-4">
+          {[
+            { label: 'Draft', val: counts.DRAFT, color: '#71717A' },
+            { label: 'Enviadas', val: counts.SENT, color: '#3B82F6' },
+            { label: 'Aceites', val: counts.ACCEPTED, color: '#10B981' },
+            { label: 'Rejeitadas', val: counts.REJECTED, color: '#EF4444' },
+          ].map(s => (
+            <div key={s.label} className="bg-[#0F0F12] border border-[#27272A] rounded-lg p-3 text-center">
+              <div className="text-xl font-bold tabular-nums" style={{ color: s.color }}>{s.val}</div>
+              <div className="text-[9px] uppercase tracking-wider text-[#71717A] mt-0.5">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Search + filter pills */}
+      {proposals.length > 0 && (
+        <div className="mb-4 space-y-2">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#71717A]" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Pesquisar proposta..."
+              className="w-full bg-[#0F0F12] border border-[#27272A] rounded-lg pl-9 pr-4 py-2 text-sm text-[#F0F0F3] placeholder-[#71717A] focus:outline-none focus:border-[#8B5CF6]"
+            />
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-[#52525B] uppercase tracking-wider font-bold mr-0.5">Estado:</span>
+            {([
+              { id: '' as const, label: `Todos (${proposals.length})` },
+              { id: 'DRAFT' as const, label: `Draft (${counts.DRAFT})` },
+              { id: 'SENT' as const, label: `Enviadas (${counts.SENT})` },
+              { id: 'ACCEPTED' as const, label: `✓ Aceites (${counts.ACCEPTED})` },
+              { id: 'REJECTED' as const, label: `✕ Rejeitadas (${counts.REJECTED})` },
+            ]).map(p => (
+              <button
+                key={p.id}
+                onClick={() => setStatusFilter(p.id)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                  statusFilter === p.id
+                    ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/45 text-[#A78BFA]'
+                    : 'bg-[#0F0F12] border-[#27272A] text-[#71717A] hover:border-[#52525B]'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -215,29 +329,65 @@ export default function PropostasPage() {
       )}
 
       <div className="grid grid-cols-1 gap-3">
-        {proposals.map(p => {
+        {filteredProposals.map(p => {
           const ss = STATUS_STYLES[p.status] || STATUS_STYLES.DRAFT
+          const hasWA = !!(p.lead?.whatsapp || p.lead?.telefone)
+          const isUpdating = updatingId === p.id
           return (
-            <div key={p.id} className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 flex items-center gap-4 hover:border-[#8B5CF6]/20 transition-all">
+            <div key={p.id} className={`bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 flex items-center gap-3 hover:border-[#8B5CF6]/20 transition-all ${isUpdating ? 'opacity-50' : ''}`}>
               <div className="w-10 h-10 rounded-lg bg-[#8B5CF6]/10 flex items-center justify-center flex-shrink-0">
                 <FileText className="w-5 h-5 text-[#8B5CF6]"/>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-[#F0F0F3] text-sm">{p.titulo}</div>
-                <div className="text-xs text-[#71717A]">{p.lead?.nome} · {p.plano} · {new Date(p.createdAt).toLocaleDateString('pt-PT')}</div>
+                <div className="font-medium text-[#F0F0F3] text-sm truncate">{p.titulo}</div>
+                <div className="text-xs text-[#71717A] truncate">{p.lead?.nome} · {p.plano} · {new Date(p.createdAt).toLocaleDateString('pt-PT')}</div>
               </div>
-              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${ss.bg} ${ss.text}`}>{p.status}</span>
-              <div className="flex gap-2">
-                <button onClick={()=>exportMd(p)} className="p-2 rounded-lg bg-[#16161A] text-[#71717A] hover:text-[#8B5CF6] transition-colors">
-                  <Download className="w-4 h-4"/>
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${ss.bg} ${ss.text}`}>{p.status}</span>
+
+              {/* Quick status actions — only show relevant transitions */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {p.status === 'DRAFT' && hasWA && (
+                  <button
+                    onClick={() => sendViaWA(p)}
+                    title="Enviar via WhatsApp + marcar como Enviada"
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] text-[10px] font-bold transition-all"
+                  >
+                    <MessageCircle className="w-3 h-3" /> Enviar
+                  </button>
+                )}
+                {p.status === 'SENT' && (
+                  <>
+                    <button
+                      onClick={() => updateStatus(p.id, 'ACCEPTED')}
+                      title="Marcar como Aceite"
+                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-[#10B981]/10 hover:bg-[#10B981]/20 text-[#10B981] text-[10px] font-bold transition-all"
+                    >
+                      <Check className="w-3 h-3" /> Aceite
+                    </button>
+                    <button
+                      onClick={() => updateStatus(p.id, 'REJECTED')}
+                      title="Marcar como Rejeitada"
+                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] font-bold transition-all"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </>
+                )}
+                <button onClick={()=>exportMd(p)} title="Exportar Markdown" className="p-1.5 rounded-lg bg-[#16161A] text-[#71717A] hover:text-[#8B5CF6] transition-colors">
+                  <Download className="w-3.5 h-3.5"/>
                 </button>
-                <button onClick={()=>setPreview(p)} className="p-2 rounded-lg bg-[#16161A] text-[#71717A] hover:text-[#F0F0F3] transition-colors">
-                  <ExternalLink className="w-4 h-4"/>
+                <button onClick={()=>setPreview(p)} title="Pré-visualizar" className="p-1.5 rounded-lg bg-[#16161A] text-[#71717A] hover:text-[#F0F0F3] transition-colors">
+                  <ExternalLink className="w-3.5 h-3.5"/>
                 </button>
               </div>
             </div>
           )
         })}
+        {filteredProposals.length===0 && proposals.length>0 && (
+          <div className="text-center py-12 text-sm text-[#52525B]">
+            Nenhuma proposta corresponde aos filtros.
+          </div>
+        )}
         {proposals.length===0&&!loading&&(
           <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
             <div className="w-14 h-14 rounded-2xl bg-[#8B5CF6]/10 flex items-center justify-center mb-4">

@@ -154,14 +154,24 @@ export default function PipelinePage() {
     return () => clearTimeout(t)
   }, [fuSuggestion])
 
-  // ── Client-side filter ────────────────────────────────────────────────────
+  // ── Client-side filter (pipeline filter + search) ─────────────────────────
   const filterLeads = (list: any[]) => {
-    if (!pipelineFilter) return list
-    if (pipelineFilter === 'hot')             return list.filter(l => l.score === 'HOT')
-    if (pipelineFilter === 'nuncaContactado') return list.filter(l => (l._count?.messages ?? 0) === 0)
-    if (pipelineFilter === 'semFollowUp')     return list.filter(l => (l._count?.followUps ?? 0) === 0)
-    if (pipelineFilter === 'altaOportunidade') return list.filter(l => l.opportunityScore >= 70)
-    return list
+    let result = list
+    if (pipelineFilter) {
+      if (pipelineFilter === 'hot')              result = result.filter(l => l.score === 'HOT')
+      else if (pipelineFilter === 'nuncaContactado')  result = result.filter(l => (l._count?.messages ?? 0) === 0)
+      else if (pipelineFilter === 'semFollowUp')      result = result.filter(l => (l._count?.followUps ?? 0) === 0)
+      else if (pipelineFilter === 'altaOportunidade') result = result.filter(l => l.opportunityScore >= 70)
+    }
+    const term = search.trim().toLowerCase()
+    if (term) {
+      result = result.filter(l =>
+        (l.nome || '').toLowerCase().includes(term) ||
+        (l.empresa || '').toLowerCase().includes(term) ||
+        (l.cidade || '').toLowerCase().includes(term)
+      )
+    }
+    return result
   }
 
   const visibleLeads = filterLeads(leads)
@@ -526,9 +536,15 @@ export default function PipelinePage() {
 
       {/* ── Kanban board ── */}
       <div className="flex gap-3 overflow-x-auto pb-4 flex-1 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory md:snap-none">
-        {STAGES.map(stage => {
+        {STAGES.map((stage, stageIdx) => {
           const stageLeads = visibleLeads.filter(l => l.pipelineStatus === stage.id)
           const isOver = dragOver === stage.id
+          // Conversion % from previous stage (if applicable)
+          const prevStage = stageIdx > 0 && stage.id !== 'LOST' ? STAGES[stageIdx - 1] : null
+          const prevCount = prevStage ? visibleLeads.filter(l => l.pipelineStatus === prevStage.id).length : 0
+          const conversionPct = prevCount > 0 ? Math.round((stageLeads.length / (stageLeads.length + prevCount)) * 100) : null
+          // Sum opportunity score in this stage (rough "value" indicator)
+          const totalOpp = stageLeads.reduce((acc, l) => acc + (l.opportunityScore || 0), 0)
           return (
             <div key={stage.id}
               className="flex-shrink-0 w-[75vw] sm:w-60 snap-start"
@@ -537,11 +553,26 @@ export default function PipelinePage() {
               onDrop={() => onDrop(stage.id)}
             >
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ background: stage.color }} />
-                  <span className="text-xs font-bold text-[#F0F0F3]">{stage.label}</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: stage.color }} />
+                  <span className="text-xs font-bold text-[#F0F0F3] truncate">{stage.label}</span>
                 </div>
-                <span className="text-xs text-[#71717A] bg-[#16161A] px-2 py-0.5 rounded-full font-medium">{stageLeads.length}</span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {conversionPct !== null && conversionPct > 0 && stage.id !== 'LOST' && stage.id !== 'CLOSED' && (
+                    <span
+                      className="text-[9px] text-[#52525B] tabular-nums"
+                      title={`${conversionPct}% chega aqui vs ${prevStage?.label}`}
+                    >
+                      ↗{conversionPct}%
+                    </span>
+                  )}
+                  <span
+                    className="text-xs text-[#71717A] bg-[#16161A] px-2 py-0.5 rounded-full font-medium tabular-nums"
+                    title={totalOpp > 0 ? `Soma de pts: ${totalOpp}` : ''}
+                  >
+                    {stageLeads.length}
+                  </span>
+                </div>
               </div>
 
               <div

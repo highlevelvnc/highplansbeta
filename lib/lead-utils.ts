@@ -268,6 +268,23 @@ function extractFirstPhone(raw: string): string {
   return ''
 }
 
+/**
+ * Returns true if the given lead's WhatsApp number is a Portuguese landline (2xx prefix).
+ * PT mobile starts with 9 — anything else (esp. 2) is a landline → no WhatsApp.
+ * For non-PT numbers we conservatively return false (we can't tell without per-country logic).
+ */
+export function isPtLandline(lead: { telefone?: string | null; whatsapp?: string | null; telefoneRaw?: string | null; whatsappRaw?: string | null }): boolean {
+  const num = getWhatsAppNumber(lead as any)
+  if (!num) return false
+  // PT format from getWhatsAppNumber: "351" + 9 digits → check digit at position 3
+  if (num.startsWith('351') && num.length === 12) {
+    return num[3] === '2'
+  }
+  // Bare 9-digit local PT number
+  if (num.length === 9 && num.startsWith('2')) return true
+  return false
+}
+
 // ─── IMPORT CLEANING ────────────────────────────────────────────────────────
 
 /**

@@ -79,6 +79,9 @@ export default function FollowUpsPage() {
   const [snoozingId, setSnoozingId] = useState<string | null>(null)
   const [showNew, setShowNew]       = useState(false)
   const [leads, setLeads]           = useState<any[]>([])
+  const [tipoFilter, setTipoFilter] = useState<string>('')  // '' = all, else CHAMADA/WHATSAPP/EMAIL/REUNIAO
+  const [bulkMode, setBulkMode]     = useState(false)
+  const [selected, setSelected]     = useState<Set<string>>(new Set())
   const router  = useRouter()
   const { toast } = useToast()
 
@@ -153,13 +156,64 @@ export default function FollowUpsPage() {
     }
   }
 
-  // ── Grouping ────────────────────────────────────────────────────────────────
-  const grouped = {
-    overdue: followups.filter(fu => classify(fu) === 'overdue'),
-    today:   followups.filter(fu => classify(fu) === 'today'),
-    week:    followups.filter(fu => classify(fu) === 'week'),
-    future:  followups.filter(fu => classify(fu) === 'future'),
+  // Bulk actions
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
+  const bulkComplete = async () => {
+    if (selected.size === 0) return
+    if (!confirm(`Marcar ${selected.size} follow-up(s) como feito(s)?`)) return
+    const ids = Array.from(selected)
+    await Promise.all(ids.map(id =>
+      fetch(`/api/followups/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enviado: true, enviadoEm: new Date().toISOString() }),
+      }).catch(() => null)
+    ))
+    toast(`✓ ${ids.length} marcados como feito`, 'success')
+    setSelected(new Set())
+    setBulkMode(false)
+    load()
+  }
+  const bulkSnooze = async (days: number) => {
+    if (selected.size === 0) return
+    const ids = Array.from(selected)
+    const d = new Date()
+    d.setDate(d.getDate() + days)
+    d.setHours(9, 0, 0, 0)
+    await Promise.all(ids.map(id =>
+      fetch(`/api/followups/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agendadoPara: d.toISOString() }),
+      }).catch(() => null)
+    ))
+    toast(`Adiado +${days}d em ${ids.length}`, 'success')
+    setSelected(new Set())
+    setBulkMode(false)
+    load()
+  }
+
+  // ── Filtering + grouping ────────────────────────────────────────────────────
+  const filtered = tipoFilter
+    ? followups.filter(fu => fu.tipo === tipoFilter)
+    : followups
+  const grouped = {
+    overdue: filtered.filter(fu => classify(fu) === 'overdue'),
+    today:   filtered.filter(fu => classify(fu) === 'today'),
+    week:    filtered.filter(fu => classify(fu) === 'week'),
+    future:  filtered.filter(fu => classify(fu) === 'future'),
+  }
+  const tipoCounts = followups.reduce((acc: Record<string, number>, fu) => {
+    acc[fu.tipo] = (acc[fu.tipo] || 0) + 1
+    return acc
+  }, {})
 
   // ── Stats counts ────────────────────────────────────────────────────────────
   const stats = [
@@ -184,8 +238,23 @@ export default function FollowUpsPage() {
         key={fu.id}
         className={`bg-[#0F0F12] border rounded-xl p-3.5 flex items-start gap-3 transition-all ${
           isOverdue ? 'border-red-500/25 bg-red-500/3' : 'border-[#27272A]'
-        } ${isCompleting || isSnoozing ? 'opacity-50' : ''}`}
+        } ${selected.has(fu.id) ? 'ring-2 ring-amber-500/50' : ''} ${isCompleting || isSnoozing ? 'opacity-50' : ''}`}
+        onClick={bulkMode ? () => toggleSelect(fu.id) : undefined}
+        style={bulkMode ? { cursor: 'pointer' } : undefined}
       >
+        {/* Bulk select checkbox */}
+        {bulkMode && (
+          <div
+            className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+              selected.has(fu.id)
+                ? 'bg-amber-400 border-amber-400 text-[#0F0F12]'
+                : 'border-[#52525B]'
+            }`}
+          >
+            {selected.has(fu.id) && <Check className="w-3 h-3" strokeWidth={3} />}
+          </div>
+        )}
+
         {/* Icon */}
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconClass}`}>
           <Icon className="w-3.5 h-3.5" />
@@ -306,6 +375,73 @@ export default function FollowUpsPage() {
               <div className="text-[10px] text-[#52525B] mt-0.5 leading-tight">{s.label}</div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Tipo filter pills + bulk mode toggle */}
+      {!loading && followups.length > 0 && (
+        <div className="mb-4 flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] text-[#52525B] uppercase tracking-wider font-bold mr-0.5">Tipo:</span>
+          {([
+            { id: '', label: `Todos (${followups.length})` },
+            { id: 'CHAMADA', label: `📞 Chamada (${tipoCounts.CHAMADA || 0})` },
+            { id: 'WHATSAPP', label: `💬 WhatsApp (${tipoCounts.WHATSAPP || 0})` },
+            { id: 'EMAIL', label: `✉️ Email (${tipoCounts.EMAIL || 0})` },
+            { id: 'REUNIAO', label: `📅 Reunião (${tipoCounts.REUNIAO || 0})` },
+          ]).filter(p => p.id === '' || (tipoCounts[p.id] || 0) > 0).map(p => (
+            <button
+              key={p.id}
+              onClick={() => setTipoFilter(p.id)}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                tipoFilter === p.id
+                  ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/45 text-[#A78BFA]'
+                  : 'bg-[#0F0F12] border-[#27272A] text-[#71717A] hover:border-[#52525B] hover:text-[#A1A1AA]'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+          <button
+            onClick={() => { setBulkMode(v => !v); setSelected(new Set()) }}
+            className={`ml-auto px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
+              bulkMode
+                ? 'bg-amber-500/15 border-amber-500/45 text-amber-400'
+                : 'bg-[#0F0F12] border-[#27272A] text-[#71717A] hover:border-amber-500/40 hover:text-amber-400'
+            }`}
+          >
+            {bulkMode ? `✓ ${selected.size} selecionado(s)` : '☑️ Modo bulk'}
+          </button>
+        </div>
+      )}
+
+      {/* Bulk action bar — sticky when bulk mode is on with selection */}
+      {bulkMode && selected.size > 0 && (
+        <div className="mb-4 sticky top-0 z-20 bg-amber-500/10 border border-amber-500/30 rounded-xl p-2.5 flex items-center gap-2 backdrop-blur-sm">
+          <span className="text-xs font-bold text-amber-400">{selected.size} selecionado(s)</span>
+          <button
+            onClick={bulkComplete}
+            className="ml-auto flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#10B981] hover:bg-[#10B981]/90 text-white text-xs font-bold transition-colors"
+          >
+            <Check className="w-3 h-3" /> Marcar feito
+          </button>
+          <button
+            onClick={() => bulkSnooze(1)}
+            className="px-3 py-1.5 rounded-lg border border-[#27272A] hover:border-[#52525B] text-xs text-[#A1A1AA] font-bold transition-colors"
+          >
+            +1d
+          </button>
+          <button
+            onClick={() => bulkSnooze(7)}
+            className="px-3 py-1.5 rounded-lg border border-[#27272A] hover:border-[#52525B] text-xs text-[#A1A1AA] font-bold transition-colors"
+          >
+            +7d
+          </button>
+          <button
+            onClick={() => { setBulkMode(false); setSelected(new Set()) }}
+            className="px-2 py-1.5 rounded-lg text-xs text-[#52525B] hover:text-[#F0F0F3]"
+          >
+            Cancelar
+          </button>
         </div>
       )}
 

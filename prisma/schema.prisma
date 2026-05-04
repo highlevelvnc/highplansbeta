@@ -35,11 +35,15 @@ model Lead {
   origem            String?
   decisionProfile   String?
   observacaoPerfil  String?
-  pipelineStatus    String   @default("NEW")
+  pipelineStatus    String   @default("NEW")  // NEW | CONTACTED | REPLIED | INTERESTED | CLOSED | LOST
+  subNicho          String?  // sub-classificação do nicho (e.g. dentro de Construtoras: "Remodelações", "Janelas/Alumínio", "Piscinas", "Modulares", "Obras Civis")
   pais              String?  // "PT", "BR", "DE", "NL"
   tags              String?  // comma-separated: "respondeu,interessado"
   agentId           String?
   agent             User?    @relation(fields: [agentId], references: [id])
+  skipCount         Int      @default(0)
+  lastSkippedAt     DateTime?
+  lastSkipReason    String?  // 'no_phone' | 'fixo_only' | 'wrong_fit' | 'later' | null
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -59,6 +63,9 @@ model Lead {
   @@index([createdAt])
   @@index([score, pipelineStatus])
   @@index([agentId, pipelineStatus])
+  @@index([skipCount, opportunityScore])
+  @@index([subNicho])
+  @@index([nicho, subNicho])
 }
 
 model Activity {
@@ -170,20 +177,53 @@ model Client {
   leadId      String?        @unique
   nome        String
   empresa     String?
+  nif         String?        // NIF (PT) / CNPJ (BR) / contribuinte
   nicho       String?
   cidade      String?
+  morada      String?        // morada de faturação
+  pais        String         @default("PT")     // "PT" | "BR" | "DE" | "NL" — define moeda default
+  moeda       String         @default("EUR")    // EUR | BRL — pode override pais
   telefone    String?
   whatsapp    String?
   email       String?
   planoAtual  String?
   planoInicio DateTime?
-  mrr         Float          @default(0)
-  status      String         @default("ACTIVE")
+  mrr         Float          @default(0)        // valor mensal na moeda do cliente
+  status      String         @default("ACTIVE") // ACTIVE | PAUSED | CHURNED
+  diaCobranca Int?           // dia do mês em que cobra (1-28)
   nps         Int?
   observacoes String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   reports     ClientReport[]
+  payments    Payment[]
+
+  @@index([status])
+  @@index([moeda])
+}
+
+model Payment {
+  id            String    @id @default(cuid())
+  clientId      String
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  valor         Float                                // valor sempre na moeda do pagamento
+  moeda         String    @default("EUR")            // EUR | BRL — preserva moeda original mesmo se cliente mudar
+  metodo        String    @default("TRANSFERENCIA")  // MULTIBANCO | TRANSFERENCIA | MBWAY | NUMERARIO | STRIPE | PIX | BOLETO | OUTRO
+  referencia    String?                              // ref. MB, NIF do pagador, ID da transação, etc.
+  status        String    @default("PAID")           // PENDING | PAID | OVERDUE | CANCELLED
+  dataPrevista  DateTime?                            // quando deveria ter sido pago
+  dataPaga      DateTime?                            // quando efetivamente foi pago
+  periodoRef    String?                              // "2026-05" — qual mês de serviço cobre
+  fatura        String?                              // número da fatura (manual)
+  notas         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+  @@index([dataPaga])
+  @@index([dataPrevista])
+  @@index([moeda])
 }
 
 model ClientReport {

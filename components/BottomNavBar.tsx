@@ -9,29 +9,38 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Users, GitBranch, Plus, X, Loader2 } from 'lucide-react'
+import { LayoutDashboard, Users, GitBranch, Plus, X, Loader2, Crosshair, Inbox, Calendar } from 'lucide-react'
 import { useToast } from '@/components/Toast'
 
 // ─── Nav items ────────────────────────────────────────────────────────────────
+// Tuned for actual mobile workflow: Prospecção (most-used) + Inbox (replies) +
+// Dashboard (overview) + Follow-ups (callbacks). FAB is "Novo Lead" elevated.
+// Pipeline + Leads CRM accessible via the side menu (less mobile-friendly views).
 
 const TABS = [
   {
+    href: '/prospeccao',
+    label: 'Prospect',
+    icon: Crosshair,
+    isActive: (p: string) => p === '/prospeccao' || p.startsWith('/prospeccao/'),
+  },
+  {
+    href: '/inbox',
+    label: 'Inbox',
+    icon: Inbox,
+    isActive: (p: string) => p === '/inbox',
+  },
+  {
     href: '/dashboard',
-    label: 'Dashboard',
+    label: 'Home',
     icon: LayoutDashboard,
     isActive: (p: string) => p === '/dashboard',
   },
   {
-    href: '/leads',
-    label: 'Leads',
-    icon: Users,
-    isActive: (p: string) => p === '/leads' || p === '/leads/importar',
-  },
-  {
-    href: '/pipeline',
-    label: 'Pipeline',
-    icon: GitBranch,
-    isActive: (p: string) => p === '/pipeline',
+    href: '/followups',
+    label: 'Agenda',
+    icon: Calendar,
+    isActive: (p: string) => p === '/followups',
   },
 ]
 
