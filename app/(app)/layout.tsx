@@ -8,6 +8,7 @@ import { ToastProvider } from '@/components/Toast'
 import { BottomNavBar } from '@/components/BottomNavBar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
+import { PaymentAlertsBanner } from '@/components/PaymentAlertsBanner'
 import { applySavedPrivacyMode } from '@/lib/privacy-mode'
 
 const nav = [
@@ -220,6 +221,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </button>
             </div>
           )}
+          {/* Global payment alerts banner — overdue + dueToday + browser notifs */}
+          {pathname !== '/financeiro' && <PaymentAlertsBanner />}
           {children}
           {/* PWA install prompt (shows non-intrusively when applicable) */}
           <PWAInstallPrompt />

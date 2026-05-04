@@ -67,3 +67,4 @@ prisma/migrations/*_BR.csv
 
 # Scripts diagnóstico ad-hoc
 scripts/check-db.ts
+scripts/seed-clients-real.ts

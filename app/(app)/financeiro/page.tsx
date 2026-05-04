@@ -6,6 +6,10 @@ import { useToast } from '@/components/Toast'
 import { CURRENCY_META, formatCurrency, type Currency } from '@/lib/currency'
 import { RegisterPaymentModal } from '@/components/RegisterPaymentModal'
 import { RevenueHero } from '@/components/RevenueHero'
+import { ClientName } from '@/components/ClientName'
+import { useClientsAnonymized } from '@/lib/client-anon'
+import { dispatchFinanceUpdate, useFinanceUpdates } from '@/lib/finance-events'
+import { Eye, EyeOff } from 'lucide-react'
 
 const STATUS_META: Record<string, { label: string; bg: string; text: string; icon: any }> = {
   PAID:      { label: 'Pago',      bg: 'bg-[#10B981]/15',  text: 'text-[#10B981]', icon: CheckCircle },
@@ -26,7 +30,14 @@ export default function FinanceiroPage() {
   const [editingPayment, setEditingPayment] = useState<any>(null)
   const [generating, setGenerating] = useState(false)
   const [heroRefresh, setHeroRefresh] = useState(0)
+  const [anon, setAnon] = useClientsAnonymized()
   const { toast } = useToast()
+
+  // Auto-refresh quando há mudanças noutras páginas (clientes, payments, etc.)
+  useFinanceUpdates(() => {
+    load()
+    setHeroRefresh(k => k + 1)
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -63,7 +74,9 @@ export default function FinanceiroPage() {
         body: JSON.stringify({ status, dataPaga: status === 'PAID' ? new Date().toISOString() : null }),
       })
       toast(`Marcado como ${status}`, 'success')
+      dispatchFinanceUpdate('payment.updated')
       load()
+      setHeroRefresh(k => k + 1)
     } catch { toast('Erro', 'error') }
   }
 
@@ -72,7 +85,9 @@ export default function FinanceiroPage() {
     try {
       await fetch(`/api/payments/${id}`, { method: 'DELETE' })
       toast('Pagamento apagado', 'success')
+      dispatchFinanceUpdate('payment.deleted')
       load()
+      setHeroRefresh(k => k + 1)
     } catch { toast('Erro', 'error') }
   }
 
@@ -83,7 +98,9 @@ export default function FinanceiroPage() {
       const res = await fetch('/api/financeiro/generate-monthly', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
       const data = await res.json()
       toast(`✓ ${data.created} criados · ${data.skipped} já existiam`, 'success')
+      dispatchFinanceUpdate('payment.created')
       load()
+      setHeroRefresh(k => k + 1)
     } catch { toast('Erro ao gerar', 'error') }
     setGenerating(false)
   }
@@ -108,7 +125,17 @@ export default function FinanceiroPage() {
             Pagamentos · MRR · Faturas pendentes · Export contabilístico
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setAnon(!anon)}
+            title={anon ? 'Mostrar nomes' : 'Esconder nomes (valores ficam visíveis)'}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs transition-all ${
+              anon ? 'bg-amber-500/10 border-amber-500/40 text-amber-400' : 'border-[#27272A] text-[#71717A] hover:border-amber-500/40 hover:text-amber-400'
+            }`}
+          >
+            {anon ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{anon ? 'Anon ON' : 'Esconder nomes'}</span>
+          </button>
           <button onClick={generateMonthly} disabled={generating} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#27272A] hover:border-[#8B5CF6]/40 text-[#71717A] hover:text-[#A78BFA] text-xs transition-all disabled:opacity-50">
             {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
             Gerar mês
@@ -271,7 +298,7 @@ export default function FinanceiroPage() {
                   <tr key={p.id} className="border-b border-[#16161A] hover:bg-[#16161A]/50 transition-colors">
                     <td className="px-3 py-2.5 text-xs text-[#A1A1AA] tabular-nums">{date ? new Date(date).toLocaleDateString('pt-PT') : '—'}</td>
                     <td className="px-3 py-2.5">
-                      <div data-privacy="pii" className="text-sm font-bold text-[#F0F0F3]">{p.client?.empresa || p.client?.nome || '—'}</div>
+                      {p.client ? <ClientName client={{ id: p.client.id, nome: p.client.nome, empresa: p.client.empresa }} className="text-sm font-bold text-[#F0F0F3]" /> : <span className="text-sm font-bold text-[#F0F0F3]">—</span>}
                     </td>
                     <td className="px-3 py-2.5 text-xs text-[#71717A]">{p.client?.planoAtual || '—'}</td>
                     <td className="px-3 py-2.5 text-xs text-[#A1A1AA] tabular-nums">{p.periodoRef || '—'}</td>
@@ -317,7 +344,7 @@ export default function FinanceiroPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
             {summary.topClientes.map((c: any) => (
               <Link key={c.id} href={`/leads/${c.id}`} className="bg-[#0F0F12] border border-[#27272A] hover:border-[#8B5CF6]/30 rounded-lg p-3 transition-all">
-                <div data-privacy="pii" className="text-xs font-bold text-[#F0F0F3] truncate">{c.empresa || c.nome}</div>
+                <ClientName client={c} className="text-xs font-bold text-[#F0F0F3] truncate" />
                 <div className="text-sm font-black text-[#10B981] mt-1">{formatCurrency(c.total, c.moeda as Currency)}</div>
                 {c.planoAtual && <div className="text-[10px] text-[#71717A] truncate mt-0.5">{c.planoAtual}</div>}
               </Link>

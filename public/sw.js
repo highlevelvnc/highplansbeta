@@ -137,6 +137,67 @@ setInterval(() => { checkPendingCallbacks().catch(() => {}) }, 60_000)
 // Also run once on activation (catches missed ones)
 checkPendingCallbacks().catch(() => {})
 
+// ── Payment due alerts — checks /api/financeiro/due-payments periodically ────
+// Notifies for overdue + due-today payments. Throttled to 1×/30min per item via
+// IndexedDB tracking to avoid spamming.
+const PAYMENT_NOTIF_TTL = 30 * 60 * 1000  // 30min between repeats
+async function checkDuePayments() {
+  try {
+    const res = await fetch('/api/financeiro/due-payments', { cache: 'no-store' })
+    if (!res.ok) return
+    const d = await res.json()
+
+    const all = await getAllCallbacks()  // reuse same store for simplicity
+    // Use prefixes to distinguish from callbacks: 'pay-overdue-{id}', 'pay-today-{id}'
+    const notifiedMap = new Map(all.filter(c => c.id.startsWith('pay-')).map(c => [c.id, c.notified || 0]))
+
+    const fmtVal = (v, m) => m === 'BRL' ? `R$ ${v.toFixed(0)}` : `${v.toFixed(0)} €`
+
+    for (const p of (d.overdue?.items || [])) {
+      const key = `pay-overdue-${p.id}`
+      const last = notifiedMap.get(key) || 0
+      if (Date.now() - last < PAYMENT_NOTIF_TTL) continue
+      const name = p.client?.empresa || p.client?.nome || 'Cliente'
+      const val = fmtVal(p.valor, p.moeda)
+      try {
+        await self.registration.showNotification(`💸 Pagamento atrasado: ${val}`, {
+          body: `${name}${p.periodoRef ? ' · ' + p.periodoRef : ''}`,
+          icon: '/favicon.ico',
+          tag: key,
+          requireInteraction: true,
+          data: { url: '/financeiro' },
+          actions: [{ action: 'open-financeiro', title: 'Ver' }],
+        })
+        await putCallback({ id: key, leadName: name, agendadoPara: new Date().toISOString(), notified: Date.now(), mensagem: 'overdue' })
+      } catch {}
+    }
+
+    for (const p of (d.dueToday?.items || [])) {
+      const key = `pay-today-${p.id}`
+      const last = notifiedMap.get(key) || 0
+      if (Date.now() - last < PAYMENT_NOTIF_TTL) continue
+      const name = p.client?.empresa || p.client?.nome || 'Cliente'
+      const val = fmtVal(p.valor, p.moeda)
+      try {
+        await self.registration.showNotification(`📅 Pagamento vence hoje: ${val}`, {
+          body: `${name}${p.periodoRef ? ' · ' + p.periodoRef : ''}`,
+          icon: '/favicon.ico',
+          tag: key,
+          requireInteraction: true,
+          data: { url: '/financeiro' },
+          actions: [{ action: 'open-financeiro', title: 'Ver' }],
+        })
+        await putCallback({ id: key, leadName: name, agendadoPara: new Date().toISOString(), notified: Date.now(), mensagem: 'today' })
+      } catch {}
+    }
+  } catch {}
+}
+
+// Check every 15min (low-frequency since these don't need second-precision)
+setInterval(() => { checkDuePayments().catch(() => {}) }, 15 * 60_000)
+// Also on activation
+checkDuePayments().catch(() => {})
+
 // ── Notification click handler ──────────────────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
@@ -174,6 +235,19 @@ self.addEventListener('notificationclick', (event) => {
           await putCallback(existing)
         }
       }).catch(() => {})
+    )
+    return
+  }
+
+  // Action: open finance page (from payment notification)
+  if (action === 'open-financeiro') {
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          if ('focus' in client) { client.navigate('/financeiro').catch(() => {}); return client.focus() }
+        }
+        if (self.clients.openWindow) return self.clients.openWindow('/financeiro')
+      })
     )
     return
   }

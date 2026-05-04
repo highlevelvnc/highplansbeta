@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { X, Loader2, Euro } from 'lucide-react'
 import { CURRENCIES, CURRENCY_META, type Currency } from '@/lib/currency'
+import { dispatchFinanceUpdate } from '@/lib/finance-events'
 
 interface Props {
   open: boolean
@@ -81,6 +82,7 @@ export function RegisterPaymentModal({ open, onClose, onSaved, client, payment, 
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error || 'Erro ao guardar')
       }
+      dispatchFinanceUpdate(isEdit ? 'payment.updated' : 'payment.created')
       onSaved()
       onClose()
     } catch (e: any) {

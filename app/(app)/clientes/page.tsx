@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { TrendingUp, Users, Euro, AlertTriangle, Phone, Mail, ExternalLink, ArrowUpRight, Calendar, RefreshCw, UserPlus, Plus, Target, CheckCircle, Edit2 } from 'lucide-react'
+import { TrendingUp, Users, Euro, AlertTriangle, Phone, Mail, ExternalLink, ArrowUpRight, Calendar, RefreshCw, UserPlus, Plus, Target, CheckCircle, Edit2, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { buildWhatsAppUrl } from '@/lib/lead-utils'
 import { NewClientModal } from '@/components/NewClientModal'
@@ -8,6 +8,9 @@ import { RegisterPaymentModal } from '@/components/RegisterPaymentModal'
 import { PotentialClientModal } from '@/components/PotentialClientModal'
 import { CURRENCY_META, formatCurrency, type Currency } from '@/lib/currency'
 import { useToast } from '@/components/Toast'
+import { ClientName } from '@/components/ClientName'
+import { useClientsAnonymized } from '@/lib/client-anon'
+import { dispatchFinanceUpdate, useFinanceUpdates } from '@/lib/finance-events'
 
 const PLAN_COLORS: Record<string, string> = {
   'Presença Profissional': '#6366F1',
@@ -30,6 +33,7 @@ export default function ClientesPage() {
   const [showPotentialModal, setShowPotentialModal] = useState(false)
   const [editingPotentialLead, setEditingPotentialLead] = useState<any>(null)
   const [convertingId, setConvertingId] = useState<string | null>(null)
+  const [anon, setAnon] = useClientsAnonymized()
   const { toast } = useToast()
 
   const loadPotential = async () => {
@@ -54,6 +58,7 @@ export default function ClientesPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Erro')
       toast('🎉 Lead convertido em cliente!', 'success')
+      dispatchFinanceUpdate('lead.converted', data.client)
       loadClients()
       loadPotential()
     } catch (e: any) {
@@ -137,6 +142,16 @@ export default function ClientesPage() {
           <p className="text-sm text-[#71717A]">Carteira · MRR · Pagamentos</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAnon(!anon)}
+            title={anon ? 'Mostrar nomes' : 'Esconder nomes (substitui por aliases — valores ficam visíveis)'}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs transition-all ${
+              anon ? 'bg-amber-500/10 border-amber-500/40 text-amber-400' : 'border-[#27272A] text-[#71717A] hover:border-amber-500/40 hover:text-amber-400'
+            }`}
+          >
+            {anon ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{anon ? 'Anon ON' : 'Esconder nomes'}</span>
+          </button>
           <Link href="/financeiro" className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#27272A] text-[#71717A] hover:border-[#10B981]/40 hover:text-[#10B981] text-xs transition-all">
             <Euro className="w-3.5 h-3.5" /> Financeiro
           </Link>
@@ -249,8 +264,8 @@ export default function ClientesPage() {
               return (
                 <tr key={client.id} className="border-b border-[#16161A] hover:bg-[#16161A]/50 transition-colors">
                   <td className="px-4 py-3">
-                    <div data-privacy="pii" className="font-semibold text-[#F0F0F3]">{client.empresa || client.nome}</div>
-                    {client.empresa && client.nome !== client.empresa && <div data-privacy="pii" className="text-xs text-[#71717A]">{client.nome}</div>}
+                    <ClientName client={client} className="font-semibold text-[#F0F0F3]" />
+                    {!anon && client.empresa && client.nome !== client.empresa && <div className="text-xs text-[#71717A]">{client.nome}</div>}
                   </td>
                   <td className="px-4 py-3">
                     <span className="text-base">{(client.moeda || 'EUR') === 'BRL' ? '🇧🇷' : '🇵🇹'}</span>
@@ -399,7 +414,7 @@ export default function ClientesPage() {
                   <div key={l.id} className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-3.5 flex items-center gap-3 hover:border-cyan-500/30 transition-all">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <Link href={`/leads/${l.id}`} data-privacy="pii" className="text-sm font-bold text-[#F0F0F3] hover:text-cyan-400 truncate">{l.empresa || l.nome}</Link>
+                        <Link href={`/leads/${l.id}`} className="text-sm font-bold text-[#F0F0F3] hover:text-cyan-400 truncate"><ClientName client={l} /></Link>
                         <span className="text-base">{(moeda) === 'BRL' ? '🇧🇷' : '🇵🇹'}</span>
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${stageColor[l.pipelineStatus] || 'bg-gray-500/15 text-gray-400'}`}>{stageLabel[l.pipelineStatus] || l.pipelineStatus}</span>
                         {l.planoPotencial && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#8B5CF6]/15 text-[#A78BFA]">{l.planoPotencial}</span>}

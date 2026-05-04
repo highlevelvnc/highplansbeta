@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { X, Loader2, UserPlus } from 'lucide-react'
 import { CURRENCIES, CURRENCY_META, defaultCurrencyForCountry, type Currency } from '@/lib/currency'
+import { dispatchFinanceUpdate } from '@/lib/finance-events'
 
 interface Props {
   open: boolean
@@ -60,6 +61,7 @@ export function NewClientModal({ open, onClose, onCreated }: Props) {
         throw new Error(err.error || 'Erro ao criar')
       }
       const created = await res.json()
+      dispatchFinanceUpdate('client.created', created)
       onCreated(created)
       onClose()
     } catch (e: any) {
