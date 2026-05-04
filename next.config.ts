@@ -20,7 +20,28 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
+            // Permite microfone (voice notes) — bloqueia camera + geolocation + interest-cohort
+            value: "camera=(), microphone=(self), geolocation=(), interest-cohort=()",
+          },
+          {
+            key: "Content-Security-Policy",
+            // - 'unsafe-inline' em script é necessário para Next inline scripts (theme + hydration)
+            // - 'unsafe-eval' para algumas libs (recharts, etc.)
+            // - img-src https + blob para favicons + OG images do LeadEnrichment
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: https: blob:",
+              "font-src 'self' data:",
+              "connect-src 'self' https: wss:",
+              "frame-src 'none'",
+              "frame-ancestors 'none'",
+              "form-action 'self'",
+              "base-uri 'self'",
+              "object-src 'none'",
+              "upgrade-insecure-requests",
+            ].join("; "),
           },
         ],
       },

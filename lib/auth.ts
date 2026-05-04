@@ -11,7 +11,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   session: {
     strategy: 'jwt',
-    maxAge: 7 * 24 * 60 * 60, // 7 dias
+    maxAge: 24 * 60 * 60,         // 1 dia (era 7d — apertado para CRM/financeiro)
+    updateAge: 60 * 60,           // refresh JWT a cada 1h de actividade
+  },
+
+  // Cookies seguros — Secure em prod (HTTPS only), HttpOnly, SameSite=Lax
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
   },
 
   providers: [

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
 
 /**
  * Tags management API.
@@ -40,16 +41,29 @@ export async function GET() {
   }
 }
 
+// Schema strict para operações destrutivas em tags
+const tagsActionSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('rename'), from: z.string().min(1).max(50), to: z.string().min(1).max(50) }),
+  z.object({ action: z.literal('merge'),  from: z.array(z.string().min(1).max(50)).min(1).max(50), to: z.string().min(1).max(50) }),
+  z.object({ action: z.literal('delete'), tag: z.string().min(1).max(50) }),
+])
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { action } = body
-    if (!action) return NextResponse.json({ error: 'action obrigatório' }, { status: 400 })
+    const parsed = tagsActionSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({
+        error: 'Dados inválidos',
+        details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+      }, { status: 400 })
+    }
+    const { action } = parsed.data
 
     if (action === 'rename') {
-      const from = (body.from || '').trim()
-      const to = (body.to || '').trim()
-      if (!from || !to) return NextResponse.json({ error: 'from + to obrigatórios' }, { status: 400 })
+      const data = parsed.data as { action: 'rename'; from: string; to: string }
+      const from = data.from.trim()
+      const to = data.to.trim()
       const leads = await prisma.lead.findMany({
         where: { tags: { contains: from } },
         select: { id: true, tags: true },
@@ -66,9 +80,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'merge') {
-      const from: string[] = Array.isArray(body.from) ? body.from.map((s: any) => String(s).trim()).filter(Boolean) : []
-      const to = (body.to || '').trim()
-      if (from.length === 0 || !to) return NextResponse.json({ error: 'from[] + to obrigatórios' }, { status: 400 })
+      const data = parsed.data as { action: 'merge'; from: string[]; to: string }
+      const from = data.from.map(s => s.trim()).filter(Boolean)
+      const to = data.to.trim()
       const fromSet = new Set(from)
       const leads = await prisma.lead.findMany({
         where: { OR: from.map(t => ({ tags: { contains: t } })) },
@@ -87,8 +101,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'delete') {
-      const tag = (body.tag || '').trim()
-      if (!tag) return NextResponse.json({ error: 'tag obrigatória' }, { status: 400 })
+      const data = parsed.data as { action: 'delete'; tag: string }
+      const tag = data.tag.trim()
       const leads = await prisma.lead.findMany({
         where: { tags: { contains: tag } },
         select: { id: true, tags: true },

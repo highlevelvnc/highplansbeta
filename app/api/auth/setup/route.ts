@@ -5,15 +5,20 @@ import { prisma } from '@/lib/prisma'
 import { hash } from 'bcryptjs'
 import { z } from 'zod'
 
+// Stricter password — pelo menos 1 letra, 1 número, e min 10 chars
 const setupSchema = z.object({
   nome: z.string().min(2).max(100),
   email: z.string().email(),
-  password: z.string().min(6).max(100),
-})
+  password: z.string()
+    .min(10, 'Password deve ter pelo menos 10 caracteres')
+    .max(100)
+    .regex(/[a-zA-Z]/, 'Password deve conter pelo menos uma letra')
+    .regex(/[0-9]/, 'Password deve conter pelo menos um número'),
+}).strict()
 
 export async function POST(req: Request) {
   try {
-    // Verificar se já existem utilizadores
+    // Verificar se já existem utilizadores — early return sem processar body
     const userCount = await prisma.user.count()
     if (userCount > 0) {
       return NextResponse.json(

@@ -1,24 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+import { logSecurityEvent, getRequestIp } from '@/lib/security-audit'
+import { auth } from '@/lib/auth'
+
+// Schema strict — validation antes de qualquer query DB
+const bulkSchema = z.object({
+  leadIds: z.array(z.string().min(1)).min(1).max(5000),
+  action: z.enum(['pipelineStatus', 'score', 'delete', 'addTag', 'removeTag', 'subNicho']),
+  value: z.string().max(100).optional().nullable(),
+}).strict()
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { leadIds, action, value } = body
-
-    if (!Array.isArray(leadIds) || leadIds.length === 0) {
-      return NextResponse.json({ error: 'leadIds obrigatório' }, { status: 400 })
+    const parsed = bulkSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({
+        error: 'Dados inválidos',
+        details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+      }, { status: 400 })
     }
-    if (!action) {
-      return NextResponse.json({ error: 'action obrigatório' }, { status: 400 })
-    }
+    const { leadIds, action, value } = parsed.data
 
     const where = { id: { in: leadIds } }
 
     switch (action) {
       case 'pipelineStatus': {
         const valid = ['NEW', 'CONTACTED', 'INTERESTED', 'PROPOSAL_SENT', 'NEGOTIATION', 'CLOSED', 'LOST']
-        if (!valid.includes(value)) {
+        if (!value || !valid.includes(value)) {
           return NextResponse.json({ error: 'Status inválido' }, { status: 400 })
         }
         const result = await prisma.lead.updateMany({ where, data: { pipelineStatus: value } })
@@ -27,7 +37,7 @@ export async function POST(req: NextRequest) {
 
       case 'score': {
         const valid = ['HOT', 'WARM', 'COLD']
-        if (!valid.includes(value)) {
+        if (!value || !valid.includes(value)) {
           return NextResponse.json({ error: 'Score inválido' }, { status: 400 })
         }
         const result = await prisma.lead.updateMany({ where, data: { score: value } })
@@ -35,7 +45,17 @@ export async function POST(req: NextRequest) {
       }
 
       case 'delete': {
+        // Audit log antes de apagar — captura quem fez, quantos, IP
+        const session = await auth().catch(() => null)
+        const ip = getRequestIp(req)
         const result = await prisma.lead.deleteMany({ where })
+        logSecurityEvent({
+          action: 'LEAD_DELETE_BULK',
+          userId: session?.user?.id,
+          userEmail: session?.user?.email || undefined,
+          ip,
+          details: { count: result.count, leadIds: leadIds.slice(0, 20) },  // primeiros 20 ids para auditar
+        }).catch(() => null)
         return NextResponse.json({ success: true, deleted: result.count })
       }
 
