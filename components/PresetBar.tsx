@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo } from 'react'
 import { Plus, X } from 'lucide-react'
 import { listPresets, savePreset, deletePreset, presetMatches, type ProspectPreset } from '@/lib/filter-presets'
 
@@ -22,7 +22,7 @@ interface Props {
   onSave: () => void
 }
 
-export function PresetBar({ current, onApply, onSave }: Props) {
+function PresetBarImpl({ current, onApply, onSave }: Props) {
   const [presets, setPresets] = useState<ProspectPreset[]>([])
   const [refresh, setRefresh] = useState(0)
 
@@ -75,3 +75,20 @@ export function PresetBar({ current, onApply, onSave }: Props) {
     </div>
   )
 }
+
+// Memoized — re-renderiza só quando os filtros atuais mudam (não em cada render do parent)
+export const PresetBar = memo(PresetBarImpl, (prev, next) => {
+  const c1 = prev.current, c2 = next.current
+  return (
+    c1.nicho === c2.nicho &&
+    c1.subNicho === c2.subNicho &&
+    c1.pais === c2.pais &&
+    c1.scoreFilter === c2.scoreFilter &&
+    c1.noSiteOnly === c2.noSiteOnly &&
+    c1.weakSiteOnly === c2.weakSiteOnly &&
+    c1.minScore === c2.minScore &&
+    c1.mobileOnly === c2.mobileOnly &&
+    c1.bookmarkedOnly === c2.bookmarkedOnly &&
+    JSON.stringify(c1.cityBlocklist || []) === JSON.stringify(c2.cityBlocklist || [])
+  )
+})

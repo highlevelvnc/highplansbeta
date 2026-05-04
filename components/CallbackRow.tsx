@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import { memo } from 'react'
 
 interface Props {
   cb: any
@@ -7,7 +8,7 @@ interface Props {
   variant: 'overdue' | 'imminent' | 'upcoming'
 }
 
-export function CallbackRow({ cb, onDone, variant }: Props) {
+function CallbackRowImpl({ cb, onDone, variant }: Props) {
   const when = new Date(cb.agendadoPara)
   const diffMin = Math.round((when.getTime() - Date.now()) / 60_000)
   const isToday = when.toDateString() === new Date().toDateString()
@@ -66,3 +67,10 @@ export function CallbackRow({ cb, onDone, variant }: Props) {
     </div>
   )
 }
+
+// Memoized — re-render só quando cb.id, cb.status ou variant mudam
+export const CallbackRow = memo(CallbackRowImpl, (prev, next) =>
+  prev.cb.id === next.cb.id &&
+  prev.cb.agendadoPara === next.cb.agendadoPara &&
+  prev.variant === next.variant
+)

@@ -1,4 +1,5 @@
 'use client'
+import { memo } from 'react'
 import { useClientsAnonymized, getAlias } from '@/lib/client-anon'
 
 interface Props {
@@ -12,8 +13,12 @@ interface Props {
  * Renderiza o nome do cliente, respeitando o toggle global de anonimização.
  * - Modo normal: "Latina Grill"
  * - Modo anon: "Cliente A4F" (estável por id) — hover revela real (com title)
+ *
+ * Memoizado — re-render apenas quando client.id ou className mudam.
+ * Em tabelas grandes (financeiro com 100+ payments) isto evita
+ * re-renderizações em cascata.
  */
-export function ClientName({ client, className = '', revealOnHover = true }: Props) {
+function ClientNameImpl({ client, className = '', revealOnHover = true }: Props) {
   const [anon] = useClientsAnonymized()
   const realName = client.empresa || client.nome || 'Cliente'
   if (!anon) return <span className={className}>{realName}</span>
@@ -29,3 +34,10 @@ export function ClientName({ client, className = '', revealOnHover = true }: Pro
     </span>
   )
 }
+
+export const ClientName = memo(ClientNameImpl, (prev, next) =>
+  prev.client.id === next.client.id &&
+  prev.client.empresa === next.client.empresa &&
+  prev.client.nome === next.client.nome &&
+  prev.className === next.className
+)

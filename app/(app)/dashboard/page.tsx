@@ -1,17 +1,18 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import {
   TrendingUp, Users, Zap, AlertTriangle, CheckSquare, Euro,
   Target, BarChart2, RefreshCw, Upload, Plus, ArrowRight,
   Flame, Clock, ExternalLink, Calendar,
 } from 'lucide-react'
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, CartesianGrid, PieChart, Pie, Cell,
-} from 'recharts'
 import Link from 'next/link'
 import { useCountUp } from '@/lib/use-count-up'
 import { ProspectFunnelWidget } from '@/components/ProspectFunnelWidget'
+
+// Lazy-loaded charts — recharts é ~100KB, não vale carregar no initial bundle.
+// Ficam em chunk separado, descarregados só quando o dashboard precisar.
+const ScoreDistributionChart = lazy(() => import('@/components/charts/ScoreDistributionChart'))
+const LeadsBarChart = lazy(() => import('@/components/charts/LeadsBarChart'))
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,20 +137,7 @@ function KPICard({ label, value, sub, icon: Icon, color = '#8B5CF6', alert = fal
   return href ? <Link href={href} className="block h-full">{inner}</Link> : inner
 }
 
-// Custom tooltip for recharts
-function CustomTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-[#16161A] border border-[#27272A] rounded-lg px-3 py-2 text-xs shadow-lg">
-      <div className="text-[#71717A] mb-1">{label}</div>
-      {payload.map((p: any, i: number) => (
-        <div key={i} className="font-semibold" style={{ color: p.color || '#F0F0F3' }}>
-          {p.value} leads
-        </div>
-      ))}
-    </div>
-  )
-}
+// CustomTooltip movido para components/charts/LeadsBarChart.tsx (junto do uso)
 
 // ─── Pipeline stage row ───────────────────────────────────────────────────────
 
@@ -568,26 +556,9 @@ export default function DashboardPage() {
             <p className="text-xs text-[#52525B] mt-0.5">HOT · WARM · COLD</p>
           </div>
           <div className="flex items-center justify-center my-2">
-            <ResponsiveContainer width="100%" height={140}>
-              <PieChart>
-                <Pie
-                  data={scoreData}
-                  cx="50%" cy="50%"
-                  innerRadius={42} outerRadius={62}
-                  dataKey="value"
-                  paddingAngle={3}
-                  strokeWidth={0}
-                >
-                  {scoreData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ background: '#16161A', border: '1px solid #27272A', borderRadius: 8, fontSize: 12 }}
-                  formatter={(v: any, name: any) => [v, name]}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<div className="h-[140px] w-full bg-[#16161A]/30 rounded animate-pulse" />}>
+              <ScoreDistributionChart data={scoreData} />
+            </Suspense>
           </div>
           <div className="space-y-2">
             {[
@@ -625,25 +596,9 @@ export default function DashboardPage() {
               Novos leads
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={140}>
-            <BarChart data={periodData} barSize={36}>
-              <CartesianGrid vertical={false} stroke="#27272A" strokeDasharray="3 3" />
-              <XAxis
-                dataKey="day"
-                tick={{ fill: '#71717A', fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis hide allowDecimals={false} />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(139,92,246,0.05)', radius: 4 }} />
-              <Bar
-                dataKey="count"
-                fill="#8B5CF6"
-                radius={[4, 4, 0, 0]}
-                fillOpacity={0.85}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <Suspense fallback={<div className="h-[140px] w-full bg-[#16161A]/30 rounded animate-pulse" />}>
+            <LeadsBarChart data={periodData} />
+          </Suspense>
         </div>
       )}
 

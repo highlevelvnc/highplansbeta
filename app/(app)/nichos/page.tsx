@@ -1,12 +1,14 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { useEffect, useState, lazy, Suspense } from 'react'
+
+// Lazy chart — recharts ~100KB sai do initial bundle
+const RevenueByNichoChart = lazy(() => import('@/components/charts/RevenueByNichoChart'))
+
+const COLORS = ['#8B5CF6', '#A78BFA', '#F59E0B', '#8B5CF6', '#3B82F6', '#10B981', '#71717A']
 
 export default function NichosPage() {
   const [data, setData] = useState<any[]>([])
   useEffect(()=>{fetch('/api/nichos').then(r=>r.json()).then(setData)},[])
-
-  const COLORS = ['#8B5CF6','#A78BFA','#F59E0B','#8B5CF6','#3B82F6','#10B981','#71717A']
 
   return (
     <div className="p-4 md:p-6">
@@ -18,16 +20,9 @@ export default function NichosPage() {
       {data.length > 0 && (
         <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4 mb-5">
           <div className="text-xs text-[#71717A] uppercase tracking-wider mb-4">Receita por Nicho</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={data} barSize={36}>
-              <XAxis dataKey="nicho" tick={{fill:'#71717A',fontSize:11}} axisLine={false} tickLine={false}/>
-              <YAxis hide/>
-              <Tooltip contentStyle={{background:'#16161A',border:'1px solid #27272A',borderRadius:8,color:'#F0F0F3',fontSize:12}} formatter={(v:any)=>[`€${v}`,'Receita']}/>
-              <Bar dataKey="receita" radius={[4,4,0,0]}>
-                {data.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <Suspense fallback={<div className="h-[200px] w-full bg-[#16161A]/30 rounded animate-pulse" />}>
+            <RevenueByNichoChart data={data} />
+          </Suspense>
         </div>
       )}
 

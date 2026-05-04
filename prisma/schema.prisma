@@ -72,6 +72,11 @@ model Lead {
   @@index([skipCount, opportunityScore])
   @@index([subNicho])
   @@index([nicho, subNicho])
+  // Hot queries de possíveis clientes + skip insights + auto-followup
+  @@index([pipelineStatus, valorPotencial])
+  @@index([lastSkippedAt])
+  @@index([planoAtual])
+  // Lead→Client conversion: lookup por leadId quando converter
 }
 
 model Activity {
@@ -83,6 +88,9 @@ model Activity {
   lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
+  // Global activity timeline filtra por (tipo, createdAt) e ordena desc
+  @@index([tipo, createdAt])
+  @@index([createdAt])
 }
 
 model FollowUp {
@@ -100,6 +108,9 @@ model FollowUp {
   @@index([leadId])
   @@index([agendadoPara])
   @@index([enviado])
+  // Notifications endpoint: filtra (enviado, agendadoPara) + (enviado, tipo, agendadoPara)
+  @@index([enviado, agendadoPara])
+  @@index([enviado, tipo, agendadoPara])
 }
 
 model Proposal {
@@ -230,6 +241,11 @@ model Payment {
   @@index([dataPaga])
   @@index([dataPrevista])
   @@index([moeda])
+  // Hot queries no /api/notifications + /api/financeiro/summary + due-payments
+  @@index([status, dataPrevista])  // overdue + dueToday + dueSoon
+  @@index([status, dataPaga])      // recebidoMes + recebidoAno + sparkline
+  @@index([status, moeda])         // groupBy moeda nos summary
+  @@index([clientId, status, dataPaga])  // top clientes YTD
 }
 
 model ClientReport {
