@@ -400,19 +400,28 @@ export default function ProspeccaoPage() {
   }, [loadCallbacks])
 
   // Mark a callback as done (PUT /api/followups/[id])
+  // Optimistic UI: remove do state local imediatamente
   const markCallbackDone = async (id: string) => {
     haptic('tick')
+    // Optimistic: remove o callback dos buckets locais já
+    setCallbacks(prev => ({
+      overdue: prev.overdue.filter((c: any) => c.id !== id),
+      imminent: prev.imminent.filter((c: any) => c.id !== id),
+      upcoming: prev.upcoming.filter((c: any) => c.id !== id),
+    }))
+    cancelCallbackInSW(id)
+    toast('✓ Callback feito', 'success')
     try {
-      await fetch(`/api/followups/${id}`, {
+      const res = await fetch(`/api/followups/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enviado: true, enviadoEm: new Date().toISOString() }),
       })
-      cancelCallbackInSW(id)  // remove from SW so it doesn't fire a stale notification
-      toast('Callback marcado como feito', 'success')
-      loadCallbacks()
+      if (!res.ok) throw new Error()
     } catch {
-      toast('Erro', 'error')
+      // Rollback: refetch para restaurar estado correto
+      loadCallbacks()
+      toast('Erro — restaurado', 'error')
     }
   }
 
@@ -649,8 +658,18 @@ export default function ProspeccaoPage() {
   }
 
   // Mark a previously-contacted lead as having replied (or interested if 2x click)
+  // Optimistic UI: updates state ANTES da resposta + rollback se der erro
   const markReplied = async (leadId: string, interested = false) => {
     haptic('tick')
+    const newStatus = interested ? 'INTERESTED' : 'REPLIED'
+
+    // Optimistic update: muda status local imediatamente
+    setHistoryLeads(prev => prev.map(l => l.id === leadId ? { ...l, pipelineStatus: newStatus } : l))
+
+    // Toast otimista (assume sucesso)
+    const baseMsg = interested ? '⭐ Marcado como interessado' : '💬 Marcado como respondeu'
+    toast(baseMsg, 'success')
+
     try {
       const res = await fetch(`/api/leads/${leadId}/mark-replied`, {
         method: 'POST',
@@ -659,18 +678,15 @@ export default function ProspeccaoPage() {
       })
       if (!res.ok) throw new Error()
       const data = await res.json()
-      const baseMsg = interested ? '⭐ Marcado como interessado' : '💬 Marcado como respondeu'
-      toast(
-        data.autoFollowUpCreated
-          ? `${baseMsg} · 📅 follow-up criado para daqui 1h`
-          : baseMsg,
-        'success'
-      )
-      // Refresh history list + callbacks (auto-followup might have been created)
-      if (showHistory) loadHistory()
+      // Update toast com info adicional se auto-followup foi criado
+      if (data.autoFollowUpCreated) {
+        toast('📅 Follow-up criado para daqui 1h', 'info')
+      }
       loadCallbacks()
     } catch {
-      toast('Erro ao marcar', 'error')
+      // Rollback: reverte o optimistic update
+      if (showHistory) loadHistory()
+      toast('Erro ao marcar — tenta de novo', 'error')
     }
   }
 

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, LogOut, Menu, X, Bell, BarChart3, Copy, Crosshair, Inbox, Tag, Activity, Euro } from 'lucide-react'
 import { ToastProvider } from '@/components/Toast'
@@ -40,9 +40,27 @@ const nav = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [fuDismissed, setFuDismissed] = useState(false)
+
+  // Prefetch agressivo das rotas mais visitadas após mount.
+  // Quando o user clicar em qualquer destas, a navegação é instantânea.
+  useEffect(() => {
+    // Idle callback evita atrapalhar paint inicial
+    const schedule = (window as any).requestIdleCallback || ((cb: any) => setTimeout(cb, 200))
+    const handle = schedule(() => {
+      router.prefetch('/prospeccao')
+      router.prefetch('/financeiro')
+      router.prefetch('/clientes')
+      router.prefetch('/inbox')
+    })
+    return () => {
+      const cancel = (window as any).cancelIdleCallback
+      if (cancel && handle) cancel(handle)
+    }
+  }, [router])
 
   // Notificações consolidadas via single endpoint /api/notifications (1 poll/min para tudo)
   const { data: notifs } = useNotifications()
