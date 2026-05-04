@@ -48,7 +48,6 @@ export async function GET(req: NextRequest) {
         probabilidadeFecho: true,
         dataPrevistaFecho: true,
         planoPotencial: true,
-        observacaoPerfil: true,
         agent: { select: { id: true, nome: true } },
         _count: { select: { messages: true, proposals: true, followUps: true } },
         updatedAt: true,

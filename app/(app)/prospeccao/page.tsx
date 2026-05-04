@@ -22,6 +22,7 @@ import { QuickFilterPills } from '@/components/prospect/QuickFilterPills'
 import { DailyGoalProgress } from '@/components/prospect/DailyGoalProgress'
 import { GamifiedHUD } from '@/components/prospect/GamifiedHUD'
 import { FloatingPoints, popPoints } from '@/components/prospect/FloatingPoints'
+import { ProspectSidebar } from '@/components/prospect/ProspectSidebar'
 import { isPrivacyModeOn, setPrivacyMode } from '@/lib/privacy-mode'
 import { isSoundEnabled, setSoundEnabled, playSound } from '@/lib/sounds'
 
@@ -392,6 +393,11 @@ export default function ProspeccaoPage() {
             tag: `callback-${cb.id}`,
           })
           notifiedCallbackIdsRef.current.add(cb.id)
+          // Cap em 100 entries para não crescer indefinidamente em sessões longas
+          if (notifiedCallbackIdsRef.current.size > 100) {
+            const arr = Array.from(notifiedCallbackIdsRef.current)
+            notifiedCallbackIdsRef.current = new Set(arr.slice(-50))
+          }
         }
       }
     } catch {}
@@ -1453,7 +1459,7 @@ export default function ProspeccaoPage() {
   const tzHint = lead?.pais ? TIMEZONE_HINTS[lead.pais] : null
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl mx-auto">
+    <div className="p-4 md:p-6 mx-auto max-w-2xl lg:max-w-[1280px]">
       {/* Header */}
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
@@ -2549,6 +2555,11 @@ export default function ProspeccaoPage() {
           )}
         </div>
       )}
+
+      {/* ── Layout responsivo: mobile = vertical · desktop (lg+) = 2 colunas ── */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-5">
+      {/* COLUNA PRINCIPAL — todo o conteúdo de prospect */}
+      <div className="min-w-0">
 
       {/* Smart insights from skip patterns */}
       {visibleInsights.length > 0 && (
@@ -3692,6 +3703,16 @@ export default function ProspeccaoPage() {
           </div>
         </div>
       )}
+
+      </div>
+      {/* SIDEBAR contextual (só desktop lg+) */}
+      <ProspectSidebar
+        callbacks={callbacks}
+        bookmarksList={bookmarksList}
+        onShowPendentes={() => { setShowPendentes(true); loadCallbacks(); loadBookmarks() }}
+        onShowHotkeys={() => setShowHotkeys(true)}
+      />
+      </div>
     </div>
   )
 }

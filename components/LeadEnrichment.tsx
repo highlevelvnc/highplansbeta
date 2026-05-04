@@ -86,13 +86,30 @@ export function LeadEnrichment({ initialUrl, empresa, cidade }: Props) {
           {data.ogImage && (
             <div className="aspect-video bg-[#16161A] rounded-lg overflow-hidden border border-[#27272A]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={data.ogImage} alt={data.title || 'preview'} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              <img
+                src={data.ogImage}
+                alt={data.title || 'preview'}
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
             </div>
           )}
           <div className="flex items-start gap-2.5">
             {data.favicon && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={data.favicon} alt="" className="w-8 h-8 rounded flex-shrink-0 bg-[#16161A]" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              <img
+                src={data.favicon}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                width={32} height={32}
+                className="w-8 h-8 rounded flex-shrink-0 bg-[#16161A]"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
             )}
             <div className="flex-1 min-w-0">
               {data.title && <div className="text-sm font-bold text-[#F0F0F3] leading-snug">{data.title}</div>}

@@ -1,29 +1,21 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { Star, CheckCircle, Target, Plus, AlertTriangle, RefreshCw } from 'lucide-react'
+/**
+ * Server Component — fetch direto à DB no server, zero JS no client.
+ * Página renderiza instantaneamente em vez de mostrar loading skeleton.
+ */
+import { Star, CheckCircle, Target, Plus } from 'lucide-react'
+import { prisma } from '@/lib/prisma'
 import { safeJsonParse } from '@/lib/utils'
-import { EmptyState } from '@/components/EmptyState'
 import Link from 'next/link'
 
-export default function OfertasPage() {
-  const [offers, setOffers] = useState<any[] | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export const dynamic = 'force-dynamic'  // sempre fresh; remova para ISR
+export const revalidate = 60             // se cachear, máximo 60s
 
-  const load = () => {
-    setLoading(true)
-    setError(null)
-    fetch('/api/offers')
-      .then(async r => {
-        if (!r.ok) throw new Error(`Erro ${r.status}`)
-        return r.json()
-      })
-      .then(data => setOffers(Array.isArray(data) ? data : []))
-      .catch(err => setError(err instanceof Error ? err.message : 'Erro ao carregar ofertas'))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { load() }, [])
+export default async function OfertasPage() {
+  const offers = await prisma.offer.findMany({
+    where: { ativo: true },
+    take: 100,
+    orderBy: [{ destaque: 'desc' }, { preco: 'asc' }],
+  })
 
   return (
     <div className="p-4 md:p-6">
@@ -32,31 +24,21 @@ export default function OfertasPage() {
         <p className="text-sm text-[#71717A]">Pacotes e planos disponíveis</p>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-56 rounded-2xl animate-shimmer" />
-          ))}
+      {offers.length === 0 ? (
+        <div className="text-center py-16">
+          <Target className="w-10 h-10 text-[#27272A] mx-auto mb-3" />
+          <h3 className="text-base font-bold text-[#F0F0F3] mb-1">Sem ofertas configuradas</h3>
+          <p className="text-sm text-[#71717A] max-w-md mx-auto mb-4">
+            As ofertas são os pacotes e planos que apresentas aos clientes.
+            Configura pelo menos uma oferta para poderes gerar propostas personalizadas.
+          </p>
+          <Link
+            href="/relatorios"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Os planos estão em lib/plans.ts
+          </Link>
         </div>
-      ) : error ? (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-8 text-center">
-          <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-3" />
-          <p className="text-red-300 text-sm mb-1">Erro ao carregar ofertas</p>
-          <p className="text-[#71717A] text-xs mb-4">{error}</p>
-          <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors">
-            <RefreshCw className="w-4 h-4" /> Tentar novamente
-          </button>
-        </div>
-      ) : !offers || offers.length === 0 ? (
-        <EmptyState
-          icon={Target}
-          title="Sem ofertas configuradas"
-          description="As ofertas são os pacotes e planos que apresentas aos clientes. Configura pelo menos uma oferta para poderes gerar propostas personalizadas."
-          actions={[
-            { label: 'Os planos estão em lib/plans.ts', onClick: () => {} },
-            { label: 'Importar exemplos', onClick: () => fetch('/api/offers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seed: true }) }).then(load), primary: true, icon: Plus },
-          ]}
-        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {offers.map(offer => {
