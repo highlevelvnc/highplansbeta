@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
@@ -10,6 +10,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
 import { PaymentAlertsBanner } from '@/components/PaymentAlertsBanner'
 import { applySavedPrivacyMode } from '@/lib/privacy-mode'
+import { useNotifications } from '@/lib/notifications-store'
 
 const nav = [
   { section: 'OPERACIONAL' },
@@ -41,16 +42,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [overdueFU, setOverdueFU] = useState(0)
   const [fuDismissed, setFuDismissed] = useState(false)
 
-  // Check for overdue follow-ups globally
-  useEffect(() => {
-    fetch('/api/dashboard')
-      .then(r => r.json())
-      .then(d => { if (d?.followUpsAtrasados > 0) setOverdueFU(d.followUpsAtrasados) })
-      .catch(() => {})
-  }, [pathname])
+  // Notificações consolidadas via single endpoint /api/notifications (1 poll/min para tudo)
+  const { data: notifs } = useNotifications()
+  const overdueFU = notifs?.followups?.overdue || 0
 
   // Register Service Worker globally (handles callback notifications across all pages)
   useEffect(() => {
@@ -61,30 +57,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Apply privacy-mode state from localStorage (blurs PII when on)
   useEffect(() => { applySavedPrivacyMode() }, [])
 
-  // Browser push notifications for overdue follow-ups
+  // Request notification permission once + auto-fire native notif for new overdue followups
+  const lastNotifiedFURef = useRef(0)
   useEffect(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) return
-    // Request permission once
     if (Notification.permission === 'default') {
       Notification.requestPermission()
     }
-    // Check every 5 min
-    const interval = setInterval(() => {
-      if (Notification.permission !== 'granted' || document.hasFocus()) return
-      fetch('/api/dashboard')
-        .then(r => r.json())
-        .then(d => {
-          if (d?.followUpsAtrasados > 0) {
-            new Notification('HIGHPLANS — Follow-ups', {
-              body: `${d.followUpsAtrasados} follow-up${d.followUpsAtrasados > 1 ? 's' : ''} atrasado${d.followUpsAtrasados > 1 ? 's' : ''}`,
-              icon: '/favicon.ico',
-            })
-          }
-        })
-        .catch(() => {})
-    }, 5 * 60 * 1000)
-    return () => clearInterval(interval)
   }, [])
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return
+    if (Notification.permission !== 'granted' || document.hasFocus()) return
+    if (overdueFU > lastNotifiedFURef.current) {
+      lastNotifiedFURef.current = overdueFU
+      new Notification('HIGHPLANS — Follow-ups', {
+        body: `${overdueFU} follow-up${overdueFU > 1 ? 's' : ''} atrasado${overdueFU > 1 ? 's' : ''}`,
+        icon: '/favicon.ico',
+      })
+    }
+  }, [overdueFU])
 
   // Lead detail pages (/leads/[id]) render their own contextual bar
   const isLeadDetailPage =

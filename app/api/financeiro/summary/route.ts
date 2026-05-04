@@ -25,67 +25,81 @@ export async function GET(_req: NextRequest) {
     const startYear = new Date(now.getFullYear(), 0, 1)
     const start12mo = new Date(now.getFullYear(), now.getMonth() - 11, 1)
 
-    // ── MRR (clientes ACTIVE) ────────────────────────────────────────────
-    const activeClients = await prisma.client.findMany({
-      where: { status: 'ACTIVE', mrr: { gt: 0 } },
-      select: { mrr: true, moeda: true },
-    })
-    const mrrPorMoeda = ZERO_MAP()
-    for (const c of activeClients) {
-      const m = (c.moeda as Currency) || 'EUR'
-      mrrPorMoeda[m] += c.mrr
+    // ── Run all queries em paralelo (Promise.all) — usa groupBy onde possível ─
+    const [
+      mrrGrouped,
+      payMesGrouped,
+      payAnoGrouped,
+      pendentesGrouped,
+      atrasadosGrouped,
+      pay12,
+      activeClientCount,
+    ] = await Promise.all([
+      // MRR ativo agregado por moeda — um único groupBy em vez de findMany
+      prisma.client.groupBy({
+        by: ['moeda'],
+        where: { status: 'ACTIVE', mrr: { gt: 0 } },
+        _sum: { mrr: true },
+      }),
+      // Recebido este mês — groupBy por moeda
+      prisma.payment.groupBy({
+        by: ['moeda'],
+        where: { status: 'PAID', dataPaga: { gte: startMonth } },
+        _sum: { valor: true },
+      }),
+      // Recebido este ano — groupBy por moeda
+      prisma.payment.groupBy({
+        by: ['moeda'],
+        where: { status: 'PAID', dataPaga: { gte: startYear } },
+        _sum: { valor: true },
+      }),
+      // Pendentes — groupBy
+      prisma.payment.groupBy({
+        by: ['moeda'],
+        where: { status: 'PENDING' },
+        _sum: { valor: true },
+        _count: { _all: true },
+      }),
+      // Atrasados (OVERDUE OR PENDING com dataPrevista passada) — groupBy
+      prisma.payment.groupBy({
+        by: ['moeda'],
+        where: {
+          OR: [
+            { status: 'OVERDUE' },
+            { AND: [{ status: 'PENDING' }, { dataPrevista: { lt: now } }] },
+          ],
+        },
+        _sum: { valor: true },
+        _count: { _all: true },
+      }),
+      // Sparkline 12 meses — única query, agrupamos em JS por mês
+      prisma.payment.findMany({
+        where: { status: 'PAID', dataPaga: { gte: start12mo } },
+        select: { valor: true, moeda: true, dataPaga: true },
+        take: 5000,
+      }),
+      // Contagem de clientes ativos
+      prisma.client.count({ where: { status: 'ACTIVE', mrr: { gt: 0 } } }),
+    ])
+
+    // Helpers para converter groupBy results para CurrencyMap
+    const toCurrencyMap = (rows: Array<{ moeda: string | null; _sum: { valor?: number | null; mrr?: number | null } }>, field: 'valor' | 'mrr') => {
+      const r = ZERO_MAP()
+      for (const row of rows) {
+        const m = (row.moeda as Currency) || 'EUR'
+        const v = row._sum[field]
+        if (v) r[m] += v
+      }
+      return r
     }
 
-    // ── Recebido este mês (PAID, dataPaga >= startMonth) ───────────────
-    const payMes = await prisma.payment.findMany({
-      where: { status: 'PAID', dataPaga: { gte: startMonth } },
-      select: { valor: true, moeda: true },
-    })
-    const recebidoMes = ZERO_MAP()
-    for (const p of payMes) recebidoMes[(p.moeda as Currency) || 'EUR'] += p.valor
-
-    // ── Recebido este ano ────────────────────────────────────────────────
-    const payAno = await prisma.payment.findMany({
-      where: { status: 'PAID', dataPaga: { gte: startYear } },
-      select: { valor: true, moeda: true },
-    })
-    const recebidoAno = ZERO_MAP()
-    for (const p of payAno) recebidoAno[(p.moeda as Currency) || 'EUR'] += p.valor
-
-    // ── Pendentes (PENDING + future dataPrevista) ────────────────────────
-    const pendentesList = await prisma.payment.findMany({
-      where: { status: 'PENDING' },
-      select: { valor: true, moeda: true, dataPrevista: true },
-    })
-    const pendentes = ZERO_MAP()
-    let pendentesCount = 0
-    for (const p of pendentesList) {
-      pendentes[(p.moeda as Currency) || 'EUR'] += p.valor
-      pendentesCount++
-    }
-
-    // ── Atrasados (OVERDUE OR PENDING com dataPrevista passada) ─────────
-    const atrasadosList = await prisma.payment.findMany({
-      where: {
-        OR: [
-          { status: 'OVERDUE' },
-          { AND: [{ status: 'PENDING' }, { dataPrevista: { lt: now } }] },
-        ],
-      },
-      select: { valor: true, moeda: true },
-    })
-    const atrasados = ZERO_MAP()
-    let atrasadosCount = 0
-    for (const p of atrasadosList) {
-      atrasados[(p.moeda as Currency) || 'EUR'] += p.valor
-      atrasadosCount++
-    }
-
-    // ── Recebido por mês (12 meses) — sparkline ─────────────────────────
-    const pay12 = await prisma.payment.findMany({
-      where: { status: 'PAID', dataPaga: { gte: start12mo } },
-      select: { valor: true, moeda: true, dataPaga: true },
-    })
+    const mrrPorMoeda = toCurrencyMap(mrrGrouped, 'mrr')
+    const recebidoMes = toCurrencyMap(payMesGrouped, 'valor')
+    const recebidoAno = toCurrencyMap(payAnoGrouped, 'valor')
+    const pendentes = toCurrencyMap(pendentesGrouped, 'valor')
+    const atrasados = toCurrencyMap(atrasadosGrouped, 'valor')
+    const pendentesCount = pendentesGrouped.reduce((s, r) => s + r._count._all, 0)
+    const atrasadosCount = atrasadosGrouped.reduce((s, r) => s + r._count._all, 0)
     const buckets: Array<{ ym: string; label: string; eur: number; brl: number }> = []
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
@@ -108,7 +122,7 @@ export async function GET(_req: NextRequest) {
       else if (m === 'BRL') bucket.brl += p.valor
     }
 
-    // ── Top clientes por receita YTD ─────────────────────────────────────
+    // ── Top clientes por receita YTD — 2 queries em vez de N+1 ──────────
     const topPays = await prisma.payment.groupBy({
       by: ['clientId', 'moeda'],
       where: { status: 'PAID', dataPaga: { gte: startYear } },
@@ -116,15 +130,20 @@ export async function GET(_req: NextRequest) {
       orderBy: { _sum: { valor: 'desc' } },
       take: 5,
     })
-    const topClientes = await Promise.all(topPays.map(async t => {
-      const client = await prisma.client.findUnique({
-        where: { id: t.clientId },
-        select: { id: true, nome: true, empresa: true, planoAtual: true },
+    const topClientIds = topPays.map(t => t.clientId)
+    const topClientDetails = topClientIds.length > 0
+      ? await prisma.client.findMany({
+          where: { id: { in: topClientIds } },
+          select: { id: true, nome: true, empresa: true, planoAtual: true },
+        })
+      : []
+    const clientById = new Map(topClientDetails.map(c => [c.id, c]))
+    const topClientes = topPays
+      .map(t => {
+        const client = clientById.get(t.clientId)
+        return client ? { ...client, moeda: t.moeda || 'EUR', total: t._sum.valor || 0 } : null
       })
-      return client
-        ? { ...client, moeda: t.moeda || 'EUR', total: t._sum.valor || 0 }
-        : null
-    }))
+      .filter(Boolean)
 
     return NextResponse.json({
       mrrPorMoeda,
@@ -135,8 +154,10 @@ export async function GET(_req: NextRequest) {
       atrasados,
       atrasadosCount,
       recebidoPorMes: buckets,
-      topClientes: topClientes.filter(Boolean),
-      activeClientCount: activeClients.length,
+      topClientes,
+      activeClientCount,
+    }, {
+      headers: { 'Cache-Control': 'private, max-age=30' },
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'

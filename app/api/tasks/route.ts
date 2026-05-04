@@ -5,7 +5,8 @@ import { createTaskSchema, validateBody } from '@/lib/validations'
 export async function GET() {
   const tasks = await prisma.internalTask.findMany({
     orderBy: [{ prioridade: 'asc' }, { dueDate: 'asc' }],
-    include: { lead: { select: { nome: true, empresa: true } } }
+    include: { lead: { select: { nome: true, empresa: true } } },
+    take: 500,
   })
   return NextResponse.json(tasks)
 }

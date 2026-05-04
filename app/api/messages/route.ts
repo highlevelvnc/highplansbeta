@@ -5,9 +5,12 @@ import { createMessageTemplateSchema, validateBody } from '@/lib/validations'
 export async function GET() {
   const templates = await prisma.messageTemplate.findMany({
     where: { ativo: true },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: 200,
   })
-  return NextResponse.json(templates)
+  return NextResponse.json(templates, {
+    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
+  })
 }
 
 export async function POST(req: Request) {

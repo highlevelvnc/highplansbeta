@@ -5,7 +5,8 @@ import { createProposalSchema, validateBody } from '@/lib/validations'
 export async function GET() {
   const proposals = await prisma.proposal.findMany({
     orderBy: { createdAt: 'desc' },
-    include: { lead: { select: { nome: true, empresa: true } } }
+    include: { lead: { select: { nome: true, empresa: true } } },
+    take: 500,
   })
   return NextResponse.json(proposals)
 }

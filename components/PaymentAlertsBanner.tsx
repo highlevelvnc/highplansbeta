@@ -1,19 +1,13 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, Bell, X, Calendar } from 'lucide-react'
 import { formatCurrency, type Currency } from '@/lib/currency'
 import { useFinanceUpdates } from '@/lib/finance-events'
+import { useNotifications, refreshNotifications } from '@/lib/notifications-store'
 
 const DISMISS_KEY = 'payment_alerts_dismissed_until'
 const NOTIFIED_KEY = 'payment_notified_ids'
-
-interface DueData {
-  overdue: { count: number; items: any[]; totals: Record<Currency, number> }
-  dueToday: { count: number; items: any[]; totals: Record<Currency, number> }
-  dueSoon: { count: number; items: any[]; totals: Record<Currency, number> }
-  totalAlertas: number
-}
 
 /**
  * Banner global de alertas de pagamento.
@@ -23,9 +17,8 @@ interface DueData {
  * - Dispara notificações nativas do browser para items novos não-notificados
  */
 export function PaymentAlertsBanner() {
-  const [data, setData] = useState<DueData | null>(null)
+  const { data: notifs } = useNotifications()
   const [dismissedUntil, setDismissedUntil] = useState<number>(0)
-  const lastFetchRef = useRef<number>(0)
 
   const isDismissed = Date.now() < dismissedUntil
 
@@ -36,33 +29,17 @@ export function PaymentAlertsBanner() {
     } catch {}
   }, [])
 
-  const load = useCallback(async () => {
-    // Throttle: max 1 req per 30s
-    if (Date.now() - lastFetchRef.current < 30_000) return
-    lastFetchRef.current = Date.now()
-    try {
-      const res = await fetch('/api/financeiro/due-payments')
-      if (!res.ok) return
-      const d = await res.json()
-      setData(d)
-      maybeNotify(d)
-    } catch {}
-  }, [])
+  // Refresh notifications quando há mudanças financeiras
+  useFinanceUpdates(() => { refreshNotifications() })
 
-  // Initial + recurring poll (every 5min) + on visibility
+  // Fire native browser notifications when new items arrive
   useEffect(() => {
-    load()
-    const id = setInterval(load, 5 * 60_000)
-    const onVis = () => { if (document.visibilityState === 'visible') load() }
-    document.addEventListener('visibilitychange', onVis)
-    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
-  }, [load])
-
-  // Refresh on finance events (new payment, status change, etc.)
-  useFinanceUpdates(() => {
-    lastFetchRef.current = 0  // bypass throttle
-    load()
-  })
+    if (!notifs?.payments) return
+    maybeNotify({
+      overdue: notifs.payments.overdue,
+      dueToday: notifs.payments.dueToday,
+    })
+  }, [notifs])
 
   const dismiss = () => {
     const until = Date.now() + 4 * 60 * 60 * 1000  // 4h
@@ -71,11 +48,12 @@ export function PaymentAlertsBanner() {
   }
 
   // Don't render if no alerts or dismissed
-  if (!data || isDismissed) return null
-  if (data.totalAlertas === 0) return null
+  if (!notifs?.payments || isDismissed) return null
+  const totalAlerts = notifs.payments.overdue.count + notifs.payments.dueToday.count
+  if (totalAlerts === 0) return null
 
-  const ovr = data.overdue
-  const due = data.dueToday
+  const ovr = notifs.payments.overdue
+  const due = notifs.payments.dueToday
   const showOverdue = ovr.count > 0
   const showDueToday = due.count > 0
 
@@ -122,7 +100,7 @@ export function PaymentAlertsBanner() {
  * Dispara notificações nativas para items novos (não-notificados antes).
  * Tracking via localStorage para evitar repetir.
  */
-function maybeNotify(d: DueData) {
+function maybeNotify(d: { overdue: { items: any[] }; dueToday: { items: any[] } }) {
   if (typeof window === 'undefined') return
   if (!('Notification' in window) || Notification.permission !== 'granted') return
   if (document.hasFocus()) return  // não notifica se já está a ver a app

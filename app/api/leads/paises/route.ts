@@ -17,7 +17,9 @@ export async function GET() {
     // Also count leads without country
     const semPais = await prisma.lead.count({ where: { OR: [{ pais: null }, { pais: '' }] } })
 
-    return NextResponse.json({ paises, semPais })
+    return NextResponse.json({ paises, semPais }, {
+      headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=900' },
+    })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'
     return NextResponse.json({ error: msg }, { status: 500 })

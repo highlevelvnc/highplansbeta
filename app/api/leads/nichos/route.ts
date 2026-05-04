@@ -14,7 +14,9 @@ export async function GET() {
       .filter(r => r.nicho && r.nicho.trim() !== '')
       .map(r => ({ nicho: r.nicho!, count: r._count.id }))
 
-    return NextResponse.json({ nichos })
+    return NextResponse.json({ nichos }, {
+      headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=600' },
+    })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'
     return NextResponse.json({ error: msg }, { status: 500 })

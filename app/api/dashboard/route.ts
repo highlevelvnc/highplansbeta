@@ -60,19 +60,21 @@ export async function GET() {
       where: { enviado: false, agendadoPara: { lt: now } },
     }),
 
-    // 9. Active clients (have planoAtual) — only fetch plan field
+    // 9. Active clients (have planoAtual) — cap defensivo
     prisma.lead.findMany({
       where: { planoAtual: { not: null } },
       select: { planoAtual: true, nicho: true },
+      take: 2000,
     }),
 
-    // 10. Potential revenue (have upgrade target but no current plan)
+    // 10. Potential revenue (have upgrade target but no current plan) — cap
     prisma.lead.findMany({
       where: {
         planoAlvoUpgrade: { not: null },
         planoAtual: null,
       },
       select: { planoAlvoUpgrade: true },
+      take: 2000,
     }),
 
     // 11. Upsell candidates

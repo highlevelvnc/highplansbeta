@@ -4,15 +4,17 @@ import { getPlanPrice } from '@/lib/plans'
 import { createClientSchema, validateBody } from '@/lib/validations'
 
 export async function GET() {
-  // Get leads that are clients (have planoAtual set)
+  // Get leads that are clients (have planoAtual set) — cap at 1000
   const leads = await prisma.lead.findMany({
     where: { planoAtual: { not: null } },
-    orderBy: { planoInicio: 'desc' }
+    orderBy: { planoInicio: 'desc' },
+    take: 1000,
   })
-  
-  // Also get dedicated clients
+
+  // Also get dedicated clients — cap at 2000 (carteira realista)
   const clients = await prisma.client.findMany({
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: 2000,
   })
 
   // Merge: leads with plans + dedicated clients

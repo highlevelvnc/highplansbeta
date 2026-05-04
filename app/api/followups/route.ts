@@ -18,7 +18,8 @@ export async function GET(req: Request) {
   const followUps = await prisma.followUp.findMany({
     where,
     orderBy: { agendadoPara: 'asc' },
-    include: { lead: { select: { nome: true, empresa: true, whatsapp: true, nicho: true } } }
+    include: { lead: { select: { nome: true, empresa: true, whatsapp: true, nicho: true } } },
+    take: 500,
   })
   return NextResponse.json(followUps)
 }
