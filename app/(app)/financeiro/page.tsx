@@ -5,6 +5,7 @@ import { Euro, Plus, Download, AlertTriangle, CheckCircle, Clock, X, Loader2, Ca
 import { useToast } from '@/components/Toast'
 import { CURRENCY_META, formatCurrency, type Currency } from '@/lib/currency'
 import { RegisterPaymentModal } from '@/components/RegisterPaymentModal'
+import { RevenueHero } from '@/components/RevenueHero'
 
 const STATUS_META: Record<string, { label: string; bg: string; text: string; icon: any }> = {
   PAID:      { label: 'Pago',      bg: 'bg-[#10B981]/15',  text: 'text-[#10B981]', icon: CheckCircle },
@@ -24,6 +25,7 @@ export default function FinanceiroPage() {
   const [showNewPayment, setShowNewPayment] = useState(false)
   const [editingPayment, setEditingPayment] = useState<any>(null)
   const [generating, setGenerating] = useState(false)
+  const [heroRefresh, setHeroRefresh] = useState(0)
   const { toast } = useToast()
 
   const load = useCallback(async () => {
@@ -119,6 +121,9 @@ export default function FinanceiroPage() {
           </button>
         </div>
       </div>
+
+      {/* Gamified hero — combined totals + monthly goal */}
+      <RevenueHero refreshKey={heroRefresh} />
 
       {/* KPI grid (multi-currency) */}
       {summary && (
@@ -324,13 +329,13 @@ export default function FinanceiroPage() {
       <RegisterPaymentModal
         open={showNewPayment}
         onClose={() => setShowNewPayment(false)}
-        onSaved={() => load()}
+        onSaved={() => { load(); setHeroRefresh(k => k + 1) }}
         clientsForPicker={clients}
       />
       <RegisterPaymentModal
         open={!!editingPayment}
         onClose={() => setEditingPayment(null)}
-        onSaved={() => load()}
+        onSaved={() => { load(); setHeroRefresh(k => k + 1) }}
         payment={editingPayment}
         clientsForPicker={clients}
       />

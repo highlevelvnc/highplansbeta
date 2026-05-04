@@ -1,11 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { TrendingUp, Users, Euro, AlertTriangle, Phone, Mail, ExternalLink, ArrowUpRight, Calendar, RefreshCw, UserPlus, Plus } from 'lucide-react'
+import { TrendingUp, Users, Euro, AlertTriangle, Phone, Mail, ExternalLink, ArrowUpRight, Calendar, RefreshCw, UserPlus, Plus, Target, CheckCircle, Edit2 } from 'lucide-react'
 import Link from 'next/link'
 import { buildWhatsAppUrl } from '@/lib/lead-utils'
 import { NewClientModal } from '@/components/NewClientModal'
 import { RegisterPaymentModal } from '@/components/RegisterPaymentModal'
+import { PotentialClientModal } from '@/components/PotentialClientModal'
 import { CURRENCY_META, formatCurrency, type Currency } from '@/lib/currency'
+import { useToast } from '@/components/Toast'
 
 const PLAN_COLORS: Record<string, string> = {
   'Presença Profissional': '#6366F1',
@@ -22,6 +24,43 @@ export default function ClientesPage() {
   const [showNewClient, setShowNewClient] = useState(false)
   const [paymentClient, setPaymentClient] = useState<any>(null)
   const [moedaFilter, setMoedaFilter] = useState<'all' | Currency>('all')
+  // Tab + Pipeline de Vendas
+  const [tab, setTab] = useState<'ativos' | 'pipeline'>('ativos')
+  const [potentialData, setPotentialData] = useState<any>(null)
+  const [showPotentialModal, setShowPotentialModal] = useState(false)
+  const [editingPotentialLead, setEditingPotentialLead] = useState<any>(null)
+  const [convertingId, setConvertingId] = useState<string | null>(null)
+  const { toast } = useToast()
+
+  const loadPotential = async () => {
+    try {
+      const res = await fetch('/api/clients/potential')
+      const data = await res.json()
+      setPotentialData(data)
+    } catch {}
+  }
+
+  useEffect(() => { if (tab === 'pipeline') loadPotential() }, [tab])
+
+  const convertLeadToClient = async (leadId: string) => {
+    if (!confirm('Converter este lead em Cliente formal?\n\nVai criar uma entrada em Clientes com os dados do potencial e marcar o lead como CLOSED.')) return
+    setConvertingId(leadId)
+    try {
+      const res = await fetch(`/api/leads/${leadId}/convert-to-client`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro')
+      toast('🎉 Lead convertido em cliente!', 'success')
+      loadClients()
+      loadPotential()
+    } catch (e: any) {
+      toast(e.message || 'Erro ao converter', 'error')
+    }
+    setConvertingId(null)
+  }
 
   const loadClients = async () => {
     try {
@@ -106,6 +145,23 @@ export default function ClientesPage() {
           </button>
         </div>
       </div>
+
+      {/* Tabs Ativos / Pipeline */}
+      <div className="flex gap-1 mb-5 bg-[#0F0F12] border border-[#27272A] rounded-lg p-1 w-fit">
+        <button onClick={() => setTab('ativos')} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm transition-all ${tab === 'ativos' ? 'bg-[#8B5CF6] text-white font-medium' : 'text-[#71717A] hover:text-[#F0F0F3]'}`}>
+          <UserPlus className="w-3.5 h-3.5" /> Ativos
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${tab === 'ativos' ? 'bg-white/20' : 'bg-[#8B5CF6]/20 text-[#8B5CF6]'}`}>{clients.length}</span>
+        </button>
+        <button onClick={() => setTab('pipeline')} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm transition-all ${tab === 'pipeline' ? 'bg-cyan-500 text-white font-medium' : 'text-[#71717A] hover:text-[#F0F0F3]'}`}>
+          <Target className="w-3.5 h-3.5" /> Pipeline
+          {potentialData?.summary?.total > 0 && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${tab === 'pipeline' ? 'bg-white/20' : 'bg-cyan-500/20 text-cyan-400'}`}>{potentialData.summary.total}</span>
+          )}
+        </button>
+      </div>
+
+      {/* ─── ATIVOS TAB ────────────────────────────────────────────── */}
+      {tab === 'ativos' && (<>
 
       {/* KPIs — multi-currency */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -267,6 +323,118 @@ export default function ClientesPage() {
           </tbody>
         </table>
       </div>
+      </>)}
+
+      {/* ─── PIPELINE TAB ─────────────────────────────────────────── */}
+      {tab === 'pipeline' && (
+        <div>
+          {/* Action header */}
+          <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+            <div>
+              <p className="text-sm text-[#71717A]">
+                Leads em conversa avançada (INTERESTED · NEGOTIATION · PROPOSAL_SENT) com valor projetado e probabilidade.
+              </p>
+            </div>
+            <button onClick={() => { setEditingPotentialLead(null); setShowPotentialModal(true) }} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-white text-xs font-bold transition-all">
+              <Target className="w-3.5 h-3.5" /> Marcar Lead como Possível
+            </button>
+          </div>
+
+          {/* Pipeline KPIs */}
+          {potentialData?.summary && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+              <div className="bg-[#0F0F12] border border-cyan-500/30 rounded-xl p-4">
+                <div className="text-[10px] uppercase tracking-wider text-cyan-400 font-bold mb-2">MRR Esperado 🇵🇹</div>
+                <div className="text-xl md:text-2xl font-black text-[#F0F0F3]">{formatCurrency(potentialData.summary.mrrEsperadoPorMoeda.EUR, 'EUR')}</div>
+                <div className="text-[10px] text-[#71717A] mt-1">se fechar 100%</div>
+              </div>
+              <div className="bg-[#0F0F12] border border-[#10B981]/30 rounded-xl p-4">
+                <div className="text-[10px] uppercase tracking-wider text-[#10B981] font-bold mb-2">MRR Ponderado 🇵🇹</div>
+                <div className="text-xl md:text-2xl font-black text-[#F0F0F3]">{formatCurrency(potentialData.summary.mrrPonderadoPorMoeda.EUR, 'EUR')}</div>
+                <div className="text-[10px] text-[#71717A] mt-1">expectativa real</div>
+              </div>
+              <div className="bg-[#0F0F12] border border-cyan-500/30 rounded-xl p-4">
+                <div className="text-[10px] uppercase tracking-wider text-cyan-400 font-bold mb-2">MRR Esperado 🇧🇷</div>
+                <div className="text-xl md:text-2xl font-black text-[#F0F0F3]">{formatCurrency(potentialData.summary.mrrEsperadoPorMoeda.BRL, 'BRL')}</div>
+                <div className="text-[10px] text-[#71717A] mt-1">se fechar 100%</div>
+              </div>
+              <div className="bg-[#0F0F12] border border-[#10B981]/30 rounded-xl p-4">
+                <div className="text-[10px] uppercase tracking-wider text-[#10B981] font-bold mb-2">MRR Ponderado 🇧🇷</div>
+                <div className="text-xl md:text-2xl font-black text-[#F0F0F3]">{formatCurrency(potentialData.summary.mrrPonderadoPorMoeda.BRL, 'BRL')}</div>
+                <div className="text-[10px] text-[#71717A] mt-1">expectativa real</div>
+              </div>
+            </div>
+          )}
+
+          {/* Pipeline list grouped by status */}
+          {!potentialData ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => <div key={i} className="h-20 bg-[#0F0F12] border border-[#27272A] rounded-xl animate-pulse" />)}
+            </div>
+          ) : potentialData.leads.length === 0 ? (
+            <div className="text-center py-16 bg-[#0F0F12] border border-[#27272A] rounded-xl">
+              <Target className="w-10 h-10 text-[#27272A] mx-auto mb-3" />
+              <div className="text-base font-bold text-[#F0F0F3] mb-1">Sem possíveis clientes</div>
+              <div className="text-sm text-[#71717A] mb-4 max-w-md mx-auto">
+                Mover um lead para INTERESTED/NEGOTIATION/PROPOSAL_SENT no pipeline ou clica em "Marcar Lead como Possível" para começar.
+              </div>
+              <button onClick={() => setShowPotentialModal(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-white text-sm font-bold">
+                <Target className="w-4 h-4" /> Marcar primeiro lead
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {potentialData.leads.map((l: any) => {
+                const moeda = (l.moedaPotencial || (l.pais === 'BR' ? 'BRL' : 'EUR')) as Currency
+                const expected = (l.valorPotencial || 0) * ((l.probabilidadeFecho ?? 50) / 100)
+                const stageColor: Record<string, string> = {
+                  INTERESTED: 'bg-cyan-500/15 text-cyan-400',
+                  NEGOTIATION: 'bg-[#A78BFA]/15 text-[#A78BFA]',
+                  PROPOSAL_SENT: 'bg-amber-500/15 text-amber-400',
+                }
+                const stageLabel: Record<string, string> = { INTERESTED: 'Interessado', NEGOTIATION: 'Negociação', PROPOSAL_SENT: 'Proposta' }
+                const dataPrev = l.dataPrevistaFecho ? new Date(l.dataPrevistaFecho) : null
+                const dias = dataPrev ? Math.round((dataPrev.getTime() - Date.now()) / 86400000) : null
+                return (
+                  <div key={l.id} className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-3.5 flex items-center gap-3 hover:border-cyan-500/30 transition-all">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <Link href={`/leads/${l.id}`} data-privacy="pii" className="text-sm font-bold text-[#F0F0F3] hover:text-cyan-400 truncate">{l.empresa || l.nome}</Link>
+                        <span className="text-base">{(moeda) === 'BRL' ? '🇧🇷' : '🇵🇹'}</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${stageColor[l.pipelineStatus] || 'bg-gray-500/15 text-gray-400'}`}>{stageLabel[l.pipelineStatus] || l.pipelineStatus}</span>
+                        {l.planoPotencial && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#8B5CF6]/15 text-[#A78BFA]">{l.planoPotencial}</span>}
+                      </div>
+                      <div className="text-[11px] text-[#71717A] truncate">
+                        {[l.cidade, l.subNicho || l.nicho].filter(Boolean).join(' · ')}
+                        {l.agent && ` · ${l.agent.nome}`}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                      <div className="text-sm font-black text-[#F0F0F3] tabular-nums">{formatCurrency(l.valorPotencial || 0, moeda)}/mês</div>
+                      <div className="text-[10px] text-cyan-400">
+                        {l.probabilidadeFecho ?? '—'}% · ~<b>{formatCurrency(expected, moeda)}</b>
+                      </div>
+                      {dias !== null && (
+                        <div className={`text-[10px] tabular-nums ${dias < 0 ? 'text-red-400' : dias <= 7 ? 'text-amber-400' : 'text-[#71717A]'}`}>
+                          {dias < 0 ? `Atrasado ${Math.abs(dias)}d` : dias === 0 ? 'Hoje' : dias === 1 ? 'Amanhã' : `Em ${dias}d`}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button onClick={() => { setEditingPotentialLead(l); setShowPotentialModal(true) }} title="Editar potencial" className="p-1.5 rounded text-[#71717A] hover:text-cyan-400 hover:bg-[#16161A] transition-colors">
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => convertLeadToClient(l.id)} disabled={convertingId === l.id} title="Converter em cliente" className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-[#10B981]/10 hover:bg-[#10B981]/20 text-[#10B981] text-[10px] font-bold transition-colors disabled:opacity-50">
+                        {convertingId === l.id ? '...' : <><CheckCircle className="w-3 h-3" /> Fechar</>}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <NewClientModal open={showNewClient} onClose={() => setShowNewClient(false)} onCreated={() => loadClients()} />
       <RegisterPaymentModal
@@ -274,6 +442,13 @@ export default function ClientesPage() {
         onClose={() => setPaymentClient(null)}
         onSaved={() => loadClients()}
         client={paymentClient}
+      />
+      <PotentialClientModal
+        open={showPotentialModal}
+        onClose={() => { setShowPotentialModal(false); setEditingPotentialLead(null) }}
+        onSaved={() => { loadPotential(); loadClients() }}
+        lead={editingPotentialLead}
+        isEdit={!!editingPotentialLead}
       />
     </div>
   )

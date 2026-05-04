@@ -44,6 +44,12 @@ model Lead {
   skipCount         Int      @default(0)
   lastSkippedAt     DateTime?
   lastSkipReason    String?  // 'no_phone' | 'fixo_only' | 'wrong_fit' | 'later' | null
+  // ─── Possível Cliente (pipeline de vendas) ──────────────────────────────
+  valorPotencial      Float?     // MRR esperado se fechar
+  moedaPotencial      String?    // EUR | BRL
+  probabilidadeFecho  Int?       // 0-100
+  dataPrevistaFecho   DateTime?  // quando achas que vai fechar
+  planoPotencial      String?    // qual plano vai vender
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
