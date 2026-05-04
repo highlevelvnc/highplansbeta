@@ -39,6 +39,7 @@ import { recordSendAndMaybeSpread, getRateState, canSend, recordBan, setActiveNu
 import { SUB_NICHOS_CONSTRUTORAS } from '@/lib/sub-nicho'
 import { getTimeAdvice } from '@/lib/time-advisor'
 import { ensurePermission, getPermissionState, hasBeenPrompted, showNotification, registerServiceWorker, scheduleCallbackInSW, cancelCallbackInSW, pingSWCheck } from '@/lib/notifications'
+import { randomGreeting, langFromCountry } from '@/lib/greetings'
 
 interface Lead {
   id: string
@@ -1187,9 +1188,8 @@ export default function ProspeccaoPage() {
     const messageBody = aiMessage || generateAiMessage(lead, aiVariant)
     // Two-tap mode (default for whatsapp:// flow): open WA with greeting, copy script to clipboard.
     // Skipped when `fullOnly` is set (e.g. user explicitly chose "send full now").
-    const greeting = lead.pais === 'DE' ? 'Hallo, guten Tag! 👋'
-      : lead.pais === 'NL' ? 'Hi, good morning! 👋'
-      : 'Olá, bom dia! 👋'
+    // Greeting é variável (anti-bloqueio WA) + adapta-se ao período do dia (manhã/tarde/noite)
+    const greeting = randomGreeting(langFromCountry(lead.pais))
 
     const sendBody = opts?.fullOnly ? messageBody : greeting
     const encoded = encodeURIComponent(sendBody)
@@ -3437,7 +3437,7 @@ export default function ProspeccaoPage() {
                       onClick={() => handleWhatsApp(false)}
                       disabled={!hasWA}
                       className={`relative flex flex-col items-center justify-center gap-1.5 text-[#25D366] hover:bg-[#25D366]/8 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed group btn-ripple ${outdoor ? 'py-9' : 'py-5'}`}
-                      title="Abre WA com 'Olá, bom dia!' e copia o script para colares depois"
+                      title="Abre WA com saudação variada (anti-bloqueio, adapta-se à hora) e copia o script"
                     >
                       <MessageCircle className={outdoor ? 'w-10 h-10' : 'w-6 h-6'} />
                       <span className={`font-bold ${outdoor ? 'text-base' : 'text-xs'}`}>WhatsApp</span>
