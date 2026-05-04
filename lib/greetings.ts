@@ -30,7 +30,7 @@ const PT_GREETINGS = {
     'Olá, tudo certo? Bom dia!',
     'Bom dia 👋',
     'Olá, bom dia 🙌',
-    'E aí, bom dia! 😊',
+    'Olá! Tudo bem? Bom dia 😊',
   ],
   afternoon: [
     'Olá, boa tarde! 👋',
@@ -42,7 +42,7 @@ const PT_GREETINGS = {
     'Olá, tudo certo? Boa tarde!',
     'Boa tarde 👋',
     'Olá, boa tarde 🙌',
-    'E aí, boa tarde! 😊',
+    'Olá! Tudo bem? Boa tarde 😊',
   ],
   evening: [
     'Olá, boa noite! 👋',
