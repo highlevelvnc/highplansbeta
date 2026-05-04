@@ -527,6 +527,22 @@ export default function ProspeccaoPage() {
     toast(next ? '🔀 Spread ativado · alterna automaticamente WA1↔WA2' : 'Spread desativado', 'success')
   }
 
+  // Marca o lead como off-topic ("Não Construção") + skip + next
+  const markOffTopic = async () => {
+    if (!lead) return
+    haptic('warning')
+    setSessionStats(s => ({ ...s, skipped: s.skipped + 1 }))
+    setStreak(0)
+    const id = lead.id
+    fetch(`/api/leads/${id}/mark-off-topic`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'manual via prospect card' }),
+    }).catch(() => null)
+    toast('🚫 Marcado off-topic · vai pro fim da fila', 'success')
+    loadNext()
+  }
+
   // Toggle "pinned" tag on the current lead — pinned leads always appear first in queue
   const togglePin = async () => {
     if (!lead) return
@@ -3462,6 +3478,21 @@ export default function ProspeccaoPage() {
                         <span>Enviar script completo (sem cumprimento)</span>
                       </button>
                     </>
+                  )}
+
+                  {/* Off-topic banner — só aparece se lead não está já marcado off-topic.
+                      Permite ao user marcar 1-click quando vê pelo nome que é mobiliário,
+                      junta de freguesia, etc., e fica registado no fim da fila. */}
+                  {lead.subNicho !== 'Não Construção' && lead.nicho === 'Construtoras' && (
+                    <div className="border-t border-[#27272A] bg-amber-500/5">
+                      <button
+                        onClick={markOffTopic}
+                        className="w-full py-2 px-3 text-[11px] text-amber-400 hover:bg-amber-500/10 flex items-center justify-center gap-1.5 font-medium transition-all"
+                        title="Marcar este lead como off-topic (não é construção). Vai pro fim da fila e fica registado."
+                      >
+                        🚫 <span>Não é construção · marcar off-topic</span>
+                      </button>
+                    </div>
                   )}
 
                   {/* Snooze + Voice + Schedule + Mark Invalid */}

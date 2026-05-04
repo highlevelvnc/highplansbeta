@@ -158,6 +158,16 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // Auto-deprioritizar 'Não Construção' — vai sempre para o FIM
+    // mesmo dentro do filtro Construtoras. Esses leads vêm errados do Google Maps
+    // (estofos, sofás, juntas de freguesia, etc.) e desperdiçam tempo.
+    // Stable sort mantém ordem relativa dos restantes.
+    validLeads = validLeads.sort((a, b) => {
+      const aOff = a.subNicho === 'Não Construção' ? 1 : 0
+      const bOff = b.subNicho === 'Não Construção' ? 1 : 0
+      return aOff - bOff
+    })
+
     // Prepend pinned leads (deduped by id) — they always show first
     if (pinnedLeads.length > 0) {
       const pinnedValid = pinnedLeads.filter(p => {
