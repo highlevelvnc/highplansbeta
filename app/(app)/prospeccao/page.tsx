@@ -3091,7 +3091,10 @@ export default function ProspeccaoPage() {
               transform: swipeDelta !== 0 ? `translateX(${swipeDelta}px) rotate(${swipeDelta * 0.05}deg)` : undefined,
               transition: swipeDelta === 0 ? 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' : undefined,
             }}
-            className="relative bg-gradient-to-br from-[#0F0F12] to-[#0A0A0D] border border-[#27272A] rounded-2xl overflow-hidden card-hover shadow-xl shadow-black/40 touch-pan-y"
+            key={lead.id}
+            className={`relative bg-gradient-to-br from-[#0F0F12] to-[#0A0A0D] border rounded-2xl overflow-hidden card-hover shadow-xl shadow-black/40 touch-pan-y animate-lead-in ${
+              lead.score === 'HOT' ? 'border-red-500/40 animate-hot-pulse' : 'border-[#27272A]'
+            }`}
           >
             {/* Swipe direction hint overlay */}
             {Math.abs(swipeDelta) > 30 && (

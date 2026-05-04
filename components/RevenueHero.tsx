@@ -137,7 +137,7 @@ export function RevenueHero({ refreshKey = 0 }: Props) {
               )}
             </div>
             <div className="flex items-baseline gap-2 mb-2">
-              <div className="text-2xl md:text-3xl font-black text-[#F0F0F3]">{formatCurrency(monthEur, 'EUR')}</div>
+              <div className={`text-2xl md:text-3xl font-black ${pctEur >= 100 ? 'text-[#10B981] has-sparkles' : 'text-[#F0F0F3]'}`}>{formatCurrency(monthEur, 'EUR')}</div>
               {goalEur > 0 && <div className="text-[11px] text-[#52525B]">/ {formatCurrency(goalEur, 'EUR')}</div>}
             </div>
             {goalEur > 0 ? (
@@ -204,7 +204,7 @@ export function RevenueHero({ refreshKey = 0 }: Props) {
               )}
             </div>
             <div className="flex items-baseline gap-2 mb-2">
-              <div className="text-2xl md:text-3xl font-black text-[#F0F0F3]">{formatCurrency(monthBrl, 'BRL')}</div>
+              <div className={`text-2xl md:text-3xl font-black ${pctBrl >= 100 ? 'text-[#10B981] has-sparkles' : 'text-[#F0F0F3]'}`}>{formatCurrency(monthBrl, 'BRL')}</div>
               {goalBrl > 0 && <div className="text-[11px] text-[#52525B]">/ {formatCurrency(goalBrl, 'BRL')}</div>}
             </div>
             {goalBrl > 0 ? (

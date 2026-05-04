@@ -453,7 +453,8 @@ export default function DashboardPage() {
             label="Leads HOT"
             value={data.leadsHot}
             animated
-            sub="Score alto — contactar agora"
+            alert={data.leadsHot > 0}
+            sub={data.leadsHot > 0 ? '🔥 Contactar agora!' : 'Sem HOT no momento'}
             color="#EF4444"
             href="/leads?score=HOT"
           />
