@@ -262,10 +262,11 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json()
-    const { rows, nicho: nichoOverride, origem: origemDefault } = body as {
+    const { rows, nicho: nichoOverride, origem: origemDefault, campaign_id: campaignIdGlobal } = body as {
       rows: Array<Record<string, string | undefined>>
       nicho?: string
       origem?: string
+      campaign_id?: string
     }
 
     if (!rows || !Array.isArray(rows)) {
@@ -357,6 +358,9 @@ export async function POST(req: Request) {
         else if (isInstagram) obs = `Instagram: ${siteVal.substring(0, 120)}`
         else if (siteVal) obs = `Site: ${siteVal.substring(0, 120)}`
 
+        // Campaign ID por linha (override) ou global do payload
+        const campaignId = (r.campaign_id || campaignIdGlobal || '').trim()
+
         const newLeadData: Record<string, any> = {
           nome,
           empresa,
@@ -382,6 +386,8 @@ export async function POST(req: Request) {
           pais: countryRaw
             ? (countryRaw.length === 2 ? countryRaw.toUpperCase() : detectCountry(telefoneRawValue || telefoneStored, cidadeRaw))
             : detectCountry(telefoneRawValue || telefoneStored, cidadeRaw),
+          // Campaign ID -> tags (comma-separated)
+          tags: campaignId ? `campaign:${campaignId}` : null,
         }
 
         const match = await findExistingLead(
@@ -393,6 +399,27 @@ export async function POST(req: Request) {
           const existingLead = await prisma.lead.findUnique({ where: { id: match.leadId } })
           if (existingLead) {
             const mergePayload = buildMergePayload(existingLead as any, newLeadData)
+
+            // Acumula campaign tag em vez de sobrescrever (zero risco para tags existentes)
+            if (campaignId) {
+              const newTag = `campaign:${campaignId}`
+              const existingTags = (existingLead as any).tags || ''
+              if (!existingTags.includes(newTag)) {
+                const merged = existingTags
+                  ? `${existingTags},${newTag}`
+                  : newTag
+                if (!mergePayload) {
+                  // Cria mergePayload se nao existia, so para adicionar tag
+                  await prisma.lead.update({
+                    where: { id: match.leadId },
+                    data: { tags: merged },
+                  })
+                } else {
+                  mergePayload.tags = merged
+                }
+              }
+            }
+
             if (mergePayload) {
               await prisma.lead.update({ where: { id: match.leadId }, data: mergePayload })
               if (mergePayload.email) index.byEmail.set(mergePayload.email.toLowerCase(), match.leadId)
