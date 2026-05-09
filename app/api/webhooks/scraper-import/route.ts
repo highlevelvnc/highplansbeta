@@ -75,8 +75,74 @@ function detectSiteInfo(siteField: string): {
   }
 }
 
-function detectNicho(nome: string, override?: string): string {
-  if (override) return override
+// Mapping: category do scraper -> nicho do CRM
+// Tudo que e construcao/remodelacao/oficio = "Construtoras"
+const SCRAPER_CATEGORY_TO_NICHO: Record<string, string> = {
+  'Construcao':        'Construtoras',
+  'Construção':        'Construtoras',
+  'Remodelacao':       'Construtoras',
+  'Remodelação':       'Construtoras',
+  'Handyman':          'Construtoras',
+  'Manutencao':        'Construtoras',
+  'Manutenção':        'Construtoras',
+  'Pinturas':          'Construtoras',
+  'Acabamentos':       'Construtoras',
+  'Tetos & Estuque':   'Construtoras',
+  'Pisos':             'Construtoras',
+  'Madeiras':          'Construtoras',
+  'Carpintaria':       'Construtoras',
+  'Canalizacao':       'Construtoras',
+  'Canalização':       'Construtoras',
+  'Eletricidade':      'Construtoras',
+  'Vidros':            'Construtoras',
+  'Serralharia':       'Construtoras',
+  'Seguranca':         'Construtoras',
+  'Segurança':         'Construtoras',
+  'Telhados':          'Construtoras',
+  'Isolamento':        'Construtoras',
+  'Climatizacao':      'Construtoras',
+  'Climatização':      'Construtoras',
+  'Aquecimento':       'Construtoras',
+  'Energia':           'Energia Solar',
+  'Lar':               'Construtoras',
+  'Limpezas':          'Limpezas',
+  'Jardinagem':        'Jardinagem',
+  'Piscinas':          'Piscinas',
+  'Pragas':            'Controlo de Pragas',
+  'Mudancas':          'Mudanças',
+  'Mudanças':          'Mudanças',
+  'Tecnicos':          'Técnicos',
+  'Técnicos':          'Técnicos',
+  'Informatica':       'Informática',
+  'Informática':       'Informática',
+  'Exterior':          'Exterior',
+}
+
+// Termos de busca -> nicho (fallback se category nao chegar)
+function nichoFromTermo(termo: string): string | null {
+  const t = (termo || '').toLowerCase()
+  // Construcao/remodelacao/handyman = todos viram Construtoras
+  if (t.match(/(remodel|constru|empreit|obras|pedreir|trolha|pichelar|biscat|marido de aluguer|reparac|manutenc|pintor|pintur|fachad|microcimento|epoxi|carpinte|tapecei|colchoei|canaliz|pichelei|desentup|eletric|vidrac|aluminio|caixilhar|estor|serralh|chaveir|fechad|portoes|alarme|cctv|videovigil|salamandr|gas|painel solar|bomba calor|ar condicionado|ledr|quadro eletric|isolamento|impermeab|soalho|parquet|telhado|chamine|fossa|toldo|escavac|terraplanag|prag|desbaratiz|desinfest|desinfec|tetos falsos|estuque|estucad|ladrilh|azulejad|pavimento|polimento|cozinha|movei|montagem ikea)/)) {
+    return 'Construtoras'
+  }
+  if (t.match(/(jardin|relva|poda|arvor)/)) return 'Jardinagem'
+  if (t.match(/(piscina)/)) return 'Piscinas'
+  if (t.match(/(limpeza)/)) return 'Limpezas'
+  if (t.match(/(mudanca|mudança)/)) return 'Mudanças'
+  return null
+}
+
+function detectNicho(nome: string, termoOuOverride?: string, category?: string): string {
+  // 1) Prioridade absoluta: category mapeada do scraper
+  if (category && SCRAPER_CATEGORY_TO_NICHO[category]) {
+    return SCRAPER_CATEGORY_TO_NICHO[category]
+  }
+  // 2) Termo de busca (smart match — handyman, biscates, etc viram Construtoras)
+  if (termoOuOverride) {
+    const fromTermo = nichoFromTermo(termoOuOverride)
+    if (fromTermo) return fromTermo
+  }
+  // 3) Fallback: detecta pelo nome
   const n = (nome || '').toLowerCase()
   if (n.includes('solar') || n.includes('fotovoltai')) return 'Energia Solar'
   if (n.includes('restaur') || n.includes('café') || n.includes('cafe') || n.includes('pizz') || n.includes('tasca') || n.includes('snack')) return 'Restaurantes'
@@ -87,7 +153,8 @@ function detectNicho(nome: string, override?: string): string {
   if (n.includes('hotel') || n.includes('hostel') || n.includes('alojamento') || n.includes('turism') || n.includes('quinta')) return 'Turismo'
   if (n.includes('imobil') || n.includes('imovel') || n.includes('imóvel')) return 'Imobiliária'
   if (n.includes('beleza') || n.includes('cabelei') || n.includes('estética') || n.includes('estetica') || n.includes('barber') || n.includes('unhas') || n.includes('brows')) return 'Beleza & Estética'
-  return 'Serviços'
+  // 4) Ultimate fallback: termo direto se foi passado
+  return termoOuOverride || 'Serviços'
 }
 
 interface PhoneIndex {
@@ -159,7 +226,7 @@ function buildMergePayload(
 ): Record<string, any> | null {
   const u: Record<string, any> = {}
   const fields = [
-    'empresa', 'nicho', 'cidade', 'telefone', 'whatsapp',
+    'empresa', 'nicho', 'subNicho', 'cidade', 'telefone', 'whatsapp',
     'telefoneRaw', 'whatsappRaw', 'email', 'origem',
     'observacaoPerfil', 'motivoScore',
   ]
@@ -234,6 +301,8 @@ export async function POST(req: Request) {
         const countryRaw = (r.country || r.pais || '').trim()
         const sourceRaw = (r.source || r.origem || '').trim()
         const websiteStatus = (r.website_status || r.websiteStatus || '').trim().toLowerCase()
+        const categoryRaw = (r.category || r.Category || '').trim()
+        const subcategoryRaw = (r.subcategory || r.subCategory || '').trim()
         const outreachScoreRaw = parseInt(r.outreach_priority_score || r.website_buyer_score || '0', 10)
         const noWebsiteScoreRaw = parseInt(r.no_website_score || '0', 10)
         const weakDigitalScoreRaw = parseInt(r.weak_digital_presence_score || '0', 10)
@@ -249,7 +318,11 @@ export async function POST(req: Request) {
         const whatsappStored = whatsapp || null
 
         const siteInfo = detectSiteInfo(siteRaw)
-        const nicho = detectNicho(nome, termoRaw || nichoOverride)
+        const nicho = detectNicho(nome, termoRaw || nichoOverride, categoryRaw)
+        // subNicho = subcategoria detalhada (ex: "Pinturas", "Canalização", "Biscates")
+        const subNicho = subcategoryRaw || categoryRaw || (termoRaw
+          ? termoRaw.charAt(0).toUpperCase() + termoRaw.slice(1)
+          : null)
 
         const hasWebsiteFromScraper = websiteStatus === 'has_website' || websiteStatus === 'active'
         const noWebsiteFromScraper = websiteStatus === 'no_website' || websiteStatus === 'sem site'
@@ -284,10 +357,11 @@ export async function POST(req: Request) {
         else if (isInstagram) obs = `Instagram: ${siteVal.substring(0, 120)}`
         else if (siteVal) obs = `Site: ${siteVal.substring(0, 120)}`
 
-        const newLeadData = {
+        const newLeadData: Record<string, any> = {
           nome,
           empresa,
           nicho,
+          subNicho: subNicho || null,
           cidade: cidadeRaw.trim() || 'Portugal',
           telefone: telefoneStored,
           whatsapp: whatsappStored,
@@ -338,7 +412,7 @@ export async function POST(req: Request) {
             skipped++
           }
         } else {
-          const createdLead = await prisma.lead.create({ data: newLeadData })
+          const createdLead = await prisma.lead.create({ data: newLeadData as any })
           if (emailRaw) index.byEmail.set(emailRaw.toLowerCase(), createdLead.id)
           const nT = normalizePhoneForMatch(telefone)
           if (nT.length >= 9) index.byTelefone.set(nT, createdLead.id)
