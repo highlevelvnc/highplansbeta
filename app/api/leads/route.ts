@@ -2,9 +2,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createLeadSchema, validateBody } from '@/lib/validations'
+import { withCache, isBypassRequested, invalidatePrefix } from '@/lib/memcache'
+
+// Sprint #44: cache 20s — listings podem mudar (novos imports) mas dentro
+// de 20s ninguém nota. Key inclui query string completa (search, filtros, page).
+const CACHE_TTL_MS = 20 * 1000
+const CACHE_PREFIX = 'leads:list:'
 
 export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = req.nextUrl
+    const bypass = isBypassRequested(req)
+
+    // Cache key = query string completa (ordenada para garantir hits consistentes)
+    const cacheKey = CACHE_PREFIX + Array.from(searchParams.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${v}`)
+      .join('&')
+
+    const result = await withCache(cacheKey, CACHE_TTL_MS, () => fetchLeads(req), { bypass })
+
+    return NextResponse.json(result.data, {
+      headers: {
+        'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
+        'X-Cache': result.cached ? `HIT age=${result.ageS}s` : 'MISS',
+      },
+    })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Erro'
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
+}
+
+async function fetchLeads(req: NextRequest) {
     const { searchParams } = req.nextUrl
 
     const search = searchParams.get('search') ?? ''
@@ -144,21 +174,13 @@ export async function GET(req: NextRequest) {
       }),
     ])
 
-    return NextResponse.json({
+    return {
       leads,
       total,
       page,
       pageSize,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
-    }, {
-      // EGRESS: cache curto — listings de leads podem mudar (novos imports) mas
-      // 15s de janela é razoável para reduzir double-load de paginação.
-      headers: { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=60' },
-    })
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Erro'
-    return NextResponse.json({ error: msg }, { status: 500 })
-  }
+    }
 }
 
 export async function POST(req: NextRequest) {
@@ -167,6 +189,7 @@ export async function POST(req: NextRequest) {
     const v = validateBody(createLeadSchema, body)
     if (!v.success) return v.response
     const lead = await prisma.lead.create({ data: v.data })
+    invalidatePrefix(CACHE_PREFIX)  // novo lead aparece no próximo GET
     return NextResponse.json(lead, { status: 201 })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'
