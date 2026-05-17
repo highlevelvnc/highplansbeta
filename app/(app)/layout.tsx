@@ -11,6 +11,7 @@ import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
 import { PaymentAlertsBanner } from '@/components/PaymentAlertsBanner'
 import { applySavedPrivacyMode } from '@/lib/privacy-mode'
 import { useNotifications } from '@/lib/notifications-store'
+import { syncFromServer } from '@/lib/wa-rate-limiter'
 
 const nav = [
   { section: 'OPERACIONAL' },
@@ -44,6 +45,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [fuDismissed, setFuDismissed] = useState(false)
+
+  // Sprint #45 — sync wa-rate-limiter state com server (multi-device, sobrevive
+  // a clear cookies). Roda 1× no mount + a cada visibility change (volta ao tab).
+  useEffect(() => {
+    syncFromServer()  // initial sync
+    const onVis = () => { if (document.visibilityState === 'visible') syncFromServer() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [])
 
   // Prefetch agressivo das rotas mais visitadas após mount.
   // Quando o user clicar em qualquer destas, a navegação é instantânea.

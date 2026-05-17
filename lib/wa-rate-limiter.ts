@@ -104,6 +104,7 @@ export function setLabel(key: NumberKey, label: string, emoji?: string) {
     s.numbers[key].label = label.trim().slice(0, 20) || DEFAULT_LABELS[key].label
     if (emoji !== undefined) s.numbers[key].emoji = emoji.slice(0, 4)
     write(s)
+    pushEventToServer(key, 'label_change', { label: s.numbers[key].label, emoji: s.numbers[key].emoji })
   }
 }
 
@@ -156,6 +157,7 @@ export function markNumberAsNew(key: NumberKey) {
     s.numbers[key].createdAt = Date.now()
     s.numbers[key].bans = []  // histórico de bans não se aplica a chip diferente
     write(s)
+    pushEventToServer(key, 'warmup_start')
   }
 }
 
@@ -165,6 +167,7 @@ export function markNumberAsWarmed(key: NumberKey) {
   if (s.numbers[key]) {
     delete s.numbers[key].createdAt
     write(s)
+    pushEventToServer(key, 'warmed')
   }
 }
 
@@ -202,6 +205,69 @@ function write(s: Storage) {
   try {
     localStorage.setItem(KEY, JSON.stringify(s))
   } catch {}
+}
+
+// ─── Sprint #45: server-side sync ────────────────────────────────────────
+//
+// localStorage continua primary (latência baixa). Server é fonte de verdade
+// para multi-device + sobrevive a clear cookies. Padrão de sync:
+//   1. No mount da app: pullFromServer() — merge eventos remotos com local
+//   2. A cada evento (send/ban/warmup/label): pushEventToServer() fire-and-forget
+//   3. Se falhar push, o evento fica em localStorage e tenta de novo na próxima visita
+
+/** Push de evento para o server. Fire-and-forget — não bloqueia UI. */
+function pushEventToServer(slot: NumberKey, type: 'send' | 'ban' | 'warmup_start' | 'warmed' | 'label_change', metadata?: Record<string, any>) {
+  if (typeof window === 'undefined') return
+  fetch('/api/wa-state/event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slot, type, metadata }),
+  }).catch(() => {/* silent fail — localStorage continua válido */})
+}
+
+/**
+ * Pull state do server e merge com localStorage. Chamar 1× no mount da app
+ * (não em cada render). Estratégia de merge:
+ *   - sends/bans: union (eventos de outros devices entram, nunca apagam)
+ *   - labels/warmup: server wins (último evento determina)
+ */
+export async function syncFromServer(): Promise<{ synced: boolean }> {
+  if (typeof window === 'undefined') return { synced: false }
+  try {
+    const res = await fetch('/api/wa-state')
+    if (!res.ok) return { synced: false }
+    const remote = await res.json() as {
+      slots: Record<NumberKey, {
+        sends24h: number[]
+        bans60d: Array<{ ts: number; count: number }>
+        label?: string
+        emoji?: string
+        warmupStartedAt?: number
+      }>
+    }
+    const local = read()
+    for (const slot of NUMBER_KEYS) {
+      const r = remote.slots[slot]
+      if (!r) continue
+      // Union de sends (dedup by timestamp)
+      const sendsSet = new Set([...local.numbers[slot].sends, ...r.sends24h])
+      local.numbers[slot].sends = Array.from(sendsSet).sort((a, b) => a - b)
+      // Union de bans (dedup by ts)
+      const banKeys = new Set(local.numbers[slot].bans.map(b => b.ts))
+      for (const rb of r.bans60d) {
+        if (!banKeys.has(rb.ts)) local.numbers[slot].bans.push(rb)
+      }
+      local.numbers[slot].bans.sort((a, b) => a.ts - b.ts)
+      // Server wins para label/emoji/warmup
+      if (r.label) local.numbers[slot].label = r.label
+      if (r.emoji) local.numbers[slot].emoji = r.emoji
+      if (r.warmupStartedAt) local.numbers[slot].createdAt = r.warmupStartedAt
+    }
+    write(local)
+    return { synced: true }
+  } catch {
+    return { synced: false }
+  }
 }
 
 export function getActiveNumber(): NumberKey {
@@ -266,6 +332,7 @@ export function recordSend() {
   const s = read()
   s.numbers[s.active].sends.push(Date.now())
   write(s)
+  pushEventToServer(s.active, 'send')
 }
 
 /**
@@ -275,12 +342,14 @@ export function recordSend() {
  */
 export function recordSendAndMaybeSpread(): { active: NumberKey; spread: boolean } {
   const s = read()
-  s.numbers[s.active].sends.push(Date.now())
+  const slotUsed = s.active   // o slot que recebeu o send (antes de eventual rotate)
+  s.numbers[slotUsed].sends.push(Date.now())
   if (s.spreadMode) {
     // alternate: wa1 → wa2 → wa1
     s.active = s.active === 'wa1' ? 'wa2' : 'wa1'
   }
   write(s)
+  pushEventToServer(slotUsed, 'send')
   return { active: s.active, spread: !!s.spreadMode }
 }
 
@@ -302,6 +371,7 @@ export function recordBan(): { count: number } {
   const dayCount = s.numbers[s.active].sends.filter(t => t > dayAgo).length
   s.numbers[s.active].bans.push({ ts: now, count: dayCount })
   write(s)
+  pushEventToServer(s.active, 'ban', { dayCount })
   return { count: dayCount }
 }
 

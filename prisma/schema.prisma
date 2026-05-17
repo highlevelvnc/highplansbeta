@@ -341,4 +341,25 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   leads        Lead[]
+  whatsappEvents WhatsappEvent[]
+}
+
+/// Sprint #45 — espelho server-side do wa-rate-limiter.
+/// Eventos source-of-truth para sends/bans/warmup/labels do WhatsApp.
+/// localStorage continua primary para latência baixa; este model serve para:
+///   1. Multi-device sync (tablet manhã + desktop tarde → contadores agregados)
+///   2. Sobrevive a clear cookies / browser novo
+///   3. Histórico permanente de bans (para adaptiveWarn fiável)
+model WhatsappEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slot      String   // 'wa1' | 'wa2'
+  type      String   // 'send' | 'ban' | 'warmup_start' | 'warmed' | 'label_change'
+  ts        DateTime @default(now())
+  metadata  String?  // JSON: { dayCount?, label?, emoji?, leadId? }
+
+  @@index([userId, slot, ts])
+  @@index([userId, slot, type, ts])
+  @@index([userId, ts])
 }
