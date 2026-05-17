@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { crmInvalidate } from '@/lib/memcache'
 
 /**
  * Converte um Lead em Client formal (1 clique).
@@ -71,6 +72,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       },
     })
 
+    // Sprint #48: conversão afecta TODOS os dashboards
+    crmInvalidate(['leads', 'pipeline', 'clients', 'dashboard', 'funnel', 'inbox'])
     return NextResponse.json({ success: true, client })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro ao converter'

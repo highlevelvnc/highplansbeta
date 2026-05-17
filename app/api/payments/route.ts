@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createPaymentSchema, validateBody } from '@/lib/validations'
+import { crmInvalidate } from '@/lib/memcache'
 
 /**
  * GET — list payments with filters.
@@ -80,6 +81,7 @@ export async function POST(req: NextRequest) {
     if (data.status === 'PAID' && !data.dataPaga) data.dataPaga = new Date()
 
     const payment = await prisma.payment.create({ data })
+    crmInvalidate(['dashboard', 'clients', 'notifications'])
     return NextResponse.json(payment, { status: 201 })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro ao criar pagamento'

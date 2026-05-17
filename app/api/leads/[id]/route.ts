@@ -4,6 +4,7 @@ import { calcOpportunityScore, calcScore } from '@/lib/utils'
 import { updateLeadSchema, validateBody } from '@/lib/validations'
 import { requireAdmin } from '@/lib/auth-guard'
 import { logSecurityEvent, getRequestIp } from '@/lib/security-audit'
+import { crmInvalidate } from '@/lib/memcache'
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -46,6 +47,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     where: { id },
     data: { ...data, opportunityScore: oppScore, score: newScore }
   })
+  // Sprint #48: lead muda → invalida listings, pipeline, dashboard, funnel
+  // (status pode ter mudado, score também)
+  crmInvalidate(['leads', 'pipeline', 'dashboard', 'funnel', 'inbox'])
 
   if (oldScore !== newScore) {
     await prisma.activity.create({
@@ -73,6 +77,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     select: { nome: true, empresa: true, telefone: true, whatsapp: true, pipelineStatus: true },
   })
   await prisma.lead.delete({ where: { id } })
+  // Sprint #48: delete invalida tudo que conta leads
+  crmInvalidate(['leads', 'pipeline', 'dashboard', 'funnel', 'clients', 'inbox', 'activity'])
   logSecurityEvent({
     action: 'LEAD_DELETE_BULK',
     userId: session.user?.id,

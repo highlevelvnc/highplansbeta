@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { logSecurityEvent, getRequestIp } from '@/lib/security-audit'
 import { auth } from '@/lib/auth'
 import { requireAdmin } from '@/lib/auth-guard'
+import { crmInvalidate } from '@/lib/memcache'
 
 // Schema strict — validation antes de qualquer query DB
 const bulkSchema = z.object({
@@ -26,6 +27,11 @@ export async function POST(req: NextRequest) {
 
     const where = { id: { in: leadIds } }
 
+    // Sprint #48: qualquer mutação bulk afecta caches downstream
+    const scopesToInvalidate = action === 'delete'
+      ? ['leads', 'pipeline', 'dashboard', 'funnel', 'clients', 'inbox', 'activity'] as const
+      : ['leads', 'pipeline', 'dashboard', 'funnel', 'inbox'] as const
+
     switch (action) {
       case 'pipelineStatus': {
         const valid = ['NEW', 'CONTACTED', 'INTERESTED', 'PROPOSAL_SENT', 'NEGOTIATION', 'CLOSED', 'LOST']
@@ -33,6 +39,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Status inválido' }, { status: 400 })
         }
         const result = await prisma.lead.updateMany({ where, data: { pipelineStatus: value } })
+        crmInvalidate([...scopesToInvalidate])
         return NextResponse.json({ success: true, updated: result.count })
       }
 
@@ -42,6 +49,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Score inválido' }, { status: 400 })
         }
         const result = await prisma.lead.updateMany({ where, data: { score: value } })
+        crmInvalidate([...scopesToInvalidate])
         return NextResponse.json({ success: true, updated: result.count })
       }
 
@@ -59,6 +67,7 @@ export async function POST(req: NextRequest) {
           ip,
           details: { count: result.count, leadIds: leadIds.slice(0, 20) },  // primeiros 20 ids para auditar
         }).catch(() => null)
+        crmInvalidate([...scopesToInvalidate])
         return NextResponse.json({ success: true, deleted: result.count })
       }
 
@@ -79,6 +88,7 @@ export async function POST(req: NextRequest) {
           await prisma.lead.update({ where: { id: l.id }, data: { tags: tags.join(',') } })
           updated++
         }
+        crmInvalidate([...scopesToInvalidate])
         return NextResponse.json({ success: true, updated })
       }
 
@@ -95,12 +105,14 @@ export async function POST(req: NextRequest) {
           await prisma.lead.update({ where: { id: l.id }, data: { tags: tags.filter(t => t !== tag).join(',') || null } })
           updated++
         }
+        crmInvalidate([...scopesToInvalidate])
         return NextResponse.json({ success: true, updated })
       }
 
       case 'subNicho': {
         // Allow subnicho to be empty (sets to null)
         const result = await prisma.lead.updateMany({ where, data: { subNicho: value || null } })
+        crmInvalidate([...scopesToInvalidate])
         return NextResponse.json({ success: true, updated: result.count })
       }
 

@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { logSecurityEvent, getRequestIp } from '@/lib/security-audit'
 import { auth } from '@/lib/auth'
 import { requireAdmin } from '@/lib/auth-guard'
+import { crmInvalidate } from '@/lib/memcache'
 
 // Schema strict — só os campos permitidos, com tipos validados
 const updatePaymentSchema = z.object({
@@ -38,6 +39,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       if (!existing?.dataPaga) safe.dataPaga = new Date()
     }
     const updated = await prisma.payment.update({ where: { id }, data: safe })
+    // Sprint #48: payment muda → dashboard receita + clients MRR + notifications (due payments)
+    crmInvalidate(['dashboard', 'clients', 'notifications'])
     return NextResponse.json(updated)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'
@@ -60,6 +63,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       select: { valor: true, moeda: true, status: true, clientId: true },
     })
     await prisma.payment.delete({ where: { id } })
+    crmInvalidate(['dashboard', 'clients', 'notifications'])
     logSecurityEvent({
       action: 'PAYMENT_DELETE',
       userId: session?.user?.id,

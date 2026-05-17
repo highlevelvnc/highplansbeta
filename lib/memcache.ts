@@ -88,3 +88,45 @@ export function isBypassRequested(req: Request): boolean {
 export function stats(): { size: number; keys: string[] } {
   return { size: _store.size, keys: Array.from(_store.keys()) }
 }
+
+/**
+ * Sprint #48 — invalidação cross-endpoint baseada em domain scopes.
+ *
+ * Cada scope mapeia para uma ou mais keys/prefixes do memcache:
+ *   leads     → leads:list:* (paginadas)
+ *   clients   → clients:carteira
+ *   dashboard → dashboard:v1
+ *   pipeline  → pipeline:v1
+ *   funnel    → funnel:* (todos os days)
+ *   inbox     → inbox:conversations:*
+ *   proposals → proposals:list
+ *   tasks     → tasks:list
+ *   activity  → activity:* (todos os filtros)
+ *   notifications → notifications:v1
+ *
+ * Uso em POST/PUT/DELETE:
+ *   crmInvalidate(['leads', 'pipeline', 'dashboard'])
+ *
+ * Próxima chamada GET a esses endpoints recalcula do DB. UI vê o estado
+ * actualizado imediatamente em vez de servir cache stale.
+ */
+export type CRMScope =
+  | 'leads' | 'clients' | 'dashboard' | 'pipeline' | 'funnel'
+  | 'inbox' | 'proposals' | 'tasks' | 'activity' | 'notifications'
+
+export function crmInvalidate(scopes: CRMScope[]): void {
+  for (const scope of scopes) {
+    switch (scope) {
+      case 'leads':         invalidatePrefix('leads:list:'); break
+      case 'clients':       invalidate('clients:carteira'); break
+      case 'dashboard':     invalidate('dashboard:v1'); break
+      case 'pipeline':      invalidate('pipeline:v1'); break
+      case 'funnel':        invalidatePrefix('funnel:'); break
+      case 'inbox':         invalidatePrefix('inbox:conversations:'); break
+      case 'proposals':     invalidate('proposals:list'); break
+      case 'tasks':         invalidate('tasks:list'); break
+      case 'activity':      invalidatePrefix('activity:'); break
+      case 'notifications': invalidate('notifications:v1'); break
+    }
+  }
+}
