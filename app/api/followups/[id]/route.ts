@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { crmInvalidate } from '@/lib/memcache'
 
 const ALLOWED_FIELDS = ['tipo', 'mensagem', 'template', 'agendadoPara', 'enviado', 'enviadoEm'] as const
 
@@ -19,6 +20,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     const fu = await prisma.followUp.update({ where: { id }, data: safeData })
+    crmInvalidate(['notifications'])
     return NextResponse.json(fu)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro ao atualizar follow-up'
@@ -30,6 +32,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   try {
     const { id } = await params
     await prisma.followUp.delete({ where: { id } })
+    crmInvalidate(['notifications'])
     return NextResponse.json({ ok: true })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro ao eliminar follow-up'

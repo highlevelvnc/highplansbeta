@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { withCache, isBypassRequested } from '@/lib/memcache'
 
 /**
  * Endpoint consolidado de notificações — substitui múltiplos polls individuais
@@ -13,10 +14,38 @@ import { prisma } from '@/lib/prisma'
  *   payments    — { overdue, dueToday, dueSoon } (com totais por moeda)
  *   alerts      — count agregado para badge global
  *
- * Cache: 30s (sufficient — user not checking literally every second)
+ * Sprint #49: memcache 30s server-side em cima do HTTP cache 30s do client.
+ * Invalidado por crmInvalidate(['notifications']) em payments/followups POST.
  */
-export async function GET(_req: NextRequest) {
+
+const CACHE_TTL_MS = 30 * 1000
+const CACHE_KEY = 'notifications:v1'
+
+export async function GET(req: NextRequest) {
   try {
+    const bypass = isBypassRequested(req)
+    const { data, cached, ageS } = await withCache(
+      CACHE_KEY,
+      CACHE_TTL_MS,
+      buildNotifications,
+      { bypass },
+    )
+    return NextResponse.json(
+      cached ? { ...data, _cached: true, _cache_age_s: ageS } : data,
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=30',
+          'X-Cache': cached ? `HIT age=${ageS}s` : 'MISS',
+        },
+      },
+    )
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Erro'
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
+}
+
+async function buildNotifications() {
     const now = new Date()
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
@@ -124,7 +153,7 @@ export async function GET(_req: NextRequest) {
       callbacksOverdue.length + callbacksImminent.length +
       paymentsOverdue.length + paymentsDueToday.length
 
-    return NextResponse.json({
+    return {
       followups: {
         overdue: followupsOverdueCount,
         dueToday: followupsDueToday.length,
@@ -142,11 +171,5 @@ export async function GET(_req: NextRequest) {
       },
       totalAlerts,
       generatedAt: now.toISOString(),
-    }, {
-      headers: { 'Cache-Control': 'private, max-age=30' },
-    })
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Erro'
-    return NextResponse.json({ error: msg }, { status: 500 })
-  }
+    }
 }

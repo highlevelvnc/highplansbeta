@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createFollowUpSchema, validateBody } from '@/lib/validations'
+import { crmInvalidate } from '@/lib/memcache'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -30,6 +31,8 @@ export async function POST(req: Request) {
     const v = validateBody(createFollowUpSchema, body)
     if (!v.success) return v.response
     const fu = await prisma.followUp.create({ data: v.data })
+    // Sprint #49: follow-up novo → invalida notifications (callbacks live aqui)
+    crmInvalidate(['notifications'])
     return NextResponse.json(fu, { status: 201 })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro ao criar follow-up'
