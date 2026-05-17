@@ -2,12 +2,13 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Users, KanbanSquare, Bell, FileText, 
-  CheckSquare, BookOpen, Shield, BarChart2, Zap, Upload
+  LayoutDashboard, Users, KanbanSquare, Bell, FileText,
+  CheckSquare, BookOpen, Shield, BarChart2, Zap, Upload, TrendingUp,
 } from 'lucide-react'
 
 const nav = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/funil', icon: TrendingUp, label: 'Funil' },
   { href: '/leads', icon: Users, label: 'Leads / CRM' },
   { href: '/pipeline', icon: KanbanSquare, label: 'Pipeline' },
   { href: '/followups', icon: Bell, label: 'Follow-Ups' },
