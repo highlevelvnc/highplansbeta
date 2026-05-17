@@ -41,6 +41,7 @@ import { getTimeAdvice } from '@/lib/time-advisor'
 import { ensurePermission, getPermissionState, hasBeenPrompted, showNotification, registerServiceWorker, scheduleCallbackInSW, cancelCallbackInSW, pingSWCheck } from '@/lib/notifications'
 import { randomGreeting, langFromCountry } from '@/lib/greetings'
 import { PAUSE_POLLING } from '@/lib/poll-flags'
+import { useNotifications } from '@/lib/notifications-store'
 
 interface Lead {
   id: string
@@ -93,6 +94,8 @@ export default function ProspeccaoPage() {
   const [queue, setQueue] = useState<Lead[]>([])          // in-memory batch of validated leads
   const [currentIdx, setCurrentIdx] = useState(0)         // position in the queue
   const [totalRemaining, setTotalRemaining] = useState(0) // total leads matching filters (from API)
+  // Sprint #46: callbacks vêm do notifications-store consolidado em vez de poll separado
+  const notifs = useNotifications()
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [nicho, setNicho] = useState('')
@@ -375,45 +378,42 @@ export default function ProspeccaoPage() {
     }
   }, [callbacks])
 
-  // Poll upcoming callbacks every 60s + trigger notifications for newly-imminent ones
-  const loadCallbacks = useCallback(async () => {
-    try {
-      const res = await fetch('/api/leads/upcoming-callbacks?minutes=15')
-      if (!res.ok) return
-      const data = await res.json()
-      setCallbacks({ overdue: data.overdue || [], imminent: data.imminent || [], upcoming: data.upcoming || [] })
+  // Sprint #46 — callbacks vêm do notifications-store consolidado (1 poll partilhado
+  // entre todos os componentes do app, em vez de 1 poll separado por página).
+  // Manualmente forçar refresh via `notifs.refresh()` (útil após criar/completar callback).
+  const loadCallbacks = useCallback(() => notifs.refresh(), [notifs])
 
-      // Fire native notifications for imminent callbacks (haven't been notified yet)
-      if (notifPermission === 'granted') {
-        for (const cb of (data.imminent || [])) {
-          if (notifiedCallbackIdsRef.current.has(cb.id)) continue
-          const when = new Date(cb.agendadoPara).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
-          const leadName = cb.lead?.empresa || cb.lead?.nome || 'Lead'
-          const minsUntil = Math.max(0, Math.round((new Date(cb.agendadoPara).getTime() - Date.now()) / 60_000))
-          showNotification(`📞 Callback em ${minsUntil}min: ${leadName}`, {
-            body: `${cb.mensagem || 'Callback agendado'} · ${when}`,
-            tag: `callback-${cb.id}`,
-          })
-          notifiedCallbackIdsRef.current.add(cb.id)
-          // Cap em 100 entries para não crescer indefinidamente em sessões longas
-          if (notifiedCallbackIdsRef.current.size > 100) {
-            const arr = Array.from(notifiedCallbackIdsRef.current)
-            notifiedCallbackIdsRef.current = new Set(arr.slice(-50))
-          }
+  // Sincroniza state local com callbacks vindos do notifications-store.
+  // State local é mantido por causa de optimistic updates (markCallbackDone)
+  // que precisam de modificar a lista sem esperar o próximo poll.
+  useEffect(() => {
+    const c = notifs.data?.callbacks
+    if (!c) return
+    setCallbacks({
+      overdue: c.overdue || [],
+      imminent: c.imminent || [],
+      upcoming: c.upcoming || [],
+    })
+
+    // Fire native notifications para imminent callbacks novos
+    if (notifPermission === 'granted') {
+      for (const cb of (c.imminent || [])) {
+        if (notifiedCallbackIdsRef.current.has(cb.id)) continue
+        const when = new Date(cb.agendadoPara).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+        const leadName = cb.lead?.empresa || cb.lead?.nome || 'Lead'
+        const minsUntil = Math.max(0, Math.round((new Date(cb.agendadoPara).getTime() - Date.now()) / 60_000))
+        showNotification(`📞 Callback em ${minsUntil}min: ${leadName}`, {
+          body: `${cb.mensagem || 'Callback agendado'} · ${when}`,
+          tag: `callback-${cb.id}`,
+        })
+        notifiedCallbackIdsRef.current.add(cb.id)
+        if (notifiedCallbackIdsRef.current.size > 100) {
+          const arr = Array.from(notifiedCallbackIdsRef.current)
+          notifiedCallbackIdsRef.current = new Set(arr.slice(-50))
         }
       }
-    } catch {}
-  }, [notifPermission])
-
-  useEffect(() => { loadCallbacks() }, [loadCallbacks])
-  // EGRESS: 60s→180s (3min). Endpoint /api/leads/upcoming-callbacks é heavy
-  // (~5-15KB) e parcialmente duplicado por /api/notifications. Em modo
-  // emergência (PAUSE_POLLING=1) só refetch on-focus.
-  useEffect(() => {
-    if (PAUSE_POLLING) return
-    const id = setInterval(loadCallbacks, 180_000)
-    return () => clearInterval(id)
-  }, [loadCallbacks])
+    }
+  }, [notifs.data?.callbacks, notifPermission])
 
   // Mark a callback as done (PUT /api/followups/[id])
   // Optimistic UI: remove do state local imediatamente
