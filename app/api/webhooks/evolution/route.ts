@@ -37,6 +37,24 @@ function extractMessageBody(message: any): string {
 
 export async function POST(req: NextRequest) {
   try {
+    // ─── AUTH: webhook tem de ser assinado com EVOLUTION_WEBHOOK_KEY ────
+    // Define no Vercel/.env: EVOLUTION_WEBHOOK_KEY=<chave-gerada-aleatoriamente>
+    // Configura na Evolution API:
+    //   Settings → Webhooks → Custom Header: { "x-webhook-key": "<chave>" }
+    //
+    // Se EVOLUTION_WEBHOOK_KEY não estiver definida, o webhook é REJEITADO
+    // (fail-closed) para evitar exposição acidental de leads/mensagens.
+    const expectedKey = process.env.EVOLUTION_WEBHOOK_KEY
+    if (!expectedKey) {
+      console.error('[evolution-webhook] EVOLUTION_WEBHOOK_KEY não configurada — webhook desactivado')
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+    }
+    const providedKey = req.headers.get('x-webhook-key') || req.headers.get('apikey')
+    if (providedKey !== expectedKey) {
+      // Não dá hint do que faltou — só 401
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const payload = await req.json()
     const event = payload?.event
     const data = payload?.data

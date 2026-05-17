@@ -22,14 +22,24 @@ export function validateBody<T>(schema: z.ZodSchema<T>, body: unknown):
 }
 
 // ─── Lead ────────────────────────────────────────────────────────────────────
+//
+// ⚠️  SECURITY: TODOS os schemas usam `.strict()` para rejeitar campos não declarados.
+//    Isto previne mass-assignment: um atacante não pode injectar createdAt, id,
+//    relações, ou qualquer campo do Prisma que não esteja explicitamente listado.
+//
+//    Se precisares adicionar um novo campo editável via API, adiciona-o AQUI.
+//    Endpoints DEVEM usar `v.data` (validado/filtrado) e NUNCA `body` (cru).
 
 export const createLeadSchema = z.object({
   nome: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
   empresa: z.string().nullish(),
   nicho: z.string().nullish(),
+  subNicho: z.string().nullish(),
   cidade: z.string().nullish(),
   telefone: z.string().nullish(),
   whatsapp: z.string().nullish(),
+  telefoneRaw: z.string().nullish(),
+  whatsappRaw: z.string().nullish(),
   email: z.string().email('Email inválido').nullish().or(z.literal('')),
   temSite: z.boolean().default(false),
   siteFraco: z.boolean().default(false),
@@ -41,9 +51,26 @@ export const createLeadSchema = z.object({
   planoAlvoUpgrade: z.string().nullish(),
   pais: z.string().nullish(),
   agentId: z.string().nullish(),
-}).passthrough()
+  // owner info (vinda do scraper enrich_owners.py — pode ser editada manualmente)
+  ownerFirstName: z.string().max(60).nullish(),
+  ownerFullName: z.string().max(150).nullish(),
+  ownerSource: z.enum(['name', 'website', 'crc', 'manual']).nullish(),
+  // metadados editáveis
+  tags: z.string().max(500).nullish(),
+  origem: z.string().max(80).nullish(),
+  decisionProfile: z.string().max(80).nullish(),
+  observacaoPerfil: z.string().max(2000).nullish(),
+  motivoScore: z.string().max(500).nullish(),
+  verbaAnuncios: z.number().nonnegative().nullish(),
+  // pipeline de cliente potencial
+  valorPotencial: z.number().nonnegative().nullish(),
+  moedaPotencial: z.enum(['EUR', 'BRL']).nullish(),
+  probabilidadeFecho: z.number().int().min(0).max(100).nullish(),
+  dataPrevistaFecho: z.string().or(z.date()).nullish(),
+  planoPotencial: z.string().nullish(),
+}).strict()
 
-export const updateLeadSchema = createLeadSchema.partial()
+export const updateLeadSchema = createLeadSchema.partial().strict()
 
 // ─── Follow-Up ───────────────────────────────────────────────────────────────
 
@@ -54,7 +81,7 @@ export const createFollowUpSchema = z.object({
   template: z.string().nullish(),
   agendadoPara: z.string().or(z.date()),
   enviado: z.boolean().default(false),
-}).passthrough()
+}).strict()
 
 // ─── Task ────────────────────────────────────────────────────────────────────
 
@@ -65,7 +92,7 @@ export const createTaskSchema = z.object({
   status: z.enum(['PENDING', 'IN_PROGRESS', 'DONE']).default('PENDING'),
   leadId: z.string().nullish(),
   dueDate: z.string().nullish(),
-}).passthrough()
+}).strict()
 
 export const updateTaskSchema = createTaskSchema.partial()
 
@@ -77,7 +104,7 @@ export const createProposalSchema = z.object({
   titulo: z.string().min(2, 'Título é obrigatório'),
   conteudo: z.string().min(1, 'Conteúdo é obrigatório'),
   status: z.enum(['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED']).default('DRAFT'),
-}).passthrough()
+}).strict()
 
 export const updateProposalSchema = createProposalSchema.partial()
 
@@ -101,7 +128,7 @@ export const createClientSchema = z.object({
   diaCobranca: z.number().int().min(1).max(28).nullish(),
   status: z.enum(['ACTIVE', 'PAUSED', 'CHURNED']).default('ACTIVE'),
   observacoes: z.string().nullish(),
-}).passthrough()
+}).strict()
 
 // ─── Payment ─────────────────────────────────────────────────────────────────
 export const createPaymentSchema = z.object({
@@ -116,7 +143,7 @@ export const createPaymentSchema = z.object({
   periodoRef: z.string().nullish(),
   fatura: z.string().nullish(),
   notas: z.string().nullish(),
-}).passthrough()
+}).strict()
 
 // ─── Message Template ────────────────────────────────────────────────────────
 
@@ -127,7 +154,7 @@ export const createMessageTemplateSchema = z.object({
   assunto: z.string().default(''),
   categoria: z.string().default('geral'),
   ativo: z.boolean().default(true),
-}).passthrough()
+}).strict()
 
 // ─── Campaign ────────────────────────────────────────────────────────────────
 
@@ -135,10 +162,26 @@ export const createCampaignSchema = z.object({
   nome: z.string().min(2, 'Nome é obrigatório'),
   canal: z.string().min(1, 'Canal é obrigatório'),
   status: z.enum(['DRAFT', 'SCHEDULED', 'SENT', 'CANCELLED']).default('DRAFT'),
-}).passthrough()
+}).strict()
 
 // ─── Pipeline Move ───────────────────────────────────────────────────────────
 
 export const pipelineMoveSchema = z.object({
   pipelineStatus: z.enum(['NEW', 'CONTACTED', 'INTERESTED', 'PROPOSAL_SENT', 'NEGOTIATION', 'CLOSED', 'LOST']),
-})
+}).strict()
+
+// ─── Playbook ────────────────────────────────────────────────────────────────
+
+export const createPlaybookSchema = z.object({
+  titulo: z.string().min(2, 'Título é obrigatório').max(200),
+  tipo: z.string().min(1, 'Tipo é obrigatório').max(60),
+  conteudo: z.string().min(1, 'Conteúdo é obrigatório').max(20000),
+}).strict()
+
+// ─── Objection ───────────────────────────────────────────────────────────────
+
+export const createObjectionSchema = z.object({
+  objecao: z.string().min(2, 'Objecção é obrigatória').max(500),
+  resposta: z.string().min(2, 'Resposta é obrigatória').max(5000),
+  categoria: z.string().max(80).nullish(),
+}).strict()

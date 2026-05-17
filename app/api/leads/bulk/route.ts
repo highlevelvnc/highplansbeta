@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { logSecurityEvent, getRequestIp } from '@/lib/security-audit'
 import { auth } from '@/lib/auth'
+import { requireAdmin } from '@/lib/auth-guard'
 
 // Schema strict — validation antes de qualquer query DB
 const bulkSchema = z.object({
@@ -45,14 +46,16 @@ export async function POST(req: NextRequest) {
       }
 
       case 'delete': {
-        // Audit log antes de apagar — captura quem fez, quantos, IP
-        const session = await auth().catch(() => null)
+        // SECURITY: bulk delete só para ADMIN — USER não pode varrer leads.
+        const adminCheck = await requireAdmin()
+        if (adminCheck instanceof NextResponse) return adminCheck
+
         const ip = getRequestIp(req)
         const result = await prisma.lead.deleteMany({ where })
         logSecurityEvent({
           action: 'LEAD_DELETE_BULK',
-          userId: session?.user?.id,
-          userEmail: session?.user?.email || undefined,
+          userId: adminCheck.user?.id,
+          userEmail: adminCheck.user?.email || undefined,
           ip,
           details: { count: result.count, leadIds: leadIds.slice(0, 20) },  // primeiros 20 ids para auditar
         }).catch(() => null)

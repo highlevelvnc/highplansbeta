@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { createPlaybookSchema, validateBody } from '@/lib/validations'
 
 export async function GET() {
   const playbooks = await prisma.playbook.findMany({ orderBy: { createdAt: 'desc' }, take: 200 })
@@ -10,6 +11,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const p = await prisma.playbook.create({ data: body })
+  const v = validateBody(createPlaybookSchema, body)
+  if (!v.success) return v.response
+  const p = await prisma.playbook.create({ data: v.data })
   return NextResponse.json(p, { status: 201 })
 }

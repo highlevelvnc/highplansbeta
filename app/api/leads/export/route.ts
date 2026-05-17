@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAdmin } from '@/lib/auth-guard'
+import { logSecurityEvent, getRequestIp } from '@/lib/security-audit'
 
 export async function GET(req: NextRequest) {
   try {
+    // SECURITY: export massivo só para ADMIN — leads contêm PII (telefone, email).
+    const session = await requireAdmin()
+    if (session instanceof NextResponse) return session
+
+    logSecurityEvent({
+      action: 'EXPORT_LEADS',
+      userId: session.user?.id,
+      userEmail: session.user?.email || undefined,
+      ip: getRequestIp(req),
+      details: { query: req.nextUrl.searchParams.toString().slice(0, 200) },
+    }).catch(() => null)
+
     const { searchParams } = req.nextUrl
 
     const search = searchParams.get('search') ?? ''

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAdmin } from '@/lib/auth-guard'
+import { logSecurityEvent, getRequestIp } from '@/lib/security-audit'
 
 /**
  * Export the `observacaoPerfil` of leads matching the given filter as a
@@ -7,9 +9,22 @@ import { prisma } from '@/lib/prisma'
  *
  * Query: same filter shape as /api/leads/export (plus ids=...)
  * Returns: text/markdown file download.
+ *
+ * SECURITY: ADMIN-only (export massivo com PII).
  */
 export async function GET(req: NextRequest) {
   try {
+    const session = await requireAdmin()
+    if (session instanceof NextResponse) return session
+
+    logSecurityEvent({
+      action: 'EXPORT_NOTES',
+      userId: session.user?.id,
+      userEmail: session.user?.email || undefined,
+      ip: getRequestIp(req),
+      details: { query: req.nextUrl.searchParams.toString().slice(0, 200) },
+    }).catch(() => null)
+
     const { searchParams } = req.nextUrl
     const ids = (searchParams.get('ids') || '').split(',').filter(Boolean)
     const search = searchParams.get('search') ?? ''

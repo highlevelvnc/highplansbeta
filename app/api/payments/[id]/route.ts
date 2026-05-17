@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { logSecurityEvent, getRequestIp } from '@/lib/security-audit'
 import { auth } from '@/lib/auth'
+import { requireAdmin } from '@/lib/auth-guard'
 
 // Schema strict — só os campos permitidos, com tipos validados
 const updatePaymentSchema = z.object({
@@ -46,8 +47,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    // SECURITY: só ADMIN apaga pagamentos (afecta contabilidade/MRR).
+    const sessionCheck = await requireAdmin()
+    if (sessionCheck instanceof NextResponse) return sessionCheck
+
     const { id } = await params
-    const session = await auth().catch(() => null)
+    const session = sessionCheck
     const ip = getRequestIp(req)
     // Captura snapshot antes de apagar para o audit log
     const existing = await prisma.payment.findUnique({
