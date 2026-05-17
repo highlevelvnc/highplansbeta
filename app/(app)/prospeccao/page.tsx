@@ -35,7 +35,7 @@ const TemplatesDrawer = lazy(() => import('@/components/TemplatesDrawer').then(m
 const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })))
 import { getAllActions, searchActions, getCategoryLabel, type ActionContext, type CommandAction } from '@/lib/command-palette-actions'
 import { useRouter } from 'next/navigation'
-import { recordSendAndMaybeSpread, getRateState, canSend, recordBan, setActiveNumber, getAllNumberStates, NUMBER_KEYS, getLabel, setLabel, getSpreadMode, setSpreadMode, RL_HOURLY_WARN, isQuietHour, getEffectiveDailyCap, markNumberAsNew, markNumberAsWarmed, getNumberAgeDays, type NumberKey } from '@/lib/wa-rate-limiter'
+import { recordSendAndMaybeSpread, getRateState, canSend, recordBan, setActiveNumber, getAllNumberStates, NUMBER_KEYS, getLabel, setLabel, getSpreadMode, setSpreadMode, RL_HOURLY_WARN, RL_DAILY_HARD, isQuietHour, getEffectiveDailyCap, markNumberAsNew, markNumberAsWarmed, getNumberAgeDays, type NumberKey } from '@/lib/wa-rate-limiter'
 import { SUB_NICHOS_CONSTRUTORAS } from '@/lib/sub-nicho'
 import { getTimeAdvice } from '@/lib/time-advisor'
 import { ensurePermission, getPermissionState, hasBeenPrompted, showNotification, registerServiceWorker, scheduleCallbackInSW, cancelCallbackInSW, pingSWCheck } from '@/lib/notifications'
@@ -513,6 +513,8 @@ export default function ProspeccaoPage() {
   const lastWaTriggerRef = useRef(0)
   // Quiet-hour ack: pediu confirm uma vez por sessão, não volta a pedir
   const quietHourAckedRef = useRef(false)
+  // Sprint #47: tracking do tier de warmup actual para detectar subida (d3→d4, d7→d8, etc)
+  const lastWarmupTierRef = useRef<string | null>(null)
 
   // Heatmap response hours
   const [heatmap, setHeatmap] = useState<{ sent: number[]; received: number[]; bestHour: number; bestRate: number; totalSent: number; totalReceived: number } | null>(null)
@@ -728,6 +730,32 @@ export default function ProspeccaoPage() {
     setRateState(getRateState())
     setAllNumberStates(getAllNumberStates())
   }
+
+  /** Sprint #47: detecta subida de tier do warmup (d3→d4, d14→d15, etc) e celebra. */
+  useEffect(() => {
+    const warmup = getEffectiveDailyCap(rateState.active)
+    const currentTier = warmup.isWarmup
+      ? warmup.tierLabel
+      : (warmup.ageDays !== null && warmup.ageDays >= 31 ? 'GRADUATED' : null)
+
+    // Primeira leitura — guarda baseline, não celebra
+    if (lastWarmupTierRef.current === null) {
+      lastWarmupTierRef.current = currentTier
+      return
+    }
+    // Mudou de tier?
+    if (currentTier !== lastWarmupTierRef.current) {
+      const prev = lastWarmupTierRef.current
+      lastWarmupTierRef.current = currentTier
+      if (currentTier === 'GRADUATED') {
+        popPoints('🎓 GRADUADO!', { color: '#F59E0B', size: 56, x: 50, y: 35 })
+        haptic('success')
+      } else if (currentTier && prev) {
+        popPoints(`🌱 ${currentTier}!`, { color: '#10B981', size: 42, x: 50, y: 40 })
+        haptic('tick')
+      }
+    }
+  }, [rateState.active, rateState.dayCount, allNumberStates])
 
   /** Marca o chip activo como "novo" — ativa caps progressivos (5/10/20/35 conforme idade). */
   const handleMarkAsNewChip = () => {
@@ -3088,7 +3116,17 @@ export default function ProspeccaoPage() {
                   <span>{label}</span>
                   <span className="text-[10px] tabular-nums opacity-70">{numState.dayCount}/{warmup.cap}</span>
                   {warmup.isWarmup && (
-                    <span className="text-[9px] bg-green-500/20 text-green-400 px-1 py-0.5 rounded-full" title={`Dia ${warmup.ageDays} de warmup`}>🌱 d{warmup.ageDays}</span>
+                    <span
+                      className="text-[9px] bg-green-500/20 text-green-400 px-1 py-0.5 rounded-full animate-warmup-breathe"
+                      title={`Dia ${warmup.ageDays} de warmup · próximo tier em ${warmup.nextTierInDays}d`}
+                    >🌱 d{warmup.ageDays}</span>
+                  )}
+                  {/* Sprint #47: badge "Graduado" para chip recém-saído do warmup (dia 31-37) */}
+                  {!warmup.isWarmup && warmup.ageDays !== null && warmup.ageDays >= 31 && warmup.ageDays <= 37 && (
+                    <span
+                      className="text-[9px] badge-graduate px-1.5 py-0.5 rounded-full"
+                      title={`Chip graduado do warmup — dia ${warmup.ageDays}, cap pleno ${RL_DAILY_HARD}/dia`}
+                    >🎓</span>
                   )}
                   {lastBanHrs !== null && lastBanHrs < 24 && (
                     <span className="text-[9px] bg-red-500/20 text-red-400 px-1 py-0.5 rounded-full">⛔ {lastBanHrs}h</span>
@@ -3119,14 +3157,34 @@ export default function ProspeccaoPage() {
             {(() => {
               const warmup = getEffectiveDailyCap(rateState.active)
               if (warmup.isWarmup) {
+                const numState = allNumberStates[rateState.active]
+                const nearLimit = numState.dayCount >= warmup.cap - 1
+                const atLimit = numState.dayCount >= warmup.cap
                 return (
                   <button
                     onClick={handleMarkAsWarmed}
-                    title={`Chip ${warmup.tierLabel}. Clica para marcar como já aquecido (remove caps).`}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-all"
+                    title={`Chip ${warmup.tierLabel}: ${numState.dayCount}/${warmup.cap} hoje. Clica para remover warmup.`}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-all ${
+                      atLimit ? 'has-sparkles animate-warmup-pulse' : nearLimit ? 'animate-warmup-pulse' : ''
+                    }`}
                   >
                     <span>🌱</span>
                     <span>d{warmup.ageDays}</span>
+                    <span className="opacity-60 text-[10px] tabular-nums">{numState.dayCount}/{warmup.cap}</span>
+                  </button>
+                )
+              }
+              // Sprint #47: badge "Graduado" para chip que acabou de sair do warmup
+              const isFreshGraduate = warmup.ageDays !== null && warmup.ageDays >= 31 && warmup.ageDays <= 37
+              if (isFreshGraduate) {
+                return (
+                  <button
+                    onClick={handleMarkAsNewChip}
+                    title={`🎓 Chip graduado! Dia ${warmup.ageDays} — cap pleno ${RL_DAILY_HARD}/dia. Trocaste? Clica para activar warmup novo.`}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold badge-graduate animate-tier-up"
+                  >
+                    <span>🎓</span>
+                    <span>Graduado d{warmup.ageDays}</span>
                   </button>
                 )
               }
