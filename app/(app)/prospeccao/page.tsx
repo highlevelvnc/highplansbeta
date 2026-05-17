@@ -3220,18 +3220,25 @@ export default function ProspeccaoPage() {
                   : streak >= 25 ? { size: 18, label: '25+', color: '#F59E0B' }
                   : streak >= 10 ? { size: 16, label: '10+', color: '#A78BFA' }
                   : null
+                // Sprint #50: streak alto = chama intensa (glow + scale)
+                const isOnFire = streak >= 25
+                const isLegend = streak >= 100
                 return (
                   <>
                     <span
-                      className={streak > 0 ? 'animate-flame' : 'opacity-40'}
-                      style={{ fontSize: tier?.size || 14, transition: 'font-size 0.3s ease' }}
+                      className={`${streak > 0 ? 'animate-flame' : 'opacity-40'} ${isLegend ? 'animate-tier-up' : ''}`}
+                      style={{
+                        fontSize: tier?.size || 14,
+                        transition: 'font-size 0.3s ease',
+                        filter: isOnFire ? `drop-shadow(0 0 8px ${tier?.color || '#F59E0B'})` : 'none',
+                      }}
                     >
                       🔥
                     </span>
                     {tier && (
                       <span
-                        className="text-[9px] font-black px-1.5 py-0.5 rounded-full"
-                        style={{ background: `${tier.color}25`, color: tier.color }}
+                        className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${isLegend ? 'badge-graduate' : ''}`}
+                        style={!isLegend ? { background: `${tier.color}25`, color: tier.color } : undefined}
                       >
                         {tier.label}
                       </span>

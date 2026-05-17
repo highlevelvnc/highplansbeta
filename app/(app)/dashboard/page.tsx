@@ -85,9 +85,11 @@ interface KPICardProps {
   animated?: boolean
   /** Currency prefix for animated numeric values (e.g. "€"). */
   currency?: string
+  /** Sprint #50: card celebra (sparkles + glow dourado) quando meta atingida. */
+  goalMet?: boolean
 }
 
-function KPICard({ label, value, sub, icon: Icon, color = '#8B5CF6', alert = false, href, animated, currency }: KPICardProps) {
+function KPICard({ label, value, sub, icon: Icon, color = '#8B5CF6', alert = false, href, animated, currency, goalMet }: KPICardProps) {
   // Animate numeric value if explicitly requested
   const numericTarget = typeof value === 'number'
     ? value
@@ -99,9 +101,16 @@ function KPICard({ label, value, sub, icon: Icon, color = '#8B5CF6', alert = fal
   const inner = (
     <div
       className={`relative overflow-hidden bg-gradient-to-br from-[#0F0F12] to-[#0A0A0D] border rounded-2xl p-4 h-full transition-all duration-300 group card-hover stagger-in hover-lift hover-shimmer
-        ${alert ? 'border-red-500/40 hover:border-red-500/60' : 'border-[#27272A]'}
+        ${alert ? 'border-red-500/40 hover:border-red-500/60' : ''}
+        ${goalMet ? 'border-amber-500/50 hover:border-amber-500/70 has-sparkles animate-tier-up' : !alert ? 'border-[#27272A]' : ''}
         ${href ? 'cursor-pointer press-scale' : ''}`}
     >
+      {goalMet && (
+        <div
+          className="absolute inset-0 opacity-30 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at center, #F59E0B22, transparent 70%)' }}
+        />
+      )}
       {/* Top gradient accent line */}
       <div
         className="absolute top-0 left-0 right-0 h-[2px] opacity-60"
@@ -410,8 +419,11 @@ export default function DashboardPage() {
             value={data.receitaAtiva}
             animated
             currency="€"
-            sub={`${data.activeClients} cliente${data.activeClients !== 1 ? 's' : ''} ativo${data.activeClients !== 1 ? 's' : ''}`}
+            sub={data.receitaAtiva >= 5000
+              ? `🎯 Meta 5k atingida! ${data.activeClients} cliente${data.activeClients !== 1 ? 's' : ''}`
+              : `${data.activeClients} cliente${data.activeClients !== 1 ? 's' : ''} ativo${data.activeClients !== 1 ? 's' : ''}`}
             color="#10B981"
+            goalMet={data.receitaAtiva >= 5000}
           />
           <KPICard
             icon={Target}
