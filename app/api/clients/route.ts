@@ -2,8 +2,31 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPlanPrice } from '@/lib/plans'
 import { createClientSchema, validateBody } from '@/lib/validations'
+import { withCache, isBypassRequested, invalidate } from '@/lib/memcache'
 
-export async function GET() {
+// Sprint #42: cache em memória 3min — carteira não muda a cada segundo.
+// Invalidação automática no POST (cliente novo).
+const CACHE_TTL_MS = 3 * 60 * 1000
+const CACHE_KEY = 'clients:carteira'
+
+export async function GET(req: Request) {
+  const bypass = isBypassRequested(req)
+  const { data, cached, ageS } = await withCache(
+    CACHE_KEY,
+    CACHE_TTL_MS,
+    buildCarteira,
+    { bypass },
+  )
+  // Resposta é array — info de cache vai em headers (não no body).
+  return NextResponse.json(data, {
+    headers: {
+      'Cache-Control': 'private, max-age=60, stale-while-revalidate=180',
+      'X-Cache': cached ? `HIT age=${ageS}s` : 'MISS',
+    },
+  })
+}
+
+async function buildCarteira() {
   // EGRESS: select agressivo. Antes puxava TODOS os campos do Lead (incluindo
   // observacaoPerfil até 2000 chars × 1000 leads = ~5MB por request).
   // Agora só os campos que o UI usa → payload ~150KB.
@@ -57,9 +80,7 @@ export async function GET() {
     diasNaBase: Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 86400000),
   }))
 
-  return NextResponse.json([...fromLeads, ...fromClients], {
-    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=180' },
-  })
+  return [...fromLeads, ...fromClients]
 }
 
 export async function POST(req: Request) {
@@ -68,6 +89,8 @@ export async function POST(req: Request) {
     const v = validateBody(createClientSchema, body)
     if (!v.success) return v.response
     const client = await prisma.client.create({ data: v.data })
+    // Invalida cache da carteira — novo cliente deve aparecer no próximo GET
+    invalidate(CACHE_KEY)
     return NextResponse.json(client, { status: 201 })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro ao criar cliente'

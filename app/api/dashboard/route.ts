@@ -1,8 +1,27 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { PLAN_PRICES } from '@/lib/plans'
+import { withCache, isBypassRequested } from '@/lib/memcache'
 
-export async function GET() {
+// Sprint #42: cache em memória (5min). Header `x-no-cache: 1` força refresh.
+const CACHE_TTL_MS = 5 * 60 * 1000
+
+export async function GET(req: Request) {
+  const bypass = isBypassRequested(req)
+  const { data: payload, cached, ageS } = await withCache(
+    'dashboard:v1',
+    CACHE_TTL_MS,
+    buildDashboard,
+    { bypass },
+  )
+
+  return NextResponse.json(
+    cached ? { ...payload, _cached: true, _cache_age_s: ageS } : payload,
+    { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' } },
+  )
+}
+
+async function buildDashboard() {
   const now = new Date()
   const fortyFiveDaysAgo = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000)
 
@@ -215,7 +234,7 @@ export async function GET() {
     avgStageDays[stage] = Math.round(data.totalDays / data.count)
   }
 
-  return NextResponse.json({
+  return {
     receitaAtiva,
     receitaPotencial,
     receitaFutura: receitaAtiva + receitaPotencial,
@@ -241,9 +260,5 @@ export async function GET() {
     agentStats,
     unassignedLeads,
     avgStageDays,
-  }, {
-    // EGRESS: dashboard recomputa coisas pesadas — cache 60s + SWR 5min
-    // significa que recarregar a página ou abrir noutra tab é instantâneo.
-    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
-  })
+  }
 }

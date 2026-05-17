@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { withCache, isBypassRequested } from '@/lib/memcache'
+
+// Sprint #42: scan de 50k leads é PESADÍSSIMO. Cache 10min em memória
+// (em cima do HTTP cache 5min já existente). Header `x-no-cache: 1` força refresh.
+const CACHE_TTL_MS = 10 * 60 * 1000
 
 /** Normalize phone to last 9 digits — catches all formatting variations. */
 function normPhone(s: string | null | undefined): string {
@@ -22,9 +27,27 @@ export async function GET(req: NextRequest) {
   try {
     const limit = parseInt(req.nextUrl.searchParams.get('limit') ?? '50', 10)
     const mode = req.nextUrl.searchParams.get('mode') ?? 'fuzzy'  // 'exact' | 'fuzzy'
+    const bypass = isBypassRequested(req)
 
-    // ── FUZZY MODE: normalize phone (last 9 digits) + normalize empresa ────
-    if (mode === 'fuzzy') {
+    // Sprint #42: cache em memória (10min) — scan 50k é caro demais.
+    // <any> porque fuzzy e exact retornam shapes diferentes (com/sem empresaGroups).
+    const { data: payload, cached, ageS } = await withCache<any>(
+      `duplicates:${mode}:${limit}`,
+      CACHE_TTL_MS,
+      () => mode === 'fuzzy' ? computeFuzzyDuplicates(limit) : computeExactDuplicates(limit),
+      { bypass },
+    )
+    return NextResponse.json(
+      cached ? { ...payload, _cached: true, _cache_age_s: ageS } : payload,
+      { headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=900' } },
+    )
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Erro'
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
+}
+
+async function computeFuzzyDuplicates(limit: number) {
       // Pull all leads with a phone or email (capped — could be huge for 40k+)
       const allLeads = await prisma.lead.findMany({
         where: {
@@ -89,7 +112,7 @@ export async function GET(req: NextRequest) {
         empresaGroups.reduce((s, g) => s + g.count - 1, 0) +
         emailGroups.reduce((s, g) => s + g.count - 1, 0)
 
-      return NextResponse.json({
+      return {
         summary: {
           phoneGroups: phoneGroups.length,
           empresaGroups: empresaGroups.length,
@@ -99,13 +122,10 @@ export async function GET(req: NextRequest) {
           scanned: allLeads.length,
         },
         duplicates: [...phoneGroups, ...empresaGroups, ...emailGroups],
-      }, {
-        // EGRESS: scan de 50k leads é PESADÍSSIMO (~15-25MB). Cache 5min
-        // agressivo — duplicates não mudam a cada segundo, é um relatório.
-        headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=900' },
-      })
-    }
+      }
+}
 
+async function computeExactDuplicates(limit: number) {
     // ── EXACT MODE (legacy fallback): exact telefone/email match ──────────
     const phoneDupes: Array<{ telefone: string; count: bigint }> = await prisma.$queryRaw`
       SELECT telefone, COUNT(*) as count
@@ -154,18 +174,12 @@ export async function GET(req: NextRequest) {
     const totalPhoneDupes = phoneDupes.reduce((s, d) => s + Number(d.count), 0) - phoneDupes.length
     const totalEmailDupes = emailDupes.reduce((s, d) => s + Number(d.count), 0) - emailDupes.length
 
-    return NextResponse.json({
+    return {
       summary: {
         phoneGroups: phoneDupes.length,
         emailGroups: emailDupes.length,
         totalDuplicateLeads: totalPhoneDupes + totalEmailDupes,
       },
       duplicates: [...phoneGroups, ...emailGroups],
-    }, {
-      headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=900' },
-    })
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Erro'
-    return NextResponse.json({ error: msg }, { status: 500 })
-  }
+    }
 }
