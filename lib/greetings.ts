@@ -106,17 +106,40 @@ const POOL: Record<Lang, typeof PT_GREETINGS> = {
   en: EN_GREETINGS,
 }
 
+const RECENT_KEY = 'wa_recent_greetings_v1'
+const RECENT_MAX = 5
+
+function getRecent(): string[] {
+  if (typeof window === 'undefined') return []
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') } catch { return [] }
+}
+
+function pushRecent(g: string) {
+  if (typeof window === 'undefined') return
+  try {
+    const list = getRecent()
+    list.push(g)
+    while (list.length > RECENT_MAX) list.shift()
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list))
+  } catch {}
+}
+
 /**
- * Retorna um greeting aleatório.
+ * Retorna um greeting aleatório, EVITANDO as últimas 5 usadas (anti-padrão).
  * Lang: 'pt' (default — para PT/BR), 'de', 'en' (NL usa en).
  */
 export function randomGreeting(lang: Lang = 'pt', d: Date = new Date()): string {
   const pool = POOL[lang] || POOL.pt
   const period = getTimeOfDay(d)
   const variants = pool[period]
-  // Pseudo-aleatório baseado em timestamp + ms para garantir variação real
-  const idx = Math.floor(Math.random() * variants.length)
-  return variants[idx]
+  const recent = getRecent()
+  // Filtra as recentes; se sobrar 0, usa pool completo (pool pequeno + muitos sends)
+  const available = variants.filter(v => !recent.includes(v))
+  const candidates = available.length > 0 ? available : variants
+  const idx = Math.floor(Math.random() * candidates.length)
+  const chosen = candidates[idx]
+  pushRecent(chosen)
+  return chosen
 }
 
 /** Map country code → lang */

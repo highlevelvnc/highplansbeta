@@ -186,18 +186,38 @@ export default function ContactosPage() {
       : integrationStatus?.email?.configured
 
     if (isApiReady && targetIds.length > 1) {
-      // Envio em massa via batch API
+      // ── ANTI-BAN: WhatsApp em batch só permite 30/req com throttle 25-35s entre cada um.
+      //    Se selecionou >30, avisa que vai cortar (não permite arriscar ban).
+      let idsToSend = targetIds
+      if (canal === 'WHATSAPP' && targetIds.length > 30) {
+        const proceed = confirm(
+          `⚠️ ANTI-BAN: selecionaste ${targetIds.length} leads.\n\n` +
+          `WhatsApp em massa só permite 30 por envio (com throttle 25-35s entre cada um, ~15min para os 30).\n\n` +
+          `Vou enviar apenas para os primeiros 30. OK?`
+        )
+        if (!proceed) return
+        idsToSend = targetIds.slice(0, 30)
+      }
+      if (canal === 'WHATSAPP') {
+        const minutes = Math.ceil((idsToSend.length * 30) / 60)
+        const ok = confirm(`Vai enviar ${idsToSend.length} WhatsApps com throttle anti-ban (~${minutes}min total). Continuar?`)
+        if (!ok) return
+      }
       setSending(true)
       try {
         const assunto = sendModal.template.assunto || undefined
         const res = await fetch('/api/messages/batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ leadIds: targetIds, canal, corpo: sendModal.template.corpo, assunto }),
+          body: JSON.stringify({ leadIds: idsToSend, canal, corpo: sendModal.template.corpo, assunto }),
         })
         const data = await res.json()
         setBatchResults({ total: data.total, sent: data.sent, failed: data.failed })
-        toast(`Enviado: ${data.sent}/${data.total} · Falhou: ${data.failed}`, data.failed > 0 ? 'error' : 'success')
+        const skippedMsg = data.skipped > 0 ? ` · Skipped (dup 72h): ${data.skipped}` : ''
+        toast(
+          `Enviado: ${data.sent}/${data.total} · Falhou: ${data.failed}${skippedMsg}`,
+          data.failed > 0 ? 'error' : 'success'
+        )
       } catch {
         toast('Erro no envio em massa', 'error')
       } finally {

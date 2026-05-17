@@ -16,10 +16,13 @@ const DAY_MS = 24 * HOUR_MS
 
 export const RL_COOLDOWN_MS = 25_000
 export const RL_COOLDOWN_JITTER_MS = 10_000
-export const RL_HOURLY_WARN = 20
-export const RL_HOURLY_HARD = 999
-export const RL_DAILY_WARN_DEFAULT = 50
-export const RL_DAILY_HARD = 999
+export const RL_HOURLY_WARN = 12
+export const RL_HOURLY_HARD = 18          // HARD STOP — depois disto a UI bloqueia
+export const RL_DAILY_WARN_DEFAULT = 45
+export const RL_DAILY_HARD = 65           // HARD STOP diário (chip aquecido ~60-70 é zona vermelha)
+// Janela horária recomendada (8h-22h) — fora disto pede confirm agressivo
+export const RL_QUIET_HOUR_START = 22     // a partir das 22h
+export const RL_QUIET_HOUR_END = 8        // até às 8h
 
 // Two slots for tracking different WhatsApp numbers (e.g. business + personal)
 // Keys are stable; labels are user-editable.
@@ -253,13 +256,44 @@ export function getAllNumberStates(): Record<NumberKey, { dayCount: number; banC
   return result
 }
 
-export function canSend(): { ok: boolean; warning?: string; cooldownMs?: number } {
+/**
+ * canSend — gatekeeper anti-ban.
+ *
+ *   ok=false → UI DEVE bloquear o envio (cooldown ativo ou caps duros excedidos)
+ *   ok=true + warning → permite mas avisa (ex: quiet hours, perto do cap)
+ *   ok=true sem warning → tudo bem
+ */
+export function canSend(): {
+  ok: boolean
+  reason?: 'cooldown' | 'hourly_cap' | 'daily_cap'
+  warning?: string
+  cooldownMs?: number
+} {
   const s = getRateState()
+  // HARD BLOCKS (botão fica disabled, retorna ok:false)
   if (s.cooldownMs > 0) {
     const sec = Math.ceil(s.cooldownMs / 1000)
-    return { ok: true, warning: `⚡ Rapid-fire (${sec}s desde o último). Cuidado com ban.`, cooldownMs: s.cooldownMs }
+    return { ok: false, reason: 'cooldown', warning: `⏳ Aguarda ${sec}s — anti rapid-fire`, cooldownMs: s.cooldownMs }
+  }
+  if (s.hourCount >= RL_HOURLY_HARD) {
+    return { ok: false, reason: 'hourly_cap', warning: `🛑 Cap horário (${s.hourCount}/${RL_HOURLY_HARD}) — pausa ~30min` }
+  }
+  if (s.dayCount >= RL_DAILY_HARD) {
+    return { ok: false, reason: 'daily_cap', warning: `🛑 Cap diário (${s.dayCount}/${RL_DAILY_HARD}) — para hoje neste número` }
+  }
+  // SOFT WARNINGS (passa mas avisa)
+  if (s.hourCount >= RL_HOURLY_WARN) {
+    return { ok: true, warning: `⚠️ Já ${s.hourCount}/h — abranda para evitar ban` }
   }
   return { ok: true }
+}
+
+/**
+ * Está em janela "ruidosa" (a evitar)? Madrugada e noite tardia = padrão #1 de spam.
+ */
+export function isQuietHour(d: Date = new Date()): boolean {
+  const h = d.getHours()
+  return h >= RL_QUIET_HOUR_START || h < RL_QUIET_HOUR_END
 }
 
 export function resetRateLimiter() {

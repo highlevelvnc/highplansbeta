@@ -35,7 +35,7 @@ const TemplatesDrawer = lazy(() => import('@/components/TemplatesDrawer').then(m
 const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })))
 import { getAllActions, searchActions, getCategoryLabel, type ActionContext, type CommandAction } from '@/lib/command-palette-actions'
 import { useRouter } from 'next/navigation'
-import { recordSendAndMaybeSpread, getRateState, canSend, recordBan, setActiveNumber, getAllNumberStates, NUMBER_KEYS, getLabel, setLabel, getSpreadMode, setSpreadMode, RL_HOURLY_WARN, type NumberKey } from '@/lib/wa-rate-limiter'
+import { recordSendAndMaybeSpread, getRateState, canSend, recordBan, setActiveNumber, getAllNumberStates, NUMBER_KEYS, getLabel, setLabel, getSpreadMode, setSpreadMode, RL_HOURLY_WARN, isQuietHour, type NumberKey } from '@/lib/wa-rate-limiter'
 import { SUB_NICHOS_CONSTRUTORAS } from '@/lib/sub-nicho'
 import { getTimeAdvice } from '@/lib/time-advisor'
 import { ensurePermission, getPermissionState, hasBeenPrompted, showNotification, registerServiceWorker, scheduleCallbackInSW, cancelCallbackInSW, pingSWCheck } from '@/lib/notifications'
@@ -504,6 +504,10 @@ export default function ProspeccaoPage() {
   // End-of-day modal (fired once when crossing 70 contacts threshold)
   const [showEndOfDay, setShowEndOfDay] = useState(false)
   const eodFiredRef = useRef(false)
+  // Anti rapid-fire: ignora trigger se < 1500ms desde o último (keyboard auto-repeat, double-click)
+  const lastWaTriggerRef = useRef(0)
+  // Quiet-hour ack: pediu confirm uma vez por sessão, não volta a pedir
+  const quietHourAckedRef = useRef(false)
 
   // Heatmap response hours
   const [heatmap, setHeatmap] = useState<{ sent: number[]; received: number[]; bestHour: number; bestRate: number; totalSent: number; totalReceived: number } | null>(null)
@@ -1072,63 +1076,176 @@ export default function ProspeccaoPage() {
     else if (!l.gmbOtimizado) problema = 'google maps por otimizar'
     else if (!l.anunciosAtivos) problema = 'sem anúncios'
 
+    // Helper: aleatório sem repetir a última (anti-fingerprint para WhatsApp)
+    const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]
+
     if (lang === 'de') {
-      const problems: Record<string, string> = {
-        'sem site': `Ich habe gesehen, dass ${empresa} keine Website hat`,
-        'site fraco': `Ich habe ${empresa}'s Website angesehen — es gibt einiges zu verbessern`,
-        'instagram inativo': `Ich habe gesehen, dass ${empresa} auf Instagram inaktiv ist`,
-        'google maps por otimizar': `Ich habe gesehen, dass ${empresa} bei Google Maps optimiert werden könnte`,
-        'sem anúncios': `Ich habe gesehen, dass ${empresa} keine Online-Werbung schaltet`,
+      const problems: Record<string, string[]> = {
+        'sem site': [
+          `Ich habe gesehen, dass ${empresa} keine Website hat`,
+          `Mir ist aufgefallen, dass ${empresa} noch keine eigene Website hat`,
+          `${empresa} hat noch keine Website — das fiel mir auf`,
+        ],
+        'site fraco': [
+          `Ich habe ${empresa}'s Website angesehen — es gibt einiges zu verbessern`,
+          `Die Website von ${empresa} hat Potenzial, das noch nicht ausgeschöpft ist`,
+        ],
+        'instagram inativo': [
+          `Ich habe gesehen, dass ${empresa} auf Instagram inaktiv ist`,
+          `Der Instagram-Account von ${empresa} könnte mehr Aufmerksamkeit bringen`,
+        ],
+        'google maps por otimizar': [
+          `Ich habe gesehen, dass ${empresa} bei Google Maps optimiert werden könnte`,
+          `Das Google-Maps-Profil von ${empresa} hat Optimierungsspielraum`,
+        ],
+        'sem anúncios': [
+          `Ich habe gesehen, dass ${empresa} keine Online-Werbung schaltet`,
+          `${empresa} ist noch nicht über Online-Anzeigen sichtbar`,
+        ],
       }
-      const intro = problems[problema] || `Ich habe ${empresa} entdeckt`
-      return `Hallo ${firstName}, guten Tag! 👋\n\n${intro}${cidade ? ` in ${cidade}` : ''}.\n\nIch helfe ${nicho || 'Unternehmen'} dabei, mehr Kunden online zu gewinnen. Hätten Sie 5 Minuten für ein kurzes Gespräch diese Woche?`
+      const intro = pick(problems[problema] || [`Ich habe ${empresa} entdeckt`])
+      const cta = pick([
+        `Hätten Sie 5 Minuten für ein kurzes Gespräch diese Woche?`,
+        `Hätten Sie diese Woche kurz Zeit für ein Gespräch?`,
+        `Macht ein kurzer Austausch diese Woche Sinn?`,
+      ])
+      return `Hallo ${firstName}, guten Tag! 👋\n\n${intro}${cidade ? ` in ${cidade}` : ''}.\n\nIch helfe ${nicho || 'Unternehmen'} dabei, mehr Kunden online zu gewinnen. ${cta}`
     }
 
     if (lang === 'en') {
-      const problems: Record<string, string> = {
-        'sem site': `I noticed ${empresa} doesn't have a website yet`,
-        'site fraco': `I checked ${empresa}'s website — there's room for improvement`,
-        'instagram inativo': `I noticed ${empresa}'s Instagram is inactive`,
-        'google maps por otimizar': `I noticed ${empresa}'s Google Maps profile could be optimized`,
-        'sem anúncios': `I noticed ${empresa} isn't running any online ads`,
+      const problems: Record<string, string[]> = {
+        'sem site': [
+          `I noticed ${empresa} doesn't have a website yet`,
+          `Saw that ${empresa} doesn't have a website online`,
+          `${empresa} caught my eye — no website yet`,
+        ],
+        'site fraco': [
+          `I checked ${empresa}'s website — there's room for improvement`,
+          `${empresa}'s site has untapped potential`,
+        ],
+        'instagram inativo': [
+          `I noticed ${empresa}'s Instagram is inactive`,
+          `${empresa}'s Instagram could bring in more visibility`,
+        ],
+        'google maps por otimizar': [
+          `I noticed ${empresa}'s Google Maps profile could be optimized`,
+          `${empresa}'s Maps profile has optimization opportunities`,
+        ],
+        'sem anúncios': [
+          `I noticed ${empresa} isn't running any online ads`,
+          `${empresa} isn't using online ads yet`,
+        ],
       }
-      const intro = problems[problema] || `I came across ${empresa}`
-      return `Hi ${firstName}, good afternoon! 👋\n\n${intro}${cidade ? ` in ${cidade}` : ''}.\n\nI help ${nicho || 'businesses'} get more customers online. Do you have 5 minutes for a quick chat this week?`
+      const intro = pick(problems[problema] || [`I came across ${empresa}`])
+      const cta = pick([
+        `Do you have 5 minutes for a quick chat this week?`,
+        `Got 5 min this week for a quick call?`,
+        `Worth a quick conversation this week?`,
+      ])
+      return `Hi ${firstName}! 👋\n\n${intro}${cidade ? ` in ${cidade}` : ''}.\n\nI help ${nicho || 'businesses'} get more customers online. ${cta}`
     }
 
-    // Portuguese (default) — 3 tonal variants
-    const intros: Record<string, Record<string, string>> = {
+    // Portuguese (default) — 3 tonal variants × várias formulações
+    const intros: Record<string, Record<string, string[]>> = {
       v1: { // formal
-        'sem site': `Reparei que ${empresa} ainda não tem site`,
-        'site fraco': `Vi o site da ${empresa} — há espaço para melhorias claras`,
-        'instagram inativo': `Vi que o Instagram da ${empresa} está parado há algum tempo`,
-        'google maps por otimizar': `Vi que o perfil da ${empresa} no Google Maps tem espaço para otimização`,
-        'sem anúncios': `Reparei que ${empresa} não está a fazer publicidade online`,
+        'sem site': [
+          `Reparei que ${empresa} ainda não tem site`,
+          `Vi que ${empresa} ainda não tem presença com site próprio`,
+          `Notei que ${empresa} ainda não tem um site online`,
+        ],
+        'site fraco': [
+          `Vi o site da ${empresa} — há espaço para melhorias claras`,
+          `Estive a ver o site da ${empresa} e há margem para optimização`,
+          `O site da ${empresa} tem potencial que ainda não está a ser aproveitado`,
+        ],
+        'instagram inativo': [
+          `Vi que o Instagram da ${empresa} está parado há algum tempo`,
+          `Notei que o Instagram da ${empresa} podia estar mais activo`,
+          `Reparei que o IG da ${empresa} podia trazer mais visibilidade`,
+        ],
+        'google maps por otimizar': [
+          `Vi que o perfil da ${empresa} no Google Maps tem espaço para optimização`,
+          `Reparei que o Google Maps da ${empresa} podia ser optimizado`,
+          `Notei que o Maps da ${empresa} podia trazer mais clientes locais`,
+        ],
+        'sem anúncios': [
+          `Reparei que ${empresa} não está a fazer publicidade online`,
+          `Vi que ${empresa} ainda não corre anúncios online`,
+          `Notei que ${empresa} podia estar a captar clientes via anúncios`,
+        ],
       },
       v2: { // casual
-        'sem site': `Vi que o ${empresa} não tem site — quase lá tinha de tropeçar para vos encontrar 😅`,
-        'site fraco': `Dei uma vista de olhos no site do ${empresa} — dá pra duplicar resultados com poucas mudanças`,
-        'instagram inativo': `Stalker mode ON — vi o IG do ${empresa} e tá meio parado, podiam ganhar muita visibilidade`,
-        'google maps por otimizar': `Procurei ${empresa} no Maps e dá para tirar muito mais partido daquele perfil`,
-        'sem anúncios': `Vi que ${empresa} não corre ads — perda enorme de oportunidades`,
+        'sem site': [
+          `Vi que o ${empresa} não tem site — quase tive de tropeçar para vos encontrar 😅`,
+          `Procurei o ${empresa} online e não encontrei site — pena, podiam estar a captar mais`,
+          `Cheguei a vocês meio por sorte porque não tem site ainda`,
+        ],
+        'site fraco': [
+          `Dei uma vista de olhos no site do ${empresa} — dá para duplicar resultados com poucas mudanças`,
+          `Vi o site do ${empresa} e há quick-wins fáceis`,
+        ],
+        'instagram inativo': [
+          `Vi o IG do ${empresa} e está meio parado, podiam ganhar muita visibilidade`,
+          `O Instagram do ${empresa} podia trazer leads se estivesse mais activo`,
+        ],
+        'google maps por otimizar': [
+          `Procurei ${empresa} no Maps e dá para tirar muito mais partido daquele perfil`,
+          `Vi o Maps do ${empresa} e há detalhes simples que trazem mais clientes`,
+        ],
+        'sem anúncios': [
+          `Vi que ${empresa} não corre ads — perda enorme de oportunidades`,
+          `Sem anúncios em ${cidade || 'PT'}, a concorrência leva os vossos clientes`,
+        ],
       },
       v3: { // punchy
-        'sem site': `${empresa} sem site = perder ~70% dos leads que pesquisam.`,
-        'site fraco': `O site atual do ${empresa} está a custar-vos clientes — posso provar com números.`,
-        'instagram inativo': `IG morto = invisibilidade. ${empresa} merece mais.`,
-        'google maps por otimizar': `Maps mal otimizado = invisível para clientes locais. Tem fix rápido.`,
-        'sem anúncios': `Sem ads em ${cidade || 'Portugal'}? Concorrência está a roubar-vos os clientes.`,
+        'sem site': [
+          `${empresa} sem site = perder ~70% dos leads que pesquisam.`,
+          `Sem site, ${empresa} é invisível para quem procura no Google.`,
+        ],
+        'site fraco': [
+          `O site actual do ${empresa} está a custar-vos clientes — posso provar com números.`,
+          `O site do ${empresa} converte muito menos do que devia.`,
+        ],
+        'instagram inativo': [
+          `IG morto = invisibilidade. ${empresa} merece mais.`,
+          `Instagram parado é dinheiro deixado em cima da mesa.`,
+        ],
+        'google maps por otimizar': [
+          `Maps mal optimizado = invisível para clientes locais. Tem fix rápido.`,
+          `${empresa} no Maps pode receber 3-5× mais contactos com a optimização certa.`,
+        ],
+        'sem anúncios': [
+          `Sem ads em ${cidade || 'Portugal'}? Concorrência está a roubar-vos os clientes.`,
+          `${empresa} sem ads = a concorrência fica com os clientes que deviam ser vossos.`,
+        ],
       },
     }
-    const intro = intros[variant][problema] || `Encontrei o ${empresa}`
+    const intro = pick(intros[variant][problema] || [`Encontrei o ${empresa}`])
+
     if (variant === 'v1') {
-      return `Olá ${firstName}, boa tarde! 👋\n\n${intro}${cidade ? ` em ${cidade}` : ''}.\n\nAjudo ${nicho || 'negócios'} como o vosso a captar mais clientes online. Tem 5 minutos para uma conversa rápida esta semana?`
+      const cta = pick([
+        `Tem 5 minutos para uma conversa rápida esta semana?`,
+        `Damos 5 minutos de conversa esta semana?`,
+        `Faz sentido marcarmos uma chamada curta esta semana?`,
+        `Vale a pena uma conversa rápida nos próximos dias?`,
+      ])
+      return `Olá ${firstName}! 👋\n\n${intro}${cidade ? ` em ${cidade}` : ''}.\n\nAjudo ${nicho || 'negócios'} como o vosso a captar mais clientes online. ${cta}`
     }
     if (variant === 'v2') {
-      return `Olá ${firstName}! 👋\n\n${intro}.\n\nFaço marketing para ${nicho || 'negócios'} aqui em ${cidade || 'PT'} e tenho casos com resultados que vos vão interessar. Damos 5min de conversa esta semana?`
+      const cta = pick([
+        `Damos 5min de conversa esta semana?`,
+        `Bora trocar duas palavras esta semana?`,
+        `Faz sentido falarmos esta semana? Prometo ser breve.`,
+      ])
+      return `Olá ${firstName}! 👋\n\n${intro}.\n\nFaço marketing para ${nicho || 'negócios'} aqui em ${cidade || 'PT'} e tenho casos com resultados que vos vão interessar. ${cta}`
     }
     // v3
-    return `${firstName}, sou direto:\n\n${intro}\n\nTrabalho com ${nicho || 'negócios'} e gero crescimento de 2-5× em 90 dias. Posso mostrar números reais? 5 min essa semana 👇`
+    const cta = pick([
+      `Posso mostrar números reais? 5 min essa semana 👇`,
+      `Mostro casos reais em 5 min. Bora?`,
+      `Quer ver dados concretos? 5 min esta semana resolve.`,
+    ])
+    return `${firstName}, vou ser direto:\n\n${intro}\n\nTrabalho com ${nicho || 'negócios'} e gero crescimento de 2-5× em 90 dias. ${cta}`
   }, [])
 
   const handleAiGenerate = (variant?: 'v1' | 'v2' | 'v3') => {
@@ -1153,6 +1270,12 @@ export default function ProspeccaoPage() {
 
   const handleWhatsApp = async (useWeb = false, opts?: { fullOnly?: boolean }) => {
     if (!lead) return
+
+    // ── GATE 0: debounce 1500ms (keyboard auto-repeat de W/E, double-click)
+    const now = Date.now()
+    if (now - lastWaTriggerRef.current < 1500) return
+    lastWaTriggerRef.current = now
+
     const num = getWhatsAppNumber(lead)
     if (!num) {
       toast('Número inválido — saltando', 'info')
@@ -1160,8 +1283,16 @@ export default function ProspeccaoPage() {
       return
     }
 
-    // ── HARD AUTO-PAUSE: if at/over adaptive ban threshold for current number,
-    //    require explicit acknowledgement once per session per number.
+    // ── GATE 1: HARD-BLOCK do rate limiter (cooldown / cap horário / cap diário)
+    const rl = canSend()
+    if (!rl.ok) {
+      toast(rl.warning || 'Bloqueado pelo anti-ban', 'error')
+      haptic('heavy')
+      return
+    }
+    if (rl.warning) toast(rl.warning, 'info')
+
+    // ── GATE 2: HARD AUTO-PAUSE adaptativa (após bans anteriores)
     const preRl = getRateState()
     if (preRl.dayCount >= preRl.adaptiveWarn && dangerAckedKey !== preRl.active) {
       const { label } = getLabel(preRl.active)
@@ -1179,14 +1310,41 @@ export default function ProspeccaoPage() {
       setDangerAckedKey(preRl.active)
     }
 
-    // Anti-block soft warning (rapid-fire)
-    const rl = canSend()
-    if (rl.warning) {
-      toast(rl.warning, 'info')
+    // ── GATE 3: janela horária 8h-22h (madrugada/noite-tarde = padrão de spam)
+    if (isQuietHour() && !quietHourAckedRef.current) {
+      const proceed = confirm(
+        `🌙 FORA DA JANELA RECOMENDADA (8h-22h)\n\n` +
+        `Mandar entre as 22h e as 8h é padrão de spam que o WhatsApp detecta.\n\n` +
+        `Continuar mesmo assim? (confirmação só será pedida 1× por sessão)`
+      )
+      if (!proceed) {
+        toast('Cancelado — janela 8h-22h é mais segura', 'info')
+        return
+      }
+      quietHourAckedRef.current = true
+    }
+
+    // ── GATE 4: dup-check 72h — não mandar 2× para o mesmo lead em pouco tempo
+    try {
+      const r = await fetch(`/api/leads/${lead.id}/recent-wa?hours=72`).then(r => r.json())
+      if (r?.recent) {
+        const proceed = confirm(
+          `🔁 JÁ MANDASTE WA A ESTE LEAD HÁ ${r.hoursAgo}h\n\n` +
+          `Mandar 2× para o mesmo número em < 72h = flag instantânea de spam.\n\n` +
+          `Última mensagem: "${r.lastBody || ''}..."\n\n` +
+          `Tens a certeza que queres mandar outra vez?`
+        )
+        if (!proceed) {
+          toast('Cancelado — bom instinto 🛡️', 'info')
+          return
+        }
+      }
+    } catch {
+      // se a verificação falhar (network), continua — não bloqueia trabalho
     }
 
     const messageBody = aiMessage || generateAiMessage(lead, aiVariant)
-    // Two-tap mode (default for whatsapp:// flow): open WA with greeting, copy script to clipboard.
+    // Two-tap mode (default for whatsapp:// flow): open WA com greeting, copia script para clipboard.
     // Skipped when `fullOnly` is set (e.g. user explicitly chose "send full now").
     // Greeting é variável (anti-bloqueio WA) + adapta-se ao período do dia (manhã/tarde/noite)
     const greeting = randomGreeting(langFromCountry(lead.pais))
@@ -1204,7 +1362,14 @@ export default function ProspeccaoPage() {
       try { await navigator.clipboard.writeText(messageBody) } catch {}
     }
 
-    // Record send + auto-rotate WA slot if spread mode is on
+    // ── ABRE A TAB PRIMEIRO. Se popup blocker bloquear, NÃO contar como envio.
+    const opened = window.open(url, '_blank')
+    if (!opened) {
+      toast('Popup bloqueado — autoriza popups para este site', 'error')
+      return
+    }
+
+    // Só agora regista o envio (contador, spread mode, etc.)
     const sendResult = recordSendAndMaybeSpread()
     const newRate = getRateState()
     setRateState(newRate)
@@ -1213,8 +1378,6 @@ export default function ProspeccaoPage() {
       setShowEndOfDay(true)
     }
     setAllNumberStates(getAllNumberStates())
-
-    window.open(url, '_blank')
     await fetch('/api/messages/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
