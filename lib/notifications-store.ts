@@ -7,6 +7,7 @@
  * Depois: uma única request a cada 60s, todos subscrevem ao state.
  */
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { PAUSE_POLLING } from '@/lib/poll-flags'
 
 // EGRESS: 90s em vez de 60s — corta 33% das requests sem o user notar.
 // Para callbacks iminentes (15min de antecedência), 90s ainda é mais que suficiente.
@@ -77,11 +78,14 @@ class NotificationsStore {
   }
 
   private start() {
-    // Initial fetch
+    // Initial fetch (sempre, mesmo em pause — para mostrar dados ao abrir)
     this.refetch()
-    // Poll every 60s
-    this.intervalId = setInterval(() => this.refetch(), POLL_INTERVAL)
-    // Refresh on tab focus
+    // EGRESS: em modo emergência (NEXT_PUBLIC_PAUSE_POLLING=1) só fazemos
+    // refresh ao mudar de tab/focus — sem setInterval.
+    if (!PAUSE_POLLING) {
+      this.intervalId = setInterval(() => this.refetch(), POLL_INTERVAL)
+    }
+    // Refresh on tab focus (mantém sempre activo — barato e UX importante)
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.onVisibility)
     }

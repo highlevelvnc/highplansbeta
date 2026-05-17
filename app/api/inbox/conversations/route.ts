@@ -96,6 +96,9 @@ export async function GET(req: NextRequest) {
       interested,
       negotiation,
       total: leads.length,
+    }, {
+      // EGRESS: payload ~150-300KB (200 leads × messages preview). Cache 30s + SWR 2min.
+      headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=120' },
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'

@@ -99,6 +99,10 @@ export async function GET(req: NextRequest) {
           scanned: allLeads.length,
         },
         duplicates: [...phoneGroups, ...empresaGroups, ...emailGroups],
+      }, {
+        // EGRESS: scan de 50k leads é PESADÍSSIMO (~15-25MB). Cache 5min
+        // agressivo — duplicates não mudam a cada segundo, é um relatório.
+        headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=900' },
       })
     }
 
@@ -157,6 +161,8 @@ export async function GET(req: NextRequest) {
         totalDuplicateLeads: totalPhoneDupes + totalEmailDupes,
       },
       duplicates: [...phoneGroups, ...emailGroups],
+    }, {
+      headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=900' },
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'

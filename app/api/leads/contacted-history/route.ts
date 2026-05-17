@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     const leads = await prisma.lead.findMany({
       where,
       orderBy: { updatedAt: 'desc' },
-      take: 500,
+      take: 200,  // EGRESS: 500 → 200 (UI mostra os mais recentes)
       select: {
         id: true,
         nome: true,
@@ -79,6 +79,8 @@ export async function GET(req: NextRequest) {
         contactedToday,
         responded,
       },
+    }, {
+      headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'

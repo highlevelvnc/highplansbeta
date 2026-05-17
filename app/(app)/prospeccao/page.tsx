@@ -40,6 +40,7 @@ import { SUB_NICHOS_CONSTRUTORAS } from '@/lib/sub-nicho'
 import { getTimeAdvice } from '@/lib/time-advisor'
 import { ensurePermission, getPermissionState, hasBeenPrompted, showNotification, registerServiceWorker, scheduleCallbackInSW, cancelCallbackInSW, pingSWCheck } from '@/lib/notifications'
 import { randomGreeting, langFromCountry } from '@/lib/greetings'
+import { PAUSE_POLLING } from '@/lib/poll-flags'
 
 interface Lead {
   id: string
@@ -405,8 +406,12 @@ export default function ProspeccaoPage() {
   }, [notifPermission])
 
   useEffect(() => { loadCallbacks() }, [loadCallbacks])
+  // EGRESS: 60s→180s (3min). Endpoint /api/leads/upcoming-callbacks é heavy
+  // (~5-15KB) e parcialmente duplicado por /api/notifications. Em modo
+  // emergência (PAUSE_POLLING=1) só refetch on-focus.
   useEffect(() => {
-    const id = setInterval(loadCallbacks, 60_000)
+    if (PAUSE_POLLING) return
+    const id = setInterval(loadCallbacks, 180_000)
     return () => clearInterval(id)
   }, [loadCallbacks])
 

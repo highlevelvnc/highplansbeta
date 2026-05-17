@@ -150,14 +150,20 @@ export async function GET(req: Request) {
     .slice(0, 18)
 
   // ── 5. Timeline 30 dias ──
-  const createdLeads = await prisma.lead.findMany({
-    where: { createdAt: { gte: since } },
-    select: { createdAt: true, pipelineStatus: true },
-  })
-  const sentMessages = await prisma.message.findMany({
-    where: { createdAt: { gte: since }, status: { in: ['SENT', 'DELIVERED'] } },
-    select: { createdAt: true },
-  })
+  // EGRESS: caps defensivos — 10k leads/30d e 20k messages/30d cobrem qualquer
+  // operação realista. Sem isto, scraper sync grande gera response 5MB+.
+  const [createdLeads, sentMessages] = await Promise.all([
+    prisma.lead.findMany({
+      where: { createdAt: { gte: since } },
+      select: { createdAt: true, pipelineStatus: true },
+      take: 10_000,
+    }),
+    prisma.message.findMany({
+      where: { createdAt: { gte: since }, status: { in: ['SENT', 'DELIVERED'] } },
+      select: { createdAt: true },
+      take: 20_000,
+    }),
+  ])
 
   const dayKey = (d: Date) =>
     d.toISOString().slice(0, 10) // YYYY-MM-DD
@@ -250,5 +256,9 @@ export async function GET(req: Request) {
     by_cidade: byCidade,
     timeline,
     recent,
+  }, {
+    // EGRESS: funnel é caro (8 queries paralelas + aggregations). Cache 60s + SWR 5min
+    // significa reload de página ou troca de tab = instant + sem hit no DB.
+    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
   })
 }

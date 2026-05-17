@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     const activities = await prisma.activity.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      take: 500,
+      take: 200,  // EGRESS: 500 → 200 (UI raramente mostra mais de 50)
       include: {
         lead: {
           select: { id: true, nome: true, empresa: true, cidade: true, score: true, pipelineStatus: true },
@@ -49,6 +49,8 @@ export async function GET(req: NextRequest) {
       total: activities.length,
       tipoCounts,
       period,
+    }, {
+      headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'

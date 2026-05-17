@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { PAUSE_POLLING } from '@/lib/poll-flags'
 import {
   TrendingUp, MessageSquare, ArrowRight, RefreshCw, ExternalLink,
   Users, Send, Reply, CalendarCheck, Trophy, XCircle,
@@ -92,7 +93,10 @@ export default function FunilPage() {
 
   useEffect(() => {
     load()
-    const t = setInterval(load, 60_000) // auto-refresh 1min
+    // EGRESS: era 60s. Funnel é pesado (8 queries) e usado raramente.
+    // 5min é mais que razoável. PAUSE_POLLING desliga em emergência.
+    if (PAUSE_POLLING) return
+    const t = setInterval(load, 300_000)
     return () => clearInterval(t)
   }, [])
 

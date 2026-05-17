@@ -6,9 +6,11 @@ export async function GET() {
   const tasks = await prisma.internalTask.findMany({
     orderBy: [{ prioridade: 'asc' }, { dueDate: 'asc' }],
     include: { lead: { select: { nome: true, empresa: true } } },
-    take: 500,
+    take: 300,
   })
-  return NextResponse.json(tasks)
+  return NextResponse.json(tasks, {
+    headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=180' },
+  })
 }
 
 export async function POST(req: Request) {
