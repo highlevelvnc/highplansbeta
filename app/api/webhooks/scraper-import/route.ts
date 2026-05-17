@@ -225,10 +225,13 @@ function buildMergePayload(
   newData: Record<string, any>
 ): Record<string, any> | null {
   const u: Record<string, any> = {}
+  // Fields que só preenchem se o existente estiver vazio (não sobrescrevem dados)
   const fields = [
     'empresa', 'nicho', 'subNicho', 'cidade', 'telefone', 'whatsapp',
     'telefoneRaw', 'whatsappRaw', 'email', 'origem',
     'observacaoPerfil', 'motivoScore',
+    // Sprint #9: owner — só popula se ainda vazio (heurística pode mudar, evita sobrescrever um nome verificado por um pior)
+    'ownerFirstName', 'ownerFullName', 'ownerSource',
   ]
   for (const f of fields) {
     const ex = existing[f]
