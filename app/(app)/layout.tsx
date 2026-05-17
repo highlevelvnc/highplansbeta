@@ -32,6 +32,7 @@ const nav = [
   { href: '/atividade', label: 'Atividade', icon: Activity },
   { href: '/duplicados', label: 'Duplicados', icon: Copy },
   { href: '/tags', label: 'Tags', icon: Tag },
+  { href: '/admin/wa-events', label: 'WhatsApp Events', icon: MessageCircle },
   { section: 'ESTRATÉGIA' },
   { href: '/nichos', label: 'Nichos', icon: TrendingUp },
   { href: '/objecoes', label: 'Objeções', icon: Zap },
