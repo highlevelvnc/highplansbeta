@@ -56,6 +56,7 @@ interface FunnelData {
     lead_city: string | null
     lead_nicho: string | null
     lead_stage: string
+    lead_owner: string | null
     wa: string | null
   }>
 }
@@ -349,6 +350,11 @@ export default function FunilPage() {
                   <div>
                     <div className="text-xs font-bold text-[#F0F0F3] truncate">
                       {m.lead_name}
+                      {m.lead_owner && (
+                        <span className="ml-2 text-[#A78BFA] font-normal">
+                          · 👤 {m.lead_owner}
+                        </span>
+                      )}
                     </div>
                     <div className="text-[10px] text-[#71717A]">
                       {tsStr} · {m.canal} · {m.lead_city || '?'}

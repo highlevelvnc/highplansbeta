@@ -361,6 +361,11 @@ export async function POST(req: Request) {
         // Campaign ID por linha (override) ou global do payload
         const campaignId = (r.campaign_id || campaignIdGlobal || '').trim()
 
+        // Sprint #9: owner do scraper (enrich_owners.py)
+        const ownerFirst = String(r.owner_first_name || '').trim() || null
+        const ownerFull  = String(r.owner_full_name || '').trim() || null
+        const ownerSrc   = String(r.owner_source || '').trim() || null
+
         const newLeadData: Record<string, any> = {
           nome,
           empresa,
@@ -388,6 +393,10 @@ export async function POST(req: Request) {
             : detectCountry(telefoneRawValue || telefoneStored, cidadeRaw),
           // Campaign ID -> tags (comma-separated)
           tags: campaignId ? `campaign:${campaignId}` : null,
+          // Sprint #9: owner (só se temos algo)
+          ...(ownerFirst ? { ownerFirstName: ownerFirst } : {}),
+          ...(ownerFull  ? { ownerFullName:  ownerFull  } : {}),
+          ...(ownerSrc   ? { ownerSource:    ownerSrc   } : {}),
         }
 
         const match = await findExistingLead(

@@ -35,6 +35,10 @@ model Lead {
   origem            String?
   decisionProfile   String?
   observacaoPerfil  String?
+  // ─── Sprint #9: Sócio-gerente / dono (vindo do enrich_owners.py do scraper) ───
+  ownerFirstName    String?  // primeiro nome — usado em "Olá [João], ..."
+  ownerFullName     String?  // nome completo — fallback p/ contexto B2B formal
+  ownerSource       String?  // 'name' (heurística) | 'website' | 'crc' | 'manual'
   pipelineStatus    String   @default("NEW")  // NEW | CONTACTED | REPLIED | INTERESTED | CLOSED | LOST
   subNicho          String?  // sub-classificação do nicho (e.g. dentro de Construtoras: "Remodelações", "Janelas/Alumínio", "Piscinas", "Modulares", "Obras Civis")
   pais              String?  // "PT", "BR", "DE", "NL"

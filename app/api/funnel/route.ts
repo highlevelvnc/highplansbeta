@@ -212,6 +212,8 @@ export async function GET(req: Request) {
           nicho: true,
           pipelineStatus: true,
           whatsapp: true,
+          ownerFirstName: true,  // Sprint #9
+          ownerFullName: true,
         },
       },
     },
@@ -228,6 +230,7 @@ export async function GET(req: Request) {
     lead_city: m.lead.cidade,
     lead_nicho: m.lead.nicho,
     lead_stage: m.lead.pipelineStatus,
+    lead_owner: m.lead.ownerFirstName || null,  // Sprint #9
     wa: m.lead.whatsapp,
   }))
 
