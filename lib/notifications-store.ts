@@ -8,7 +8,9 @@
  */
 import { useEffect, useState, useRef, useCallback } from 'react'
 
-const POLL_INTERVAL = 60_000  // 1min
+// EGRESS: 90s em vez de 60s — corta 33% das requests sem o user notar.
+// Para callbacks iminentes (15min de antecedência), 90s ainda é mais que suficiente.
+const POLL_INTERVAL = 90_000  // 90s
 const STORAGE_BUS_KEY = 'notifs_last_update'
 
 export type NotificationsData = {
@@ -54,7 +56,10 @@ class NotificationsStore {
     if (this.fetching) return this.fetching
     this.fetching = (async () => {
       try {
-        const res = await fetch('/api/notifications', { cache: 'no-store' })
+        // EGRESS: deixa o browser cachear (max-age=30 vem do server). Combinado
+        // com POLL 90s, isto reduz request count em ~50% — apenas refetch real
+        // quando o cache de 30s expirou e o poll de 90s disparou.
+        const res = await fetch('/api/notifications')
         if (!res.ok) return null
         this.data = await res.json()
         this.lastFetchAt = Date.now()

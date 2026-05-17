@@ -241,5 +241,9 @@ export async function GET() {
     agentStats,
     unassignedLeads,
     avgStageDays,
+  }, {
+    // EGRESS: dashboard recomputa coisas pesadas — cache 60s + SWR 5min
+    // significa que recarregar a página ou abrir noutra tab é instantâneo.
+    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
   })
 }

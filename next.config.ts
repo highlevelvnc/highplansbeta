@@ -45,15 +45,31 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // Bloquear acesso directo a API de fora (CORS implícito)
+      // ⚠️  EGRESS: NÃO meter Cache-Control aqui. Cada route define o seu próprio
+      //    header (ex: /api/notifications usa private,max-age=30; /api/leads/nichos
+      //    usa private,max-age=600). Header global override anula todos eles.
+      //    Routes mutating (POST/PUT/DELETE) não cacheiam por defeito no browser.
       {
         source: "/api/:path*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "Cache-Control", value: "no-store, max-age=0" },
         ],
       },
     ];
+  },
+
+  // Bundle: empacotar imports só do que é usado (corta 80-200KB do client)
+  experimental: {
+    optimizePackageImports: [
+      'lucide-react',
+      'recharts',
+      'date-fns',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-select',
+      '@radix-ui/react-tooltip',
+    ],
   },
 
   // Limitar tamanho de body para API routes (proteção DoS)

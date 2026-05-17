@@ -4,21 +4,36 @@ import { getPlanPrice } from '@/lib/plans'
 import { createClientSchema, validateBody } from '@/lib/validations'
 
 export async function GET() {
-  // Get leads that are clients (have planoAtual set) — cap at 1000
+  // EGRESS: select agressivo. Antes puxava TODOS os campos do Lead (incluindo
+  // observacaoPerfil até 2000 chars × 1000 leads = ~5MB por request).
+  // Agora só os campos que o UI usa → payload ~150KB.
   const leads = await prisma.lead.findMany({
     where: { planoAtual: { not: null } },
     orderBy: { planoInicio: 'desc' },
     take: 1000,
+    select: {
+      id: true, nome: true, empresa: true, nicho: true, cidade: true,
+      telefone: true, whatsapp: true, email: true,
+      planoAtual: true, planoInicio: true,
+    },
   })
 
-  // Also get dedicated clients — cap at 2000 (carteira realista)
+  // Mesmo princípio para Client (carteira realista cap 2000).
   const clients = await prisma.client.findMany({
     orderBy: { createdAt: 'desc' },
     take: 2000,
+    select: {
+      id: true, leadId: true, nome: true, empresa: true, nicho: true, cidade: true,
+      telefone: true, whatsapp: true, email: true,
+      planoAtual: true, planoInicio: true,
+      mrr: true, moeda: true, status: true,
+      pais: true, diaCobranca: true,
+      createdAt: true,
+    },
   })
 
   // Merge: leads with plans + dedicated clients
-  const fromLeads = leads.map((l: typeof leads[number]) => ({
+  const fromLeads = leads.map((l) => ({
     id: l.id,
     leadId: l.id,
     nome: l.nome,
@@ -36,7 +51,15 @@ export async function GET() {
     diasNaBase: l.planoInicio ? Math.floor((Date.now() - new Date(l.planoInicio).getTime()) / 86400000) : 0,
   }))
 
-  return NextResponse.json([...fromLeads, ...clients.map((c: typeof clients[number]) => ({ ...c, source: 'client', diasNaBase: Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 86400000) }))])
+  const fromClients = clients.map((c) => ({
+    ...c,
+    source: 'client',
+    diasNaBase: Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 86400000),
+  }))
+
+  return NextResponse.json([...fromLeads, ...fromClients], {
+    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=180' },
+  })
 }
 
 export async function POST(req: Request) {

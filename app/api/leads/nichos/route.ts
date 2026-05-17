@@ -15,7 +15,8 @@ export async function GET() {
       .map(r => ({ nicho: r.nicho!, count: r._count.id }))
 
     return NextResponse.json({ nichos }, {
-      headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=600' },
+      // EGRESS: nichos mudam pouco (só quando há novo scraper sync). Cache 10min.
+      headers: { 'Cache-Control': 'private, max-age=600, stale-while-revalidate=1800' },
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'

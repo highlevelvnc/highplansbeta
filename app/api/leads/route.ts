@@ -132,8 +132,11 @@ export async function GET(req: NextRequest) {
               messages: true,
             },
           },
+          // Mantemos uma única coluna (createdAt) da última mensagem porque a
+          // UI mostra "último contacto" em /leads. Payload é minúsculo (~16 bytes
+          // × pageSize) e o cache header de 15s elimina double-fetches.
           messages: {
-            select: { createdAt: true },
+            select: { createdAt: true, canal: true },
             orderBy: { createdAt: 'desc' },
             take: 1,
           },
@@ -147,6 +150,10 @@ export async function GET(req: NextRequest) {
       page,
       pageSize,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    }, {
+      // EGRESS: cache curto — listings de leads podem mudar (novos imports) mas
+      // 15s de janela é razoável para reduzir double-load de paginação.
+      headers: { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=60' },
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'
