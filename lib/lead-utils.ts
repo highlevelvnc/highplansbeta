@@ -269,6 +269,47 @@ function extractFirstPhone(raw: string): string {
 }
 
 /**
+ * Verifica se o número (em formato E.164 sem +) tem prefixo compatível com
+ * o país do lead. Anti-erro: evita mandar 351912345678 para um lead marcado
+ * como BR, ou 5511... para um marcado como PT.
+ *
+ * Retorna:
+ *   - { ok: true }: prefixo consistente OU não sabemos o país do lead
+ *   - { ok: false, expectedPrefix, actualCountry }: clear mismatch
+ *
+ * Países suportados: PT (351), BR (55), DE (49), NL (31).
+ */
+export function validatePhoneCountry(
+  number: string,
+  leadCountry?: string | null,
+): { ok: boolean; expectedPrefix?: string; actualCountry?: string } {
+  if (!number || !leadCountry) return { ok: true }
+
+  const prefixes: Record<string, string> = {
+    PT: '351',
+    BR: '55',
+    DE: '49',
+    NL: '31',
+  }
+
+  const expectedPrefix = prefixes[leadCountry.toUpperCase()]
+  if (!expectedPrefix) return { ok: true }  // país desconhecido — não bloqueia
+
+  if (number.startsWith(expectedPrefix)) return { ok: true }
+
+  // Tenta detectar país real do número
+  let actualCountry = 'desconhecido'
+  for (const [country, prefix] of Object.entries(prefixes)) {
+    if (number.startsWith(prefix)) {
+      actualCountry = country
+      break
+    }
+  }
+
+  return { ok: false, expectedPrefix, actualCountry }
+}
+
+/**
  * Returns true if the given lead's WhatsApp number is a Portuguese landline (2xx prefix).
  * PT mobile starts with 9 — anything else (esp. 2) is a landline → no WhatsApp.
  * For non-PT numbers we conservatively return false (we can't tell without per-country logic).

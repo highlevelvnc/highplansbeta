@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/components/Toast'
-import { displayName, getWhatsAppNumber, buildWhatsAppUrl, COUNTRY_INFO } from '@/lib/lead-utils'
+import { displayName, getWhatsAppNumber, buildWhatsAppUrl, COUNTRY_INFO, validatePhoneCountry } from '@/lib/lead-utils'
 import { haptic, isSilentMode, setSilentMode } from '@/lib/haptics'
 import { LeadAvatar } from '@/components/LeadAvatar'
 import { CallbackRow } from '@/components/CallbackRow'
@@ -35,7 +35,7 @@ const TemplatesDrawer = lazy(() => import('@/components/TemplatesDrawer').then(m
 const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })))
 import { getAllActions, searchActions, getCategoryLabel, type ActionContext, type CommandAction } from '@/lib/command-palette-actions'
 import { useRouter } from 'next/navigation'
-import { recordSendAndMaybeSpread, getRateState, canSend, recordBan, setActiveNumber, getAllNumberStates, NUMBER_KEYS, getLabel, setLabel, getSpreadMode, setSpreadMode, RL_HOURLY_WARN, isQuietHour, type NumberKey } from '@/lib/wa-rate-limiter'
+import { recordSendAndMaybeSpread, getRateState, canSend, recordBan, setActiveNumber, getAllNumberStates, NUMBER_KEYS, getLabel, setLabel, getSpreadMode, setSpreadMode, RL_HOURLY_WARN, isQuietHour, getEffectiveDailyCap, markNumberAsNew, markNumberAsWarmed, getNumberAgeDays, type NumberKey } from '@/lib/wa-rate-limiter'
 import { SUB_NICHOS_CONSTRUTORAS } from '@/lib/sub-nicho'
 import { getTimeAdvice } from '@/lib/time-advisor'
 import { ensurePermission, getPermissionState, hasBeenPrompted, showNotification, registerServiceWorker, scheduleCallbackInSW, cancelCallbackInSW, pingSWCheck } from '@/lib/notifications'
@@ -728,6 +728,38 @@ export default function ProspeccaoPage() {
     setRateState(getRateState())
     setAllNumberStates(getAllNumberStates())
   }
+
+  /** Marca o chip activo como "novo" — ativa caps progressivos (5/10/20/35 conforme idade). */
+  const handleMarkAsNewChip = () => {
+    const { label } = getLabel(rateState.active)
+    if (!confirm(
+      `🌱 MARCAR "${label}" COMO CHIP NOVO\n\n` +
+      `Vais activar warmup automático:\n` +
+      `• Dia 1-3: 5 envios/dia\n` +
+      `• Dia 4-7: 10 envios/dia\n` +
+      `• Dia 8-14: 20 envios/dia\n` +
+      `• Dia 15-30: 35 envios/dia\n` +
+      `• Dia 31+: cap pleno (65/dia)\n\n` +
+      `O histórico de bans é apagado (chip diferente = sorte diferente).\n` +
+      `Confirmar?`
+    )) return
+    markNumberAsNew(rateState.active)
+    haptic('success')
+    toast(`🌱 ${label} marcado como chip novo — warmup activo`, 'success')
+    setRateState(getRateState())
+    setAllNumberStates(getAllNumberStates())
+  }
+
+  /** Marca como chip antigo já aquecido — remove caps de warmup. */
+  const handleMarkAsWarmed = () => {
+    const { label } = getLabel(rateState.active)
+    if (!confirm(`Marcar "${label}" como chip antigo já aquecido (sem warmup)?`)) return
+    markNumberAsWarmed(rateState.active)
+    haptic('tick')
+    toast(`${label} agora usa cap pleno`, 'success')
+    setRateState(getRateState())
+    setAllNumberStates(getAllNumberStates())
+  }
   // Tick during cooldown so countdown UI updates smoothly
   useEffect(() => {
     if (rateState.cooldownMs <= 0) return
@@ -1286,6 +1318,22 @@ export default function ProspeccaoPage() {
       toast('Número inválido — saltando', 'info')
       loadNext()
       return
+    }
+
+    // ── GATE 0.5: anti-engano de país — número com prefixo incompatível
+    //    com lead.pais sugere erro de classificação ou número corrupto.
+    const countryCheck = validatePhoneCountry(num, lead.pais)
+    if (!countryCheck.ok) {
+      const proceed = confirm(
+        `⚠️ PAÍS NÃO BATE\n\n` +
+        `Lead marcado como ${lead.pais} mas o número parece ser de ${countryCheck.actualCountry} (esperado prefixo ${countryCheck.expectedPrefix}).\n\n` +
+        `Mandar mesmo assim?\n` +
+        `(número: +${num})`
+      )
+      if (!proceed) {
+        toast('Cancelado — verifica o número/país do lead', 'info')
+        return
+      }
     }
 
     // ── GATE 1: HARD-BLOCK do rate limiter (cooldown / cap horário / cap diário)
@@ -3018,6 +3066,7 @@ export default function ProspeccaoPage() {
               const numState = allNumberStates[key]
               const { label, emoji } = getLabel(key)
               const lastBanHrs = numState.lastBanTs ? Math.round((Date.now() - numState.lastBanTs) / (60 * 60 * 1000)) : null
+              const warmup = getEffectiveDailyCap(key)
               return (
                 <button
                   key={key}
@@ -3028,11 +3077,19 @@ export default function ProspeccaoPage() {
                       ? 'bg-[#8B5CF6]/15 border border-[#8B5CF6]/40 text-[#A78BFA]'
                       : 'border border-[#27272A] text-[#71717A] hover:border-[#52525B]'
                   }`}
-                  title={`${label} — ${numState.dayCount} hoje${lastBanHrs !== null ? ` · ban há ${lastBanHrs}h` : ''} (duplo-clique para renomear)`}
+                  title={
+                    `${label} — ${numState.dayCount}/${warmup.cap} hoje` +
+                    (warmup.isWarmup ? ` · 🌱 ${warmup.tierLabel} (dia ${warmup.ageDays}, próximo nível em ${warmup.nextTierInDays}d)` : '') +
+                    (lastBanHrs !== null ? ` · ban há ${lastBanHrs}h` : '') +
+                    ' · duplo-clique p/ renomear'
+                  }
                 >
                   <span>{emoji}</span>
                   <span>{label}</span>
-                  <span className="text-[10px] tabular-nums opacity-70">{numState.dayCount}</span>
+                  <span className="text-[10px] tabular-nums opacity-70">{numState.dayCount}/{warmup.cap}</span>
+                  {warmup.isWarmup && (
+                    <span className="text-[9px] bg-green-500/20 text-green-400 px-1 py-0.5 rounded-full" title={`Dia ${warmup.ageDays} de warmup`}>🌱 d{warmup.ageDays}</span>
+                  )}
                   {lastBanHrs !== null && lastBanHrs < 24 && (
                     <span className="text-[9px] bg-red-500/20 text-red-400 px-1 py-0.5 rounded-full">⛔ {lastBanHrs}h</span>
                   )}
@@ -3058,6 +3115,32 @@ export default function ProspeccaoPage() {
               <span>🔀</span>
               <span>{spreadMode ? 'Spread ON' : 'Spread'}</span>
             </button>
+            {/* Warmup toggle — só aparece se chip antigo (para marcar como novo após troca) */}
+            {(() => {
+              const warmup = getEffectiveDailyCap(rateState.active)
+              if (warmup.isWarmup) {
+                return (
+                  <button
+                    onClick={handleMarkAsWarmed}
+                    title={`Chip ${warmup.tierLabel}. Clica para marcar como já aquecido (remove caps).`}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-all"
+                  >
+                    <span>🌱</span>
+                    <span>d{warmup.ageDays}</span>
+                  </button>
+                )
+              }
+              return (
+                <button
+                  onClick={handleMarkAsNewChip}
+                  title="Trocaste de chip? Activa warmup (caps 5/10/20/35 conforme idade)"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-[#27272A] text-[#52525B] hover:text-green-400 hover:border-green-500/30 transition-all"
+                >
+                  <span>🌱</span>
+                  <span>Chip novo</span>
+                </button>
+              )
+            })()}
             <button
               onClick={handleReportBan}
               title="Tomei ban — registar agora"

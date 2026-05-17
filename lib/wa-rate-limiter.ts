@@ -40,7 +40,28 @@ type NumberData = {
   bans: { ts: number; count: number }[]  // ban events with daily count at that moment
   label?: string               // user-editable display label
   emoji?: string               // user-editable emoji
+  createdAt?: number           // timestamp da activação do chip — usado p/ warmup
 }
+
+/**
+ * WARMUP — caps progressivos para chip novo. WhatsApp deteta números novos
+ * (ainda sem histórico de conversas) e bana muito mais facilmente se mandares
+ * 50 logo no dia 1. Caps recomendados (baseado em padrões observados em PT/BR):
+ *
+ *   dia 1-3:   5/dia       — só warm-up (responde manualmente a 2-3 conversas)
+ *   dia 4-7:   10/dia      — aumenta confiança
+ *   dia 8-14:  20/dia      — ramp-up
+ *   dia 15-30: 35/dia      — quase pleno
+ *   dia 31+:   full cap (RL_DAILY_HARD)
+ *
+ * Se ainda assim houver ban no warmup, o adaptiveWarn aperta ainda mais.
+ */
+const WARMUP_TIERS: Array<{ untilDay: number; cap: number; label: string }> = [
+  { untilDay: 3,  cap: 5,  label: 'Warmup dia 1-3' },
+  { untilDay: 7,  cap: 10, label: 'Warmup dia 4-7' },
+  { untilDay: 14, cap: 20, label: 'Warmup dia 8-14' },
+  { untilDay: 30, cap: 35, label: 'Warmup dia 15-30' },
+]
 
 type Storage = {
   active: NumberKey
@@ -82,6 +103,67 @@ export function setLabel(key: NumberKey, label: string, emoji?: string) {
   if (s.numbers[key]) {
     s.numbers[key].label = label.trim().slice(0, 20) || DEFAULT_LABELS[key].label
     if (emoji !== undefined) s.numbers[key].emoji = emoji.slice(0, 4)
+    write(s)
+  }
+}
+
+/** Idade do chip em dias (desde createdAt). Se nunca foi marcado, devolve null (assume "antigo"). */
+export function getNumberAgeDays(key: NumberKey): number | null {
+  const s = read()
+  const createdAt = s.numbers[key]?.createdAt
+  if (!createdAt) return null
+  return Math.floor((Date.now() - createdAt) / DAY_MS)
+}
+
+/**
+ * Cap diário efectivo respeitando WARMUP_TIERS.
+ * Devolve { cap, isWarmup, tierLabel, nextTierInDays }.
+ * Se idade desconhecida (null), assume "antigo" → RL_DAILY_HARD.
+ */
+export function getEffectiveDailyCap(key: NumberKey): {
+  cap: number
+  isWarmup: boolean
+  tierLabel: string | null
+  nextTierInDays: number | null
+  ageDays: number | null
+} {
+  const ageDays = getNumberAgeDays(key)
+  if (ageDays === null || ageDays >= 30) {
+    return { cap: RL_DAILY_HARD, isWarmup: false, tierLabel: null, nextTierInDays: null, ageDays }
+  }
+  for (const tier of WARMUP_TIERS) {
+    if (ageDays <= tier.untilDay) {
+      return {
+        cap: tier.cap,
+        isWarmup: true,
+        tierLabel: tier.label,
+        nextTierInDays: tier.untilDay - ageDays + 1,
+        ageDays,
+      }
+    }
+  }
+  return { cap: RL_DAILY_HARD, isWarmup: false, tierLabel: null, nextTierInDays: null, ageDays }
+}
+
+/**
+ * Marca o slot como "chip novo" — reinicia createdAt + apaga histórico de bans
+ * (chip novo = pode ter sorte diferente do anterior). NÃO apaga sends do dia
+ * porque o utilizador pode estar a meio da prospect quando troca.
+ */
+export function markNumberAsNew(key: NumberKey) {
+  const s = read()
+  if (s.numbers[key]) {
+    s.numbers[key].createdAt = Date.now()
+    s.numbers[key].bans = []  // histórico de bans não se aplica a chip diferente
+    write(s)
+  }
+}
+
+/** Marca como "chip antigo já aquecido" — limpa createdAt para usar full cap. */
+export function markNumberAsWarmed(key: NumberKey) {
+  const s = read()
+  if (s.numbers[key]) {
+    delete s.numbers[key].createdAt
     write(s)
   }
 }
@@ -262,14 +344,19 @@ export function getAllNumberStates(): Record<NumberKey, { dayCount: number; banC
  *   ok=false → UI DEVE bloquear o envio (cooldown ativo ou caps duros excedidos)
  *   ok=true + warning → permite mas avisa (ex: quiet hours, perto do cap)
  *   ok=true sem warning → tudo bem
+ *
+ * Respeita WARMUP TIERS — se chip novo (createdAt < 30d), o cap diário é
+ * dinâmico (5/10/20/35 conforme idade) em vez do RL_DAILY_HARD pleno.
  */
 export function canSend(): {
   ok: boolean
-  reason?: 'cooldown' | 'hourly_cap' | 'daily_cap'
+  reason?: 'cooldown' | 'hourly_cap' | 'daily_cap' | 'warmup_cap'
   warning?: string
   cooldownMs?: number
 } {
   const s = getRateState()
+  const warmup = getEffectiveDailyCap(s.active)
+
   // HARD BLOCKS (botão fica disabled, retorna ok:false)
   if (s.cooldownMs > 0) {
     const sec = Math.ceil(s.cooldownMs / 1000)
@@ -278,12 +365,23 @@ export function canSend(): {
   if (s.hourCount >= RL_HOURLY_HARD) {
     return { ok: false, reason: 'hourly_cap', warning: `🛑 Cap horário (${s.hourCount}/${RL_HOURLY_HARD}) — pausa ~30min` }
   }
+  // WARMUP CAP (chip novo) — cap mais apertado que o pleno
+  if (warmup.isWarmup && s.dayCount >= warmup.cap) {
+    return {
+      ok: false,
+      reason: 'warmup_cap',
+      warning: `🌱 ${warmup.tierLabel}: ${s.dayCount}/${warmup.cap} hoje. Próximo nível em ${warmup.nextTierInDays}d. Aguenta — chip novo precisa aquecer.`,
+    }
+  }
   if (s.dayCount >= RL_DAILY_HARD) {
     return { ok: false, reason: 'daily_cap', warning: `🛑 Cap diário (${s.dayCount}/${RL_DAILY_HARD}) — para hoje neste número` }
   }
   // SOFT WARNINGS (passa mas avisa)
   if (s.hourCount >= RL_HOURLY_WARN) {
     return { ok: true, warning: `⚠️ Já ${s.hourCount}/h — abranda para evitar ban` }
+  }
+  if (warmup.isWarmup && s.dayCount >= warmup.cap - 2) {
+    return { ok: true, warning: `🌱 ${warmup.tierLabel}: faltam ${warmup.cap - s.dayCount} para o limite de hoje` }
   }
   return { ok: true }
 }
