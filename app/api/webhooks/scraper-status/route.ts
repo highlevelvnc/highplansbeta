@@ -67,21 +67,39 @@ export async function POST(req: Request) {
     }, { status: 400 })
   }
 
-  // Procura lead por phone OU whatsapp (normalizados)
+  // ── ANTI-CRUZAMENTO: gera variantes razoáveis do número (com e sem prefixo
+  //    de país) e usa match por `equals/in` (indexado) em vez de `contains`
+  //    (sequencial scan + cruzava 912345678 com 351912345678 → updates errados).
+  const variants = new Set<string>([phone])
+  if (phone.startsWith('351') && phone.length === 12) variants.add(phone.substring(3))
+  if (phone.startsWith('55') && phone.length >= 12) variants.add(phone.substring(2))
+  if (phone.startsWith('49') && phone.length >= 11) variants.add(phone.substring(2))
+  if (phone.startsWith('31') && phone.length >= 11) variants.add(phone.substring(2))
+  if (phone.length === 9 && (phone.startsWith('9') || phone.startsWith('2'))) {
+    variants.add('351' + phone)  // PT mobile/fixo sem prefixo
+  }
+  if (phone.length === 11 && (phone.startsWith('1') || phone.startsWith('2'))) {
+    variants.add('55' + phone)   // BR sem prefixo
+  }
+  const variantList = Array.from(variants)
+
+  // Query com `in` (indexed) — sem seq scan, sem cruzamento.
   const leads = await prisma.lead.findMany({
     where: {
       OR: [
-        { telefone: { contains: phone } },
-        { whatsapp: { contains: phone } },
+        { telefone:   { in: variantList } },
+        { whatsapp:   { in: variantList } },
+        { telefoneRaw:{ in: variantList } },
+        { whatsappRaw:{ in: variantList } },
       ],
     },
     select: { id: true, nome: true, empresa: true, pipelineStatus: true,
               telefone: true, whatsapp: true },
   })
 
-  // Filtra match exacto após normalização
+  // Defesa adicional: confirma normalização (caso storage tenha "+351 912 ..." com espaços).
   const matched = leads.filter(l =>
-    normPhone(l.telefone) === phone || normPhone(l.whatsapp) === phone
+    variants.has(normPhone(l.telefone)) || variants.has(normPhone(l.whatsapp))
   )
 
   if (matched.length === 0) {
