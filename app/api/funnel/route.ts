@@ -11,6 +11,10 @@ import { prisma } from '@/lib/prisma'
  *   - breakdown por nicho + cidade
  *   - timeline 30d (criados vs contactados vs respondidos)
  *   - recent replies (últimas 20 mensagens com lead context)
+ *
+ * Sprint #41 — Cache em memória (TTL 5min) para reduzir egress Supabase.
+ * Lifetime da serverless function no Vercel ~5-15min, faz que a maioria
+ * dos polls reaproveite o último resultado.
  */
 
 const STAGES = [
@@ -23,9 +27,28 @@ const STAGES = [
   'LOST',
 ] as const
 
+// Sprint #41: cache simples em memória — chave = `days`
+type CacheEntry = { ts: number; data: any }
+const _cache = new Map<number, CacheEntry>()
+const CACHE_TTL_MS = 5 * 60 * 1000  // 5 min
+const CACHE_BYPASS_HEADER = 'x-no-cache'
+
 export async function GET(req: Request) {
   const url = new URL(req.url)
   const days = parseInt(url.searchParams.get('days') || '30')
+
+  // Cache lookup (a menos que header de bypass)
+  const bypass = req.headers.get(CACHE_BYPASS_HEADER) === '1'
+  if (!bypass) {
+    const cached = _cache.get(days)
+    if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+      return NextResponse.json({
+        ...cached.data,
+        _cached: true,
+        _cache_age_s: Math.round((Date.now() - cached.ts) / 1000),
+      })
+    }
+  }
 
   const since = new Date()
   since.setDate(since.getDate() - days)
@@ -241,7 +264,7 @@ export async function GET(req: Request) {
   }))
 
   // ── Response ──
-  return NextResponse.json({
+  const payload = {
     totals: {
       total: totalLeads,
       ...totals,
@@ -256,7 +279,16 @@ export async function GET(req: Request) {
     by_cidade: byCidade,
     timeline,
     recent,
-  }, {
+  }
+
+  // Sprint #41: guarda no cache in-memory para próximas chamadas em ≤5min
+  _cache.set(days, { ts: Date.now(), data: payload })
+  // Limpa entradas antigas (evita memory leak)
+  for (const [k, v] of _cache.entries()) {
+    if (Date.now() - v.ts > CACHE_TTL_MS * 2) _cache.delete(k)
+  }
+
+  return NextResponse.json(payload, {
     // EGRESS: funnel é caro (8 queries paralelas + aggregations). Cache 60s + SWR 5min
     // significa reload de página ou troca de tab = instant + sem hit no DB.
     headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
