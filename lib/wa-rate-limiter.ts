@@ -409,49 +409,77 @@ export function getAllNumberStates(): Record<NumberKey, { dayCount: number; banC
 }
 
 /**
- * canSend — gatekeeper anti-ban.
+ * canSend — informa risco de ban, mas NUNCA bloqueia (preferência do user).
  *
- *   ok=false → UI DEVE bloquear o envio (cooldown ativo ou caps duros excedidos)
- *   ok=true + warning → permite mas avisa (ex: quiet hours, perto do cap)
- *   ok=true sem warning → tudo bem
+ *   ok=true sempre — UI permite envio em qualquer condição
+ *   warning?      — toast/UI feedback para sinalizar zona de risco
+ *   severity?     — 'info' | 'warn' | 'danger' para escalar visual/haptic
+ *   reason?       — origem do warning (debug/analytics)
  *
- * Respeita WARMUP TIERS — se chip novo (createdAt < 30d), o cap diário é
- * dinâmico (5/10/20/35 conforme idade) em vez do RL_DAILY_HARD pleno.
+ * Respeita WARMUP TIERS — caps dinâmicos para chip novo (5/10/20/35 vs 65).
+ *
+ * NOTA: a única coisa que bloqueia mesmo é o debounce de 1500ms no
+ * handleWhatsApp (anti double-click acidental). Todos os caps são apenas
+ * warnings — o user decide se quer arriscar.
  */
 export function canSend(): {
   ok: boolean
   reason?: 'cooldown' | 'hourly_cap' | 'daily_cap' | 'warmup_cap'
+  severity?: 'info' | 'warn' | 'danger'
   warning?: string
   cooldownMs?: number
 } {
   const s = getRateState()
   const warmup = getEffectiveDailyCap(s.active)
 
-  // HARD BLOCKS (botão fica disabled, retorna ok:false)
-  if (s.cooldownMs > 0) {
-    const sec = Math.ceil(s.cooldownMs / 1000)
-    return { ok: false, reason: 'cooldown', warning: `⏳ Aguarda ${sec}s — anti rapid-fire`, cooldownMs: s.cooldownMs }
-  }
-  if (s.hourCount >= RL_HOURLY_HARD) {
-    return { ok: false, reason: 'hourly_cap', warning: `🛑 Cap horário (${s.hourCount}/${RL_HOURLY_HARD}) — pausa ~30min` }
-  }
-  // WARMUP CAP (chip novo) — cap mais apertado que o pleno
-  if (warmup.isWarmup && s.dayCount >= warmup.cap) {
+  // ⛔ ZONA DE PERIGO — passou o cap duro, mas DEIXA PASSAR (só avisa forte)
+  if (s.dayCount >= RL_DAILY_HARD) {
     return {
-      ok: false,
-      reason: 'warmup_cap',
-      warning: `🌱 ${warmup.tierLabel}: ${s.dayCount}/${warmup.cap} hoje. Próximo nível em ${warmup.nextTierInDays}d. Aguenta — chip novo precisa aquecer.`,
+      ok: true,
+      reason: 'daily_cap',
+      severity: 'danger',
+      warning: `🛑 Cap diário ultrapassado (${s.dayCount}/${RL_DAILY_HARD}) — ALTO RISCO de ban neste número`,
     }
   }
-  if (s.dayCount >= RL_DAILY_HARD) {
-    return { ok: false, reason: 'daily_cap', warning: `🛑 Cap diário (${s.dayCount}/${RL_DAILY_HARD}) — para hoje neste número` }
+  if (s.hourCount >= RL_HOURLY_HARD) {
+    return {
+      ok: true,
+      reason: 'hourly_cap',
+      severity: 'danger',
+      warning: `🛑 Cap horário ultrapassado (${s.hourCount}/${RL_HOURLY_HARD}) — pausa ~30min recomendada`,
+    }
   }
-  // SOFT WARNINGS (passa mas avisa)
+  if (warmup.isWarmup && s.dayCount >= warmup.cap) {
+    return {
+      ok: true,
+      reason: 'warmup_cap',
+      severity: 'danger',
+      warning: `🌱 Warmup cap ultrapassado (${s.dayCount}/${warmup.cap}) — chip novo em zona crítica de ban`,
+    }
+  }
+
+  // ⚠️ COOLDOWN — só info, deixa enviar
+  if (s.cooldownMs > 0) {
+    const sec = Math.ceil(s.cooldownMs / 1000)
+    return {
+      ok: true,
+      reason: 'cooldown',
+      severity: 'info',
+      warning: `⚡ Rapid-fire (${sec}s desde o último). Cuidado com ban.`,
+      cooldownMs: s.cooldownMs,
+    }
+  }
+
+  // 🟡 WARNINGS PROACTIVOS — perto do cap
   if (s.hourCount >= RL_HOURLY_WARN) {
-    return { ok: true, warning: `⚠️ Já ${s.hourCount}/h — abranda para evitar ban` }
+    return { ok: true, severity: 'warn', warning: `⚠️ Já ${s.hourCount}/h — abranda para evitar ban` }
   }
   if (warmup.isWarmup && s.dayCount >= warmup.cap - 2) {
-    return { ok: true, warning: `🌱 ${warmup.tierLabel}: faltam ${warmup.cap - s.dayCount} para o limite de hoje` }
+    return {
+      ok: true,
+      severity: 'warn',
+      warning: `🌱 ${warmup.tierLabel}: faltam ${warmup.cap - s.dayCount} para o limite warmup de hoje`,
+    }
   }
   return { ok: true }
 }

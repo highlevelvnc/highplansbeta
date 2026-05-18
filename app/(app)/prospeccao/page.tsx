@@ -1365,14 +1365,18 @@ export default function ProspeccaoPage() {
       }
     }
 
-    // ── GATE 1: HARD-BLOCK do rate limiter (cooldown / cap horário / cap diário)
+    // ── GATE 1: rate limiter — APENAS AVISA, nunca bloqueia (decisão do user)
+    //    severity escala feedback visual/haptic:
+    //      info   = toast info (cooldown próximo)
+    //      warn   = toast info amarelo (perto do cap)
+    //      danger = toast erro + haptic heavy (cap ultrapassado, alto risco ban)
     const rl = canSend()
-    if (!rl.ok) {
-      toast(rl.warning || 'Bloqueado pelo anti-ban', 'error')
-      haptic('heavy')
-      return
+    if (rl.warning) {
+      const toastType = rl.severity === 'danger' ? 'error' : 'info'
+      toast(rl.warning, toastType)
+      if (rl.severity === 'danger') haptic('heavy')
+      else if (rl.severity === 'warn') haptic('medium')
     }
-    if (rl.warning) toast(rl.warning, 'info')
 
     // ── GATE 2: HARD AUTO-PAUSE adaptativa (após bans anteriores)
     const preRl = getRateState()
