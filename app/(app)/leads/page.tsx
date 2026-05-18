@@ -12,6 +12,7 @@ import { Onboarding } from '@/components/Onboarding'
 import { QuickFollowUpModal } from '@/components/QuickFollowUpModal'
 import { QuickProposalModal } from '@/components/QuickProposalModal'
 import { WhatsAppModal } from '@/components/WhatsAppModal'
+import { LeadQuickActions } from '@/components/LeadQuickActions'
 import { useToast } from '@/components/Toast'
 import { displayName, getPhoneDisplayMeta, COUNTRY_INFO } from '@/lib/lead-utils'
 
@@ -1222,12 +1223,16 @@ export default function LeadsPage() {
                 </div>
 
                 {/* Last contact info */}
-                <div className="text-[10px] mt-1 mb-0.5">
-                  {lastMsg ? (
-                    <span className="text-[#52525B]">Último contacto: <span className="text-[#71717A]">{relativeTime(lastMsg)}</span></span>
-                  ) : (
-                    <span className="text-amber-400/70">Nunca contactado</span>
-                  )}
+                <div className="flex items-center justify-between gap-2 text-[10px] mt-1 mb-0.5">
+                  <div>
+                    {lastMsg ? (
+                      <span className="text-[#52525B]">Último contacto: <span className="text-[#71717A]">{relativeTime(lastMsg)}</span></span>
+                    ) : (
+                      <span className="text-amber-400/70">Nunca contactado</span>
+                    )}
+                  </div>
+                  {/* Sprint #66: quick actions inline (call mode, proposta, callback, nota) */}
+                  <LeadQuickActions leadId={lead.id} compact onUpdated={() => load()} />
                 </div>
               </div>
 
@@ -1457,6 +1462,8 @@ export default function LeadsPage() {
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                       </Link>
+                      {/* Sprint #66 — quick actions (call mode, proposal, callback, note) */}
+                      <LeadQuickActions leadId={lead.id} compact onUpdated={() => load()} />
                     </div>
                   </td>
                 </tr>

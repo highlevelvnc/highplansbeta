@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { QuickFollowUpModal } from '@/components/QuickFollowUpModal'
 import { WhatsAppModal } from '@/components/WhatsAppModal'
 import { FollowUpSuggestion } from '@/components/FollowUpSuggestion'
+import { LeadQuickActions } from '@/components/LeadQuickActions'
 import { displayName, getWhatsAppNumber, getCallNumber, buildWhatsAppUrl, COUNTRY_INFO } from '@/lib/lead-utils'
 
 const STAGES = [
@@ -738,15 +739,19 @@ export default function PipelinePage() {
                             <StickyNote className="w-3 h-3" />
                           </button>
                         </div>
-                        {/* Open lead */}
-                        <Link
-                          href={`/leads/${lead.id}`}
-                          onClick={e => e.stopPropagation()}
-                          title="Abrir perfil"
-                          className="w-6 h-6 rounded-md bg-[rgba(139,92,246,0.08)] hover:bg-[rgba(139,92,246,0.18)] text-[#8B5CF6] flex items-center justify-center transition-all"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                        </Link>
+                        <div className="flex items-center gap-1">
+                          {/* Sprint #66 — quick actions (call mode, proposta, callback, nota) */}
+                          <LeadQuickActions leadId={lead.id} compact />
+                          {/* Open lead */}
+                          <Link
+                            href={`/leads/${lead.id}`}
+                            onClick={e => e.stopPropagation()}
+                            title="Abrir perfil"
+                            className="w-6 h-6 rounded-md bg-[rgba(139,92,246,0.08)] hover:bg-[rgba(139,92,246,0.18)] text-[#8B5CF6] flex items-center justify-center transition-all"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </Link>
+                        </div>
                       </div>
 
                       {/* Inline note input */}
