@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, LogOut, Menu, X, Bell, BarChart3, Copy, Crosshair, Inbox, Tag, Activity, Euro, CalendarCheck } from 'lucide-react'
+import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, LogOut, Menu, X, Bell, BarChart3, Copy, Crosshair, Inbox, Tag, Activity, Euro, CalendarCheck, Sunrise } from 'lucide-react'
 import { ToastProvider } from '@/components/Toast'
 import { BottomNavBar } from '@/components/BottomNavBar'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -38,6 +38,7 @@ const nav = [
   { href: '/admin/calendar', label: 'Calendar', icon: Calendar },
   { href: '/admin/perf', label: 'Performance', icon: Activity },
   { href: '/admin/auto-followup', label: 'Auto Follow-up', icon: CalendarCheck },
+  { href: '/admin/daily-plan', label: 'Plano do dia', icon: Sunrise },
   { section: 'ESTRATÉGIA' },
   { href: '/nichos', label: 'Nichos', icon: TrendingUp },
   { href: '/objecoes', label: 'Objeções', icon: Zap },
