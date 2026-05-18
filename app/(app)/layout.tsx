@@ -9,6 +9,7 @@ import { BottomNavBar } from '@/components/BottomNavBar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
 import { PaymentAlertsBanner } from '@/components/PaymentAlertsBanner'
+import { CommandPalette } from '@/components/CommandPalette'
 import { applySavedPrivacyMode } from '@/lib/privacy-mode'
 import { useNotifications } from '@/lib/notifications-store'
 import { syncFromServer } from '@/lib/wa-rate-limiter'
@@ -33,6 +34,9 @@ const nav = [
   { href: '/duplicados', label: 'Duplicados', icon: Copy },
   { href: '/tags', label: 'Tags', icon: Tag },
   { href: '/admin/wa-events', label: 'WhatsApp Events', icon: MessageCircle },
+  { href: '/admin/ab-test', label: 'A/B Test', icon: Zap },
+  { href: '/admin/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/admin/perf', label: 'Performance', icon: Activity },
   { section: 'ESTRATÉGIA' },
   { href: '/nichos', label: 'Nichos', icon: TrendingUp },
   { href: '/objecoes', label: 'Objeções', icon: Zap },
@@ -244,6 +248,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* Global payment alerts banner — overdue + dueToday + browser notifs */}
           {pathname !== '/financeiro' && <PaymentAlertsBanner />}
           {children}
+          {/* Sprint #55: Cmd+K command palette global */}
+          <CommandPalette />
           {/* PWA install prompt (shows non-intrusively when applicable) */}
           <PWAInstallPrompt />
           {/* Global bottom nav — hidden on lead detail pages (they have their own bar) */}
