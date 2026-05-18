@@ -45,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { type: 'nav', label: 'A/B Test',        href: '/admin/ab-test',  keywords: 'ab test variant mensagem',        emoji: '🧪' },
   { type: 'nav', label: 'Performance',     href: '/admin/perf',     keywords: 'performance cache stats egress',  emoji: '⚙️' },
   { type: 'nav', label: 'Calendar',        href: '/admin/calendar', keywords: 'calendar calendario followups',   emoji: '📅' },
+  { type: 'nav', label: 'Auto Follow-up',  href: '/admin/auto-followup', keywords: 'auto followup automatico agendamento config', emoji: '🤖' },
   { type: 'nav', label: 'Relatórios',      href: '/relatorios',     keywords: 'relatorios reports',              emoji: '📄' },
   { type: 'nav', label: 'Objeções',        href: '/objecoes',       keywords: 'objecoes objeçoes',               emoji: '🛡️' },
   { type: 'nav', label: 'Playbooks',       href: '/playbooks',      keywords: 'playbooks scripts',               emoji: '📖' },
