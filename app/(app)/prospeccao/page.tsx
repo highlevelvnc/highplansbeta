@@ -42,6 +42,7 @@ import { ensurePermission, getPermissionState, hasBeenPrompted, showNotification
 import { randomGreeting, langFromCountry } from '@/lib/greetings'
 import { PAUSE_POLLING } from '@/lib/poll-flags'
 import { useNotifications } from '@/lib/notifications-store'
+import { scheduleAutoFollowUp } from '@/lib/auto-followup'
 
 interface Lead {
   id: string
@@ -1471,6 +1472,12 @@ export default function ProspeccaoPage() {
       }),
     }).catch(() => {})
     fetch(`/api/leads/${lead.id}/recalc-score`, { method: 'POST' }).catch(() => {})
+    // Sprint #53: auto follow-up D+N (config local). Fire-and-forget.
+    scheduleAutoFollowUp({
+      leadId: lead.id,
+      leadStatus: lead.pipelineStatus || 'NEW',
+      leadName: lead.empresa || lead.nome,
+    }).catch(() => null)
     setContactedCount(c => c + 1)
     incrementDaily()
     setStreak(s => {
