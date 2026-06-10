@@ -231,8 +231,18 @@ function pushEventToServer(slot: NumberKey, type: 'send' | 'ban' | 'warmup_start
  *   - sends/bans: union (eventos de outros devices entram, nunca apagam)
  *   - labels/warmup: server wins (último evento determina)
  */
-export async function syncFromServer(): Promise<{ synced: boolean }> {
+// Guard contra syncs concorrentes + throttle (não correr em todo visibilitychange).
+let _syncInFlight = false
+let _lastSyncAt = 0
+const SYNC_THROTTLE_MS = 30_000
+
+export async function syncFromServer(opts?: { force?: boolean }): Promise<{ synced: boolean }> {
   if (typeof window === 'undefined') return { synced: false }
+  // Throttle: ignora chamadas demasiado próximas (visibilitychange dispara muito).
+  if (!opts?.force && Date.now() - _lastSyncAt < SYNC_THROTTLE_MS) return { synced: false }
+  // Coalesce: um sync de cada vez.
+  if (_syncInFlight) return { synced: false }
+  _syncInFlight = true
   try {
     const res = await fetch('/api/wa-state')
     if (!res.ok) return { synced: false }
@@ -245,11 +255,14 @@ export async function syncFromServer(): Promise<{ synced: boolean }> {
         warmupStartedAt?: number
       }>
     }
+    // Re-read FRESCO aqui (após o await da rede): se o utilizador enviou um WA
+    // durante o fetch, recordSend já gravou — apanhamos esse send no merge em vez
+    // de o sobrepor com um snapshot antigo.
     const local = read()
     for (const slot of NUMBER_KEYS) {
       const r = remote.slots[slot]
       if (!r) continue
-      // Union de sends (dedup by timestamp)
+      // Union de sends (dedup by timestamp) — nunca apaga sends locais.
       const sendsSet = new Set([...local.numbers[slot].sends, ...r.sends24h])
       local.numbers[slot].sends = Array.from(sendsSet).sort((a, b) => a - b)
       // Union de bans (dedup by ts)
@@ -264,9 +277,12 @@ export async function syncFromServer(): Promise<{ synced: boolean }> {
       if (r.warmupStartedAt) local.numbers[slot].createdAt = r.warmupStartedAt
     }
     write(local)
+    _lastSyncAt = Date.now()
     return { synced: true }
   } catch {
     return { synced: false }
+  } finally {
+    _syncInFlight = false
   }
 }
 
