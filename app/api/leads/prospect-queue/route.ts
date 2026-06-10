@@ -59,6 +59,12 @@ export async function GET(req: NextRequest) {
     if (weakSiteOnly) where.siteFraco = true
     if (minScore > 0) where.opportunityScore = { gte: minScore }
     if (subNicho) where.subNicho = subNicho
+    // "Excluir Não Construção": filtra à entrada os off-topic (imobiliárias,
+    // restaurantes, etc. mal classificados). Ignorado se o user escolheu
+    // explicitamente o sub-nicho 'Não Construção' no dropdown.
+    else if (searchParams.get('excludeOffTopic') === '1') {
+      where.subNicho = { not: 'Não Construção' }
+    }
     if (bookmarkedOnly) where.tags = { contains: 'revisitar' }
 
     // First, fetch PINNED leads (override messages: none rule — pinned can be re-shown)

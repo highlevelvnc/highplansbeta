@@ -37,13 +37,14 @@ import { getAllActions, searchActions, getCategoryLabel, type ActionContext, typ
 import { useRouter } from 'next/navigation'
 import { recordSendAndMaybeSpread, getRateState, canSend, recordBan, setActiveNumber, getAllNumberStates, NUMBER_KEYS, getLabel, setLabel, getSpreadMode, setSpreadMode, RL_HOURLY_WARN, RL_DAILY_HARD, isQuietHour, getEffectiveDailyCap, markNumberAsNew, markNumberAsWarmed, getNumberAgeDays, getChipHealth, type NumberKey } from '@/lib/wa-rate-limiter'
 import { ChipHealthBanner } from '@/components/prospect/ChipHealthBanner'
+import { ObjectionsPanel } from '@/components/prospect/ObjectionsPanel'
 import { SUB_NICHOS_CONSTRUTORAS } from '@/lib/sub-nicho'
 import { getTimeAdvice } from '@/lib/time-advisor'
 import { ensurePermission, getPermissionState, hasBeenPrompted, showNotification, registerServiceWorker, scheduleCallbackInSW, cancelCallbackInSW, pingSWCheck } from '@/lib/notifications'
 import { randomGreeting, langFromCountry } from '@/lib/greetings'
 import { PAUSE_POLLING } from '@/lib/poll-flags'
 import { useNotifications } from '@/lib/notifications-store'
-import { scheduleAutoFollowUp } from '@/lib/auto-followup'
+import { scheduleAutoFollowUp, getAutoFUConfig } from '@/lib/auto-followup'
 
 interface Lead {
   id: string
@@ -128,6 +129,10 @@ export default function ProspeccaoPage() {
   const router = useRouter()
   // Sub-niche filter (within Construtoras)
   const [subNicho, setSubNicho] = useState<string>('')
+  // Excluir "Não Construção" da fila (default ON — limpa off-topic mal classificado)
+  const [excludeOffTopic, setExcludeOffTopic] = useState(true)
+  // Painel de objeções inline (tecla O)
+  const [showObjections, setShowObjections] = useState(false)
   // Best-times widget
   const [bestTimes, setBestTimes] = useState<any>(null)
   const [bestTimesDismissed, setBestTimesDismissed] = useState(false)
@@ -332,6 +337,7 @@ export default function ProspeccaoPage() {
       if (av === 'v1' || av === 'v2' || av === 'v3') setAiVariant(av)
       setBookmarkedOnly(localStorage.getItem('prosp_bookmarkedOnly') === '1')
       setNewestFirst(localStorage.getItem('prosp_newestFirst') === '1')
+      setExcludeOffTopic(localStorage.getItem('prosp_excludeOffTopic') !== '0') // default ON
       setOutdoor(localStorage.getItem('prosp_outdoor') === '1')
       setSmartBatchEnabled(localStorage.getItem('prosp_smartBatch') !== '0') // default ON
     } catch {}
@@ -476,6 +482,9 @@ export default function ProspeccaoPage() {
   useEffect(() => {
     try { localStorage.setItem('prosp_newestFirst', newestFirst ? '1' : '0') } catch {}
   }, [newestFirst])
+  useEffect(() => {
+    try { localStorage.setItem('prosp_excludeOffTopic', excludeOffTopic ? '1' : '0') } catch {}
+  }, [excludeOffTopic])
 
   // Persist subNicho
   useEffect(() => {
@@ -925,6 +934,7 @@ export default function ProspeccaoPage() {
     if (subNicho) params.set('subNicho', subNicho)
     if (bookmarkedOnly) params.set('bookmarkedOnly', '1')
     if (newestFirst) params.set('newestFirst', '1')
+    if (excludeOffTopic) params.set('excludeOffTopic', '1')
     // Smart batching: bias next batch toward last-sent context
     if (smartBatchEnabled && lastContextRef.current.city) params.set('preferCity', lastContextRef.current.city)
     if (smartBatchEnabled && lastContextRef.current.subNicho) params.set('preferSubNicho', lastContextRef.current.subNicho)
@@ -935,7 +945,7 @@ export default function ProspeccaoPage() {
     } catch {
       return { leads: [], total: 0 }
     }
-  }, [nicho, pais, mobileOnly, cityBlocklist, scoreFilter, noSiteOnly, weakSiteOnly, minScore, subNicho, bookmarkedOnly, newestFirst, smartBatchEnabled])
+  }, [nicho, pais, mobileOnly, cityBlocklist, scoreFilter, noSiteOnly, weakSiteOnly, minScore, subNicho, bookmarkedOnly, newestFirst, excludeOffTopic, smartBatchEnabled])
 
   // Guard contra race conditions: se um fetch já está em curso, não dispara outro
   const loadNextInFlightRef = useRef(false)
@@ -1004,7 +1014,7 @@ export default function ProspeccaoPage() {
       setTotalRemaining(total)
       setLoading(false)
     })
-  }, [nicho, pais, mobileOnly, cityBlocklist, scoreFilter, noSiteOnly, weakSiteOnly, minScore, subNicho, bookmarkedOnly, newestFirst, smartBatchEnabled]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [nicho, pais, mobileOnly, cityBlocklist, scoreFilter, noSiteOnly, weakSiteOnly, minScore, subNicho, bookmarkedOnly, newestFirst, excludeOffTopic, smartBatchEnabled]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch skip insights — runs on mount, on filter change, and every 5 skips
   const loadInsights = useCallback(async () => {
@@ -1227,6 +1237,60 @@ export default function ProspeccaoPage() {
       return `Hi ${firstName}! 👋\n\n${intro}${cidade ? ` in ${cidade}` : ''}.\n\nI help ${nicho || 'businesses'} get more customers online. ${cta}`
     }
 
+    // ── Sprint Construção-First: proposta de valor calibrada ao sub-nicho ──
+    // Aproveita l.subNicho (já classificado) para especializar a mensagem no
+    // momento do contacto, em vez do genérico "captar mais clientes online".
+    // Cada sector tem várias formulações (anti-fingerprint via pick).
+    const subNichoPitch = (sn?: string): { sector: string; benefit: string } => {
+      const c = cidade || 'a vossa zona'
+      const map: Record<string, { sector: string; benefits: string[] }> = {
+        'Remodelações': {
+          sector: 'remodelações',
+          benefits: [
+            `a mostrar os trabalhos antes/depois e a captar quem procura remodelações em ${c}`,
+            `a transformar fotos de obra em pedidos de orçamento`,
+            `a aparecer quando alguém em ${c} pesquisa "remodelações" ou "obras em casa"`,
+          ],
+        },
+        'Obras Civis': {
+          sector: 'obras civis',
+          benefits: [
+            `a transmitir solidez e a ganhar obras de maior dimensão`,
+            `a passar confiança a quem decide adjudicar projetos maiores`,
+            `a destacar obras concluídas para atrair clientes e parcerias sérias`,
+          ],
+        },
+        'Janelas/Alumínio': {
+          sector: 'janelas e caixilharia',
+          benefits: [
+            `a captar pedidos de orçamento de janelas e alumínio na zona de ${c}`,
+            `a aparecer para quem procura "janelas" ou "caixilharia" em ${c}`,
+            `a converter a procura local de PVC/alumínio em orçamentos reais`,
+          ],
+        },
+        'Piscinas': {
+          sector: 'piscinas',
+          benefits: [
+            `a aparecer no topo quando alguém procura "construção de piscinas" em ${c}`,
+            `a aproveitar a época alta com mais pedidos de orçamento`,
+            `a mostrar piscinas construídas e a converter a procura local`,
+          ],
+        },
+        'Modulares': {
+          sector: 'casas modulares',
+          benefits: [
+            `a vender mais com uma presença que transmite confiança e qualidade`,
+            `a mostrar modelos e acabamentos a quem procura soluções chave-na-mão`,
+            `a captar interessados com fotos e simulações claras`,
+          ],
+        },
+      }
+      const entry = map[sn || '']
+      if (!entry) return { sector: nicho || 'construção', benefit: 'a captar mais clientes online' }
+      return { sector: entry.sector, benefit: pick(entry.benefits) }
+    }
+    const sp = subNichoPitch(l.subNicho)
+
     // Portuguese (default) — 3 tonal variants × várias formulações
     const intros: Record<string, Record<string, string[]>> = {
       v1: { // formal
@@ -1311,7 +1375,7 @@ export default function ProspeccaoPage() {
         `Faz sentido marcarmos uma chamada curta esta semana?`,
         `Vale a pena uma conversa rápida nos próximos dias?`,
       ])
-      return `Olá ${firstName}! 👋\n\n${intro}${cidade ? ` em ${cidade}` : ''}.\n\nAjudo ${nicho || 'negócios'} como o vosso a captar mais clientes online. ${cta}`
+      return `Olá ${firstName}! 👋\n\n${intro}${cidade ? ` em ${cidade}` : ''}.\n\nAjudo empresas de ${sp.sector} como a vossa ${sp.benefit}. ${cta}`
     }
     if (variant === 'v2') {
       const cta = pick([
@@ -1319,7 +1383,7 @@ export default function ProspeccaoPage() {
         `Bora trocar duas palavras esta semana?`,
         `Faz sentido falarmos esta semana? Prometo ser breve.`,
       ])
-      return `Olá ${firstName}! 👋\n\n${intro}.\n\nFaço marketing para ${nicho || 'negócios'} aqui em ${cidade || 'PT'} e tenho casos com resultados que vos vão interessar. ${cta}`
+      return `Olá ${firstName}! 👋\n\n${intro}.\n\nFaço a parte digital de empresas de ${sp.sector} e ajudo ${sp.benefit}. ${cta}`
     }
     // v3
     const cta = pick([
@@ -1327,7 +1391,7 @@ export default function ProspeccaoPage() {
       `Mostro casos reais em 5 min. Bora?`,
       `Quer ver dados concretos? 5 min esta semana resolve.`,
     ])
-    return `${firstName}, vou ser direto:\n\n${intro}\n\nTrabalho com ${nicho || 'negócios'} e gero crescimento de 2-5× em 90 dias. ${cta}`
+    return `${firstName}, vou ser direto:\n\n${intro}\n\nAjudo-vos ${sp.benefit} — resultados em 60-90 dias. ${cta}`
   }, [])
 
   const handleAiGenerate = (variant?: 'v1' | 'v2' | 'v3') => {
@@ -1539,10 +1603,14 @@ export default function ProspeccaoPage() {
     if (showHistory) loadHistory()
 
     const spreadMsg = sendResult.spread ? ` · próximo: ${getLabel(sendResult.active).label}` : ''
+    // Sprint Construção-First: feedback do follow-up automático (se ativo) — fecha o loop.
+    const fuCfg = getAutoFUConfig()
+    const fuDays = fuCfg.daysByStatus[lead.pipelineStatus || 'NEW'] ?? 0
+    const fuMsg = fuCfg.enabled && fuDays > 0 ? ` · FU +${fuDays}d agendado` : ''
     if (opts?.fullOnly) {
-      toast(`Script enviado · ${displayName(lead)}${spreadMsg}`, 'success')
+      toast(`Script enviado · ${displayName(lead)}${fuMsg}${spreadMsg}`, 'success')
     } else {
-      toast(`Cumprimento aberto · script copiado (cola depois)${spreadMsg}`, 'success')
+      toast(`Cumprimento aberto · script copiado${fuMsg}${spreadMsg}`, 'success')
     }
     loadNext()
     } finally {
@@ -1690,6 +1758,7 @@ export default function ProspeccaoPage() {
         if (k === 'p') { e.preventDefault(); setShowPendentes(true); loadCallbacks(); loadBookmarks(); return }
         if (k === 'm') { e.preventDefault(); openDailyReport(); return }
         if (k === 'n' && lead) { e.preventDefault(); setShowVoiceNote(true); return }
+        if (k === 'o') { e.preventDefault(); setShowObjections(v => !v); return }
       }
 
       // Ignore if typing in input/textarea/select
@@ -1711,6 +1780,7 @@ export default function ProspeccaoPage() {
         else if (k === 'i') { e.preventDefault(); markInvalid() }
         else if (k === 'z') { e.preventDefault(); snooze(2) }
         else if (k === 'g') { e.preventDefault(); handleAiGenerate() }
+        else if (k === 'o') { e.preventDefault(); setShowObjections(v => !v) }
         else if (k === '?' || k === 'h') { e.preventDefault(); setShowHotkeys(v => !v) }
       }
       // Skip reason picker
@@ -1898,6 +1968,7 @@ export default function ProspeccaoPage() {
               { k: 'E', label: 'WhatsApp Web' },
               { k: 'L', label: 'Ligar' },
               { k: 'G', label: 'Gerar mensagem AI' },
+              { k: 'O', label: 'Objeções (copiar resposta)' },
               { k: 'S / →', label: 'Saltar lead' },
               { k: 'Shift+S', label: 'Saltar com razão' },
               { k: 'B / ←', label: 'Voltar ao anterior' },
@@ -2059,6 +2130,13 @@ export default function ProspeccaoPage() {
           />
         </Suspense>
       )}
+
+      {/* Sprint Construção-First: painel de objeções a 1-clique (tecla O) */}
+      <ObjectionsPanel
+        open={showObjections}
+        onClose={() => setShowObjections(false)}
+        onCopied={(objecao) => toast(`Resposta copiada · "${objecao}"`, 'success')}
+      />
 
       {/* Métricas modal — tabs Today / 7d / 30d */}
       {showDailyReport && (
@@ -2960,6 +3038,22 @@ export default function ProspeccaoPage() {
             ))}
           </select>
         )}
+        {/* Excluir "Não Construção" — limpa imobiliárias/restaurantes mal classificados.
+            Escondido se o user escolheu explicitamente esse sub-tipo no dropdown. */}
+        {nicho === 'Construtoras' && subNicho !== 'Não Construção' && (
+          <button
+            onClick={() => setExcludeOffTopic(v => !v)}
+            title={excludeOffTopic ? 'A excluir leads "Não Construção" da fila' : 'A incluir tudo (mesmo off-topic)'}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-bold border transition-all flex-shrink-0 ${
+              excludeOffTopic
+                ? 'bg-[#10B981]/12 border-[#10B981]/40 text-[#10B981]'
+                : 'bg-[#0F0F12] border-[#27272A] text-[#52525B] hover:text-[#A1A1AA] hover:border-[#52525B]'
+            }`}
+          >
+            <span>{excludeOffTopic ? '✓' : '○'}</span>
+            <span>Só construção</span>
+          </button>
+        )}
       </div>
 
       {/* Filter presets — saved combinations for one-click context switching */}
@@ -3557,6 +3651,13 @@ export default function ProspeccaoPage() {
                       </h2>
                     )}
                   </div>
+                  {/* Sprint Construção-First: alerta se o lead já respondeu — evita
+                      fazer cold pitch a quem está mid-conversa (chega via revisitar/pinned). */}
+                  {(lead.pipelineStatus === 'REPLIED' || lead.pipelineStatus === 'INTERESTED') && (
+                    <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#10B981]/15 border border-[#10B981]/40 text-[#10B981] text-[11px] font-bold animate-warmup-breathe">
+                      💬 Já respondeu — continua a conversa, não cold-pitch
+                    </div>
+                  )}
                   <div className="text-sm text-[#71717A] flex items-center gap-1.5 flex-wrap">
                     {lead.nicho && <span>{lead.nicho}</span>}
                     {lead.nicho && lead.cidade && <span className="text-[#27272A]">·</span>}
