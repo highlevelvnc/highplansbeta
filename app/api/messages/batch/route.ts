@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendWhatsAppMessage, sendEmail, fillTemplate } from '@/lib/messaging'
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth-guard'
 import { z } from 'zod'
 
 const batchSchema = z.object({
@@ -30,6 +31,10 @@ const DUP_WINDOW_HOURS = 72
 
 export async function POST(req: NextRequest) {
   try {
+    // SECURITY: auth no handler (defesa em camadas — dispara WhatsApp real).
+    const session = await requireAuth()
+    if (session instanceof NextResponse) return session
+
     const body = await req.json()
     const parsed = batchSchema.safeParse(body)
 

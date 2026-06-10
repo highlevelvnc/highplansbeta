@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAdmin } from '@/lib/auth-guard'
+import { logSecurityEvent, getRequestIp } from '@/lib/security-audit'
 
 /**
  * Export payments as CSV — one row per payment, ready for accounting software.
@@ -8,6 +10,8 @@ import { prisma } from '@/lib/prisma'
  *   from=YYYY-MM-DD&to=YYYY-MM-DD  (default: current year)
  *   moeda=EUR|BRL                  (default: all)
  *   status=PAID|PENDING|...        (default: PAID)
+ *
+ * SECURITY: ADMIN-only (export massivo de dados financeiros).
  */
 function csvEscape(v: any): string {
   if (v === null || v === undefined) return ''
@@ -18,6 +22,17 @@ function csvEscape(v: any): string {
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await requireAdmin()
+    if (session instanceof NextResponse) return session
+
+    logSecurityEvent({
+      action: 'EXPORT_LEADS',
+      userId: session.user?.id,
+      userEmail: session.user?.email || undefined,
+      ip: getRequestIp(req),
+      details: { type: 'financeiro_export', query: req.nextUrl.searchParams.toString().slice(0, 200) },
+    }).catch(() => null)
+
     const { searchParams } = req.nextUrl
     const now = new Date()
     const from = searchParams.get('from') || `${now.getFullYear()}-01-01`
