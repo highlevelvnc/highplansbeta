@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } from 'react'
 import {
   MessageCircle, Phone, ChevronRight, Zap, Globe, MapPin,
   RefreshCw, Loader2, Tag, X, CheckCircle, PhoneOff,
@@ -35,7 +35,8 @@ const TemplatesDrawer = lazy(() => import('@/components/TemplatesDrawer').then(m
 const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })))
 import { getAllActions, searchActions, getCategoryLabel, type ActionContext, type CommandAction } from '@/lib/command-palette-actions'
 import { useRouter } from 'next/navigation'
-import { recordSendAndMaybeSpread, getRateState, canSend, recordBan, setActiveNumber, getAllNumberStates, NUMBER_KEYS, getLabel, setLabel, getSpreadMode, setSpreadMode, RL_HOURLY_WARN, RL_DAILY_HARD, isQuietHour, getEffectiveDailyCap, markNumberAsNew, markNumberAsWarmed, getNumberAgeDays, type NumberKey } from '@/lib/wa-rate-limiter'
+import { recordSendAndMaybeSpread, getRateState, canSend, recordBan, setActiveNumber, getAllNumberStates, NUMBER_KEYS, getLabel, setLabel, getSpreadMode, setSpreadMode, RL_HOURLY_WARN, RL_DAILY_HARD, isQuietHour, getEffectiveDailyCap, markNumberAsNew, markNumberAsWarmed, getNumberAgeDays, getChipHealth, type NumberKey } from '@/lib/wa-rate-limiter'
+import { ChipHealthBanner } from '@/components/prospect/ChipHealthBanner'
 import { SUB_NICHOS_CONSTRUTORAS } from '@/lib/sub-nicho'
 import { getTimeAdvice } from '@/lib/time-advisor'
 import { ensurePermission, getPermissionState, hasBeenPrompted, showNotification, registerServiceWorker, scheduleCallbackInSW, cancelCallbackInSW, pingSWCheck } from '@/lib/notifications'
@@ -549,6 +550,11 @@ export default function ProspeccaoPage() {
   )
   const [allNumberStates, setAllNumberStates] = useState(() =>
     typeof window !== 'undefined' ? getAllNumberStates() : ({ wa1: { dayCount: 0, banCount: 0, lastBanTs: null, cooldownMs: 0 }, wa2: { dayCount: 0, banCount: 0, lastBanTs: null, cooldownMs: 0 } } as ReturnType<typeof getAllNumberStates>)
+  )
+  // Chip Health "pré-voo": recalcula quando o estado do chip muda (após envios / troca).
+  const chipHealth = useMemo(
+    () => (typeof window !== 'undefined' ? getChipHealth() : null),
+    [rateState.active, rateState.dayCount, rateState.hourCount, rateState.cooldownMs, allNumberStates],
   )
 
   const switchNumber = (key: NumberKey) => {
@@ -2964,6 +2970,19 @@ export default function ProspeccaoPage() {
       />
 
       {/* Quick filter pills — one-click toggles for common queries */}
+      {chipHealth && (() => {
+        const otherKey: NumberKey = rateState.active === 'wa1' ? 'wa2' : 'wa1'
+        const otherHealthier = allNumberStates[otherKey].dayCount < allNumberStates[rateState.active].dayCount
+          && (allNumberStates[otherKey].lastBanTs === null || (Date.now() - allNumberStates[otherKey].lastBanTs) > 24 * 60 * 60 * 1000)
+        return (
+          <ChipHealthBanner
+            health={chipHealth}
+            canSwitch={otherHealthier}
+            onSwitchChip={() => switchNumber(otherKey)}
+          />
+        )
+      })()}
+
       <QuickFilterPills
         scoreFilter={scoreFilter}
         setScoreFilter={setScoreFilter}

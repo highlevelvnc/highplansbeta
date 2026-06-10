@@ -511,3 +511,87 @@ export function isQuietHour(d: Date = new Date()): boolean {
 export function resetRateLimiter() {
   try { localStorage.removeItem(KEY) } catch {}
 }
+
+// ─── Chip Health "pré-voo" ───────────────────────────────────────────────
+//
+// Consolida warmup + caps + hora + ban num único semáforo: "é seguro mandar
+// agora neste chip?". Tudo informativo — não bloqueia (decisão do user).
+
+export type ChipHealth = {
+  level: 'green' | 'yellow' | 'red'
+  title: string
+  detail: string
+  safeRemaining: number   // envios até ao cap efetivo de hoje (clamp 0)
+  cap: number             // cap efetivo (warmup se chip novo, senão diário pleno)
+  dayCount: number
+  hourCount: number
+  isWarmup: boolean
+  ageDays: number | null
+  reasons: string[]       // razões que puxam o nível para baixo
+  label: string           // nome do chip ativo (para a UI)
+}
+
+/**
+ * Estado de saúde do chip ativo. Combina:
+ *   - warmup tier (chip novo → cap apertado)
+ *   - cap diário/horário vs envios de hoje
+ *   - ban recente (<24h)
+ *   - janela horária 8h-22h
+ *   - cooldown rapid-fire
+ */
+export function getChipHealth(d: Date = new Date()): ChipHealth {
+  const s = getRateState()
+  const warmup = getEffectiveDailyCap(s.active)
+  const { label } = getLabel(s.active)
+  const cap = warmup.cap
+  const dayCount = s.dayCount
+  const hourCount = s.hourCount
+  const safeRemaining = Math.max(0, cap - dayCount)
+  const quiet = isQuietHour(d)
+  const banRecent = s.lastBan ? (d.getTime() - s.lastBan.ts) < DAY_MS : false
+
+  const reasons: string[] = []
+  let level: 'green' | 'yellow' | 'red' = 'green'
+
+  // ── Condições VERMELHAS (risco alto — para ou troca de chip) ──
+  if (dayCount >= cap) { level = 'red'; reasons.push(`Cap diário atingido (${dayCount}/${cap})`) }
+  if (hourCount >= RL_HOURLY_HARD) { level = 'red'; reasons.push(`Cap horário atingido (${hourCount}/${RL_HOURLY_HARD})`) }
+  if (banRecent) {
+    const hrs = Math.round((d.getTime() - (s.lastBan?.ts ?? 0)) / (60 * 60 * 1000))
+    level = 'red'; reasons.push(`Ban há ${hrs}h neste número`)
+  }
+
+  // ── Condições AMARELAS (cautela — só se ainda verde) ──
+  if (level === 'green') {
+    if (quiet) { level = 'yellow'; reasons.push('Fora da janela 8h-22h') }
+    else if (s.cooldownMs > 0) { level = 'yellow'; reasons.push(`Cooldown ativo (${Math.ceil(s.cooldownMs / 1000)}s)`) }
+    else if (hourCount >= RL_HOURLY_WARN) { level = 'yellow'; reasons.push(`Já ${hourCount} esta hora`) }
+    else if (dayCount >= cap - 3) { level = 'yellow'; reasons.push(`Perto do limite (${dayCount}/${cap})`) }
+    else if (warmup.isWarmup) { level = 'yellow'; reasons.push(`Chip novo · ${warmup.tierLabel}`) }
+  } else if (quiet && !reasons.includes('Fora da janela 8h-22h')) {
+    // quiet hour reforça o vermelho
+    reasons.push('Fora da janela 8h-22h')
+  }
+
+  // ── Título + detalhe ──
+  let title: string
+  let detail: string
+  if (level === 'green') {
+    title = '✅ Seguro para prospectar'
+    detail = `≈${safeRemaining} envios seguros hoje neste chip (${dayCount}/${cap})`
+  } else if (level === 'yellow') {
+    title = '⚠️ Cuidado — abranda'
+    detail = `${reasons[0]} · faltam ${safeRemaining} até ao limite`
+  } else {
+    title = '🛑 Risco alto de ban'
+    detail = warmup.isWarmup || dayCount >= cap
+      ? `${reasons[0]} · usa o outro chip ou para por hoje`
+      : `${reasons[0]} · considera o outro chip ou uma pausa`
+  }
+
+  return {
+    level, title, detail, safeRemaining, cap,
+    dayCount, hourCount, isWarmup: warmup.isWarmup, ageDays: warmup.ageDays,
+    reasons, label,
+  }
+}
