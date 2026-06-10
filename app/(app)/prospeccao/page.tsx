@@ -139,6 +139,8 @@ export default function ProspeccaoPage() {
   const [variantStats, setVariantStats] = useState<any>(null)
   // Bookmarks
   const [bookmarkedOnly, setBookmarkedOnly] = useState(false)
+  // "Novos primeiro": prioriza leads recém-scrappados no desempate da fila
+  const [newestFirst, setNewestFirst] = useState(false)
   // Schedule callback modal
   const [showScheduleCallback, setShowScheduleCallback] = useState(false)
   // Voice note modal
@@ -328,6 +330,7 @@ export default function ProspeccaoPage() {
       const av = localStorage.getItem('prosp_aiVariant') as any
       if (av === 'v1' || av === 'v2' || av === 'v3') setAiVariant(av)
       setBookmarkedOnly(localStorage.getItem('prosp_bookmarkedOnly') === '1')
+      setNewestFirst(localStorage.getItem('prosp_newestFirst') === '1')
       setOutdoor(localStorage.getItem('prosp_outdoor') === '1')
       setSmartBatchEnabled(localStorage.getItem('prosp_smartBatch') !== '0') // default ON
     } catch {}
@@ -469,6 +472,9 @@ export default function ProspeccaoPage() {
   useEffect(() => {
     try { localStorage.setItem('prosp_bookmarkedOnly', bookmarkedOnly ? '1' : '0') } catch {}
   }, [bookmarkedOnly])
+  useEffect(() => {
+    try { localStorage.setItem('prosp_newestFirst', newestFirst ? '1' : '0') } catch {}
+  }, [newestFirst])
 
   // Persist subNicho
   useEffect(() => {
@@ -512,6 +518,9 @@ export default function ProspeccaoPage() {
   const eodFiredRef = useRef(false)
   // Anti rapid-fire: ignora trigger se < 1500ms desde o último (keyboard auto-repeat, double-click)
   const lastWaTriggerRef = useRef(0)
+  // Anti double-send: bloqueia reentrância enquanto um envio decorre. O debounce
+  // temporal (1500ms) não cobre o await do dup-check em rede lenta — este flag sim.
+  const waSendingRef = useRef(false)
   // Quiet-hour ack: pediu confirm uma vez por sessão, não volta a pedir
   const quietHourAckedRef = useRef(false)
   // Sprint #47: tracking do tier de warmup actual para detectar subida (d3→d4, d7→d8, etc)
@@ -909,6 +918,7 @@ export default function ProspeccaoPage() {
     if (minScore > 0) params.set('minScore', String(minScore))
     if (subNicho) params.set('subNicho', subNicho)
     if (bookmarkedOnly) params.set('bookmarkedOnly', '1')
+    if (newestFirst) params.set('newestFirst', '1')
     // Smart batching: bias next batch toward last-sent context
     if (smartBatchEnabled && lastContextRef.current.city) params.set('preferCity', lastContextRef.current.city)
     if (smartBatchEnabled && lastContextRef.current.subNicho) params.set('preferSubNicho', lastContextRef.current.subNicho)
@@ -919,7 +929,7 @@ export default function ProspeccaoPage() {
     } catch {
       return { leads: [], total: 0 }
     }
-  }, [nicho, pais, mobileOnly, cityBlocklist, scoreFilter, noSiteOnly, weakSiteOnly, minScore, subNicho, bookmarkedOnly, smartBatchEnabled])
+  }, [nicho, pais, mobileOnly, cityBlocklist, scoreFilter, noSiteOnly, weakSiteOnly, minScore, subNicho, bookmarkedOnly, newestFirst, smartBatchEnabled])
 
   // Guard contra race conditions: se um fetch já está em curso, não dispara outro
   const loadNextInFlightRef = useRef(false)
@@ -988,7 +998,7 @@ export default function ProspeccaoPage() {
       setTotalRemaining(total)
       setLoading(false)
     })
-  }, [nicho, pais, mobileOnly, cityBlocklist, scoreFilter, noSiteOnly, weakSiteOnly, minScore, subNicho, bookmarkedOnly, smartBatchEnabled]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [nicho, pais, mobileOnly, cityBlocklist, scoreFilter, noSiteOnly, weakSiteOnly, minScore, subNicho, bookmarkedOnly, newestFirst, smartBatchEnabled]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch skip insights — runs on mount, on filter change, and every 5 skips
   const loadInsights = useCallback(async () => {
@@ -1342,6 +1352,13 @@ export default function ProspeccaoPage() {
     if (now - lastWaTriggerRef.current < 1500) return
     lastWaTriggerRef.current = now
 
+    // ── GATE 0b: in-flight guard — impede double-send se um 2º clique chega
+    //    enquanto o envio anterior ainda decorre (o await do dup-check em rede
+    //    lenta pode exceder o debounce temporal). Libertado no finally.
+    if (waSendingRef.current) return
+    waSendingRef.current = true
+    try {
+
     const num = getWhatsAppNumber(lead)
     if (!num) {
       toast('Número inválido — saltando', 'info')
@@ -1522,6 +1539,10 @@ export default function ProspeccaoPage() {
       toast(`Cumprimento aberto · script copiado (cola depois)${spreadMsg}`, 'success')
     }
     loadNext()
+    } finally {
+      // Liberta o guard sempre — mesmo em cancelamentos (returns dos gates) ou erro.
+      waSendingRef.current = false
+    }
   }
 
 
@@ -2954,6 +2975,8 @@ export default function ProspeccaoPage() {
         setWeakSiteOnly={setWeakSiteOnly}
         bookmarkedOnly={bookmarkedOnly}
         setBookmarkedOnly={setBookmarkedOnly}
+        newestFirst={newestFirst}
+        setNewestFirst={setNewestFirst}
         onSearchClick={() => setShowSearch(true)}
       />
 

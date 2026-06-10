@@ -21,6 +21,9 @@ export async function GET(req: NextRequest) {
     const minScore = parseInt(searchParams.get('minScore') ?? '0', 10) || 0
     const subNicho = searchParams.get('subNicho') ?? ''
     const bookmarkedOnly = searchParams.get('bookmarkedOnly') === '1'
+    // "Novos primeiro": inverte o desempate createdAt para desc — útil logo após
+    // scrappar um lote fresco (ex: construção/remodelações) e querer atacá-lo já.
+    const newestFirst = searchParams.get('newestFirst') === '1'
     // Smart batching hints: bias the queue toward leads matching last-sent context
     const preferCity = searchParams.get('preferCity') ?? ''
     const preferSubNicho = searchParams.get('preferSubNicho') ?? ''
@@ -86,7 +89,9 @@ export async function GET(req: NextRequest) {
       orderBy: [
         { skipCount: 'asc' },
         { opportunityScore: 'desc' },
-        { createdAt: 'asc' },
+        // Desempate: mais antigos primeiro (default — não deixar leads apodrecer)
+        // OU mais recentes primeiro quando newestFirst (lote fresco scrappado).
+        { createdAt: newestFirst ? 'desc' : 'asc' },
       ],
       take: limit * 3,
       select: {

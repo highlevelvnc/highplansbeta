@@ -14,6 +14,8 @@ interface Props {
   setWeakSiteOnly: (v: boolean | ((p: boolean) => boolean)) => void
   bookmarkedOnly: boolean
   setBookmarkedOnly: (v: boolean | ((p: boolean) => boolean)) => void
+  newestFirst: boolean
+  setNewestFirst: (v: boolean | ((p: boolean) => boolean)) => void
   onSearchClick: () => void
 }
 
@@ -32,6 +34,7 @@ function QuickFilterPillsImpl(p: Props) {
         { id: 'nosite',   label: '📵 Sem site',    active: p.noSiteOnly,             toggle: () => p.setNoSiteOnly(v => !v) },
         { id: 'weaksite', label: '📉 Site fraco',  active: p.weakSiteOnly,           toggle: () => p.setWeakSiteOnly(v => !v) },
         { id: 'bookmark', label: '⭐ Revisitar',   active: p.bookmarkedOnly,         toggle: () => p.setBookmarkedOnly(v => !v) },
+        { id: 'newest',   label: '🆕 Novos 1º',    active: p.newestFirst,            toggle: () => p.setNewestFirst(v => !v) },
       ]).map(pill => (
         <button
           key={pill.id}
@@ -61,5 +64,6 @@ export const QuickFilterPills = memo(QuickFilterPillsImpl, (prev, next) =>
   prev.minScore === next.minScore &&
   prev.noSiteOnly === next.noSiteOnly &&
   prev.weakSiteOnly === next.weakSiteOnly &&
-  prev.bookmarkedOnly === next.bookmarkedOnly
+  prev.bookmarkedOnly === next.bookmarkedOnly &&
+  prev.newestFirst === next.newestFirst
 )
