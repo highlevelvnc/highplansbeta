@@ -8,7 +8,7 @@ const COLORS = ['#8B5CF6', '#A78BFA', '#F59E0B', '#8B5CF6', '#3B82F6', '#10B981'
 
 export default function NichosPage() {
   const [data, setData] = useState<any[]>([])
-  useEffect(()=>{fetch('/api/nichos').then(r=>r.json()).then(setData)},[])
+  useEffect(()=>{fetch('/api/nichos').then(r=>r.json()).then(setData).catch(()=>setData([]))},[])
 
   return (
     <div className="p-4 md:p-6">
