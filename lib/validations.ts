@@ -94,7 +94,7 @@ export const createTaskSchema = z.object({
   dueDate: z.string().nullish(),
 }).strict()
 
-export const updateTaskSchema = createTaskSchema.partial()
+export const updateTaskSchema = createTaskSchema.partial().strict()
 
 // ─── Proposal ────────────────────────────────────────────────────────────────
 
@@ -106,7 +106,7 @@ export const createProposalSchema = z.object({
   status: z.enum(['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED']).default('DRAFT'),
 }).strict()
 
-export const updateProposalSchema = createProposalSchema.partial()
+export const updateProposalSchema = createProposalSchema.partial().strict()
 
 // ─── Client ──────────────────────────────────────────────────────────────────
 
@@ -178,6 +178,8 @@ export const createPlaybookSchema = z.object({
   conteudo: z.string().min(1, 'Conteúdo é obrigatório').max(20000),
 }).strict()
 
+export const updatePlaybookSchema = createPlaybookSchema.partial().strict()
+
 // ─── Objection ───────────────────────────────────────────────────────────────
 
 export const createObjectionSchema = z.object({
@@ -185,3 +187,5 @@ export const createObjectionSchema = z.object({
   resposta: z.string().min(2, 'Resposta é obrigatória').max(5000),
   categoria: z.string().max(80).nullish(),
 }).strict()
+
+export const updateObjectionSchema = createObjectionSchema.partial().strict()

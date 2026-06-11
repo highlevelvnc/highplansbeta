@@ -25,21 +25,22 @@ export function ObjectionsPanel({
 }) {
   const [items, setItems] = useState<Objection[]>([])
   const [loading, setLoading] = useState(false)
-  const [loaded, setLoaded] = useState(false)
   const [query, setQuery] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Lazy-load só na primeira abertura (e cacheado depois).
+  // Refetch a cada abertura com no-store — garante objeções frescas mesmo
+  // depois de editar/apagar na biblioteca (/objecoes). Mantém os items
+  // anteriores visíveis enquanto recarrega (sem flash vazio).
   useEffect(() => {
-    if (!open || loaded) return
+    if (!open) return
     setLoading(true)
-    fetch('/api/objections')
+    fetch('/api/objections', { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : []))
-      .then((data) => { setItems(Array.isArray(data) ? data : []); setLoaded(true) })
-      .catch(() => setItems([]))
+      .then((data) => setItems(Array.isArray(data) ? data : []))
+      .catch(() => {})
       .finally(() => setLoading(false))
-  }, [open, loaded])
+  }, [open])
 
   // Focus + reset ao abrir; Esc fecha.
   useEffect(() => {

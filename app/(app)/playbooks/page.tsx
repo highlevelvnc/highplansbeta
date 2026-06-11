@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Plus, BookOpen, FileText, List, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react'
+import { Plus, BookOpen, FileText, List, AlertTriangle, RefreshCw, Loader2, Edit2, Trash2 } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
 import { useToast } from '@/components/Toast'
 
@@ -12,22 +12,51 @@ export default function PlaybooksPage() {
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<any>(null)
   const [showNew, setShowNew] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ titulo: '', tipo: 'SCRIPT', conteudo: '' })
   const [errors, setErrors] = useState<{ titulo?: string; conteudo?: string }>({})
   const { toast } = useToast()
 
-  const load = () => {
+  const closeModal = () => { setShowNew(false); setEditingId(null); setForm({ titulo: '', tipo: 'SCRIPT', conteudo: '' }); setErrors({}) }
+  const startNew = () => { setEditingId(null); setForm({ titulo: '', tipo: 'SCRIPT', conteudo: '' }); setErrors({}); setShowNew(true) }
+  const startEdit = (p: any) => {
+    setForm({ titulo: p.titulo || '', tipo: p.tipo || 'SCRIPT', conteudo: p.conteudo || '' })
+    setEditingId(p.id)
+    setErrors({})
+    setShowNew(true)
+  }
+  const remove = async (p: any) => {
+    if (!confirm(`Apagar o playbook "${p.titulo}"? Esta ação é irreversível.`)) return
+    setDeletingId(p.id)
+    try {
+      const res = await fetch(`/api/playbooks/${p.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`Erro ${res.status}`)
+      toast('Playbook apagado', 'success')
+      if (selected?.id === p.id) setSelected(null)
+      await load()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao apagar', 'error')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const load = async () => {
     setLoading(true)
     setError(null)
-    fetch('/api/playbooks')
-      .then(async r => {
-        if (!r.ok) throw new Error(`Erro ${r.status}`)
-        return r.json()
-      })
-      .then(data => setPlaybooks(Array.isArray(data) ? data : []))
-      .catch(err => setError(err instanceof Error ? err.message : 'Erro ao carregar'))
-      .finally(() => setLoading(false))
+    try {
+      // no-store: após editar/apagar, garante lista fresca (a GET tem cache HTTP 120s)
+      const r = await fetch('/api/playbooks', { cache: 'no-store' })
+      if (!r.ok) throw new Error(`Erro ${r.status}`)
+      const data = await r.json()
+      setPlaybooks(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar')
+    } finally {
+      setLoading(false)
+    }
   }
   useEffect(() => { load() }, [])
 
@@ -35,7 +64,7 @@ export default function PlaybooksPage() {
   useEffect(() => {
     if (!showNew) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setShowNew(false); setErrors({}) }
+      if (e.key === 'Escape') closeModal()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -50,23 +79,27 @@ export default function PlaybooksPage() {
     return Object.keys(e).length === 0
   }
 
-  const create = async () => {
-    if (!validate()) return
+  const save = async () => {
+    if (!validate()) {
+      toast('Corrige os campos marcados', 'error')
+      return
+    }
     setSaving(true)
     try {
-      const res = await fetch('/api/playbooks', {
-        method: 'POST',
+      const res = await fetch(editingId ? `/api/playbooks/${editingId}` : '/api/playbooks', {
+        method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
       if (!res.ok) throw new Error(`Erro ${res.status}`)
-      toast('Playbook criado', 'success')
-      setShowNew(false)
-      setForm({ titulo: '', tipo: 'SCRIPT', conteudo: '' })
-      setErrors({})
+      const saved = await res.json().catch(() => null)
+      toast(editingId ? 'Playbook atualizado' : 'Playbook criado', 'success')
+      // Se estava selecionado, atualiza o painel com a resposta do servidor (timestamps frescos)
+      if (editingId && selected?.id === editingId && saved) setSelected(saved)
+      closeModal()
       load()
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao criar playbook', 'error')
+      toast(err instanceof Error ? err.message : 'Erro ao guardar playbook', 'error')
     } finally {
       setSaving(false)
     }
@@ -79,7 +112,7 @@ export default function PlaybooksPage() {
           <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Playbooks</h1>
           <p className="text-sm text-[#71717A]">Scripts, checklists e ferramentas internas</p>
         </div>
-        <button onClick={() => setShowNew(true)} className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+        <button onClick={startNew} className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <Plus className="w-4 h-4" /> Novo Playbook
         </button>
       </div>
@@ -103,7 +136,7 @@ export default function PlaybooksPage() {
           title="Sem playbooks criados"
           description="Os playbooks são a tua biblioteca interna de scripts de vendas, checklists de onboarding e ferramentas. Cria o primeiro para começar."
           actions={[
-            { label: 'Criar primeiro playbook', onClick: () => setShowNew(true), primary: true, icon: Plus },
+            { label: 'Criar primeiro playbook', onClick: startNew, primary: true, icon: Plus },
           ]}
         />
       ) : (
@@ -126,9 +159,19 @@ export default function PlaybooksPage() {
 
           {selected && (
             <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-[#F0F0F3]">{selected.titulo}</h2>
-                <button onClick={() => setSelected(null)} className="text-[#71717A] hover:text-[#F0F0F3] text-lg">✕</button>
+              <div className="flex items-center justify-between mb-4 gap-2">
+                <h2 className="font-bold text-[#F0F0F3] min-w-0 truncate">{selected.titulo}</h2>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button onClick={() => startEdit(selected)} title="Editar"
+                    className="p-1.5 rounded-lg border border-[#27272A] text-[#71717A] hover:text-[#A78BFA] hover:border-[#A78BFA]/40 transition-all">
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => remove(selected)} disabled={deletingId === selected.id} title="Apagar"
+                    className="p-1.5 rounded-lg border border-[#27272A] text-[#71717A] hover:text-red-400 hover:border-red-500/40 transition-all disabled:opacity-50">
+                    {deletingId === selected.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  </button>
+                  <button onClick={() => setSelected(null)} title="Fechar" className="text-[#71717A] hover:text-[#F0F0F3] text-lg px-1">✕</button>
+                </div>
               </div>
               <pre className="text-sm text-[#F0F0F3] whitespace-pre-wrap font-sans leading-relaxed">{selected.conteudo}</pre>
             </div>
@@ -137,9 +180,9 @@ export default function PlaybooksPage() {
       )}
 
       {showNew && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-overlay-enter" onClick={e => e.target === e.currentTarget && setShowNew(false)}>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-overlay-enter" onClick={e => e.target === e.currentTarget && closeModal()}>
           <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-lg animate-modal-enter">
-            <h2 className="font-bold text-lg text-[#F0F0F3] mb-4">Novo Playbook</h2>
+            <h2 className="font-bold text-lg text-[#F0F0F3] mb-4">{editingId ? 'Editar Playbook' : 'Novo Playbook'}</h2>
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-[#71717A] mb-1 block">Título *</label>
@@ -162,10 +205,10 @@ export default function PlaybooksPage() {
               </div>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => { setShowNew(false); setErrors({}) }} disabled={saving} className="flex-1 py-2 rounded-lg border border-[#27272A] text-sm text-[#71717A] disabled:opacity-50">Cancelar</button>
-              <button onClick={create} disabled={saving} className="flex-1 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+              <button onClick={closeModal} disabled={saving} className="flex-1 py-2 rounded-lg border border-[#27272A] text-sm text-[#71717A] disabled:opacity-50">Cancelar</button>
+              <button onClick={save} disabled={saving} className="flex-1 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                {saving ? 'A guardar...' : 'Guardar'}
+                {saving ? 'A guardar...' : editingId ? 'Atualizar' : 'Guardar'}
               </button>
             </div>
           </div>

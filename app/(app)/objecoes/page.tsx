@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronUp, Plus, Zap, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Zap, AlertTriangle, RefreshCw, Loader2, Edit2, Trash2 } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
 import { useToast } from '@/components/Toast'
 
@@ -13,6 +13,7 @@ const CAT_LABELS: Record<string, string> = {
   TIMING: 'Timing',
   GARANTIA: 'Garantia',
   CONCORRENTE_ATUAL: 'Concorrente Atual',
+  OUTROS: 'Outras',
 }
 
 export default function ObjecoesPage() {
@@ -21,22 +22,51 @@ export default function ObjecoesPage() {
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showNew, setShowNew] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ objecao: '', resposta: '', categoria: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const { toast } = useToast()
 
-  const load = () => {
+  const closeModal = () => { setShowNew(false); setEditingId(null); setForm({ objecao: '', resposta: '', categoria: '' }); setErrors({}) }
+  const startNew = () => { setEditingId(null); setForm({ objecao: '', resposta: '', categoria: '' }); setErrors({}); setShowNew(true) }
+  const startEdit = (o: any) => {
+    setForm({ objecao: o.objecao || '', resposta: o.resposta || '', categoria: o.categoria || '' })
+    setEditingId(o.id)
+    setErrors({})
+    setShowNew(true)
+  }
+  const remove = async (id: string) => {
+    if (!confirm('Apagar esta objeção? Esta ação é irreversível.')) return
+    setDeletingId(id)
+    try {
+      const res = await fetch(`/api/objections/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`Erro ${res.status}`)
+      toast('Objeção apagada', 'success')
+      if (id === expanded) setExpanded(null)
+      await load()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Erro ao apagar', 'error')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const load = async () => {
     setLoading(true)
     setError(null)
-    fetch('/api/objections')
-      .then(async r => {
-        if (!r.ok) throw new Error(`Erro ${r.status}`)
-        return r.json()
-      })
-      .then(data => setObjections(Array.isArray(data) ? data : []))
-      .catch(err => setError(err instanceof Error ? err.message : 'Erro ao carregar'))
-      .finally(() => setLoading(false))
+    try {
+      // no-store: após editar/apagar, garante lista fresca (a GET tem cache HTTP 180s)
+      const r = await fetch('/api/objections', { cache: 'no-store' })
+      if (!r.ok) throw new Error(`Erro ${r.status}`)
+      const data = await r.json()
+      setObjections(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar')
+    } finally {
+      setLoading(false)
+    }
   }
   useEffect(() => { load() }, [])
 
@@ -44,7 +74,7 @@ export default function ObjecoesPage() {
   useEffect(() => {
     if (!showNew) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setShowNew(false); setErrors({}) }
+      if (e.key === 'Escape') closeModal()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -60,26 +90,24 @@ export default function ObjecoesPage() {
     return Object.keys(e).length === 0
   }
 
-  const create = async () => {
+  const save = async () => {
     if (!validate()) {
       toast('Corrige os campos marcados', 'error')
       return
     }
     setSaving(true)
     try {
-      const res = await fetch('/api/objections', {
-        method: 'POST',
+      const res = await fetch(editingId ? `/api/objections/${editingId}` : '/api/objections', {
+        method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
       if (!res.ok) throw new Error(`Erro ${res.status}`)
-      toast('Objeção criada', 'success')
-      setShowNew(false)
-      setForm({ objecao: '', resposta: '', categoria: '' })
-      setErrors({})
+      toast(editingId ? 'Objeção atualizada' : 'Objeção criada', 'success')
+      closeModal()
       load()
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Erro ao criar', 'error')
+      toast(err instanceof Error ? err.message : 'Erro ao guardar', 'error')
     } finally {
       setSaving(false)
     }
@@ -101,7 +129,7 @@ export default function ObjecoesPage() {
             {loading ? 'A carregar...' : `${objections?.length || 0} respostas estratégicas`}
           </p>
         </div>
-        <button onClick={() => setShowNew(true)} className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+        <button onClick={startNew} className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <Plus className="w-4 h-4" /> Nova Objeção
         </button>
       </div>
@@ -132,11 +160,13 @@ export default function ObjecoesPage() {
           title="Sem objeções registadas"
           description="A biblioteca de objeções guarda as respostas estratégicas para as objeções mais comuns (preço, tempo, timing, concorrente, etc.). Cria a primeira para começar."
           actions={[
-            { label: 'Criar primeira objeção', onClick: () => setShowNew(true), primary: true, icon: Plus },
+            { label: 'Criar primeira objeção', onClick: startNew, primary: true, icon: Plus },
           ]}
         />
       ) : (
-        Object.entries(byCategory).map(([cat, items]: any) => (
+        Object.entries(byCategory)
+          .sort(([a], [b]) => Object.keys(CAT_LABELS).indexOf(a) - Object.keys(CAT_LABELS).indexOf(b))
+          .map(([cat, items]: any) => (
           <div key={cat} className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <Zap className="w-3.5 h-3.5 text-[#8B5CF6]" />
@@ -155,6 +185,16 @@ export default function ObjecoesPage() {
                     <div className="px-4 pb-4 border-t border-[#16161A]">
                       <div className="text-xs text-[#8B5CF6] uppercase tracking-wider mb-2 mt-3">Resposta Estratégica</div>
                       <p className="text-sm text-[#F0F0F3] leading-relaxed">{o.resposta}</p>
+                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#16161A]">
+                        <button onClick={() => startEdit(o)}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#27272A] text-[#71717A] hover:text-[#A78BFA] hover:border-[#A78BFA]/40 text-xs transition-all">
+                          <Edit2 className="w-3 h-3" /> Editar
+                        </button>
+                        <button onClick={() => remove(o.id)} disabled={deletingId === o.id}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#27272A] text-[#71717A] hover:text-red-400 hover:border-red-500/40 text-xs transition-all disabled:opacity-50">
+                          {deletingId === o.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />} Apagar
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -165,9 +205,9 @@ export default function ObjecoesPage() {
       )}
 
       {showNew && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-overlay-enter" onClick={e => e.target === e.currentTarget && setShowNew(false)}>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-overlay-enter" onClick={e => e.target === e.currentTarget && closeModal()}>
           <div className="bg-[#0F0F12] border border-[#27272A] rounded-2xl p-6 w-full max-w-md animate-modal-enter">
-            <h2 className="font-bold text-lg text-[#F0F0F3] mb-4">Nova Objeção</h2>
+            <h2 className="font-bold text-lg text-[#F0F0F3] mb-4">{editingId ? 'Editar Objeção' : 'Nova Objeção'}</h2>
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-[#71717A] mb-1 block">Objeção *</label>
@@ -182,7 +222,7 @@ export default function ObjecoesPage() {
                 <select value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}
                   className="w-full bg-[#09090B] border border-[#27272A] rounded-lg px-3 py-2 text-sm text-[#F0F0F3] focus:outline-none focus:border-[#8B5CF6]">
                   <option value="">Sem categoria</option>
-                  {Object.entries(CAT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  {Object.entries(CAT_LABELS).filter(([k]) => k !== 'OUTROS').map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </div>
               <div>
@@ -195,14 +235,14 @@ export default function ObjecoesPage() {
               </div>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => { setShowNew(false); setErrors({}) }} disabled={saving}
+              <button onClick={closeModal} disabled={saving}
                 className="flex-1 py-2 rounded-lg border border-[#27272A] text-sm text-[#71717A] hover:border-[#71717A] disabled:opacity-50">
                 Cancelar
               </button>
-              <button onClick={create} disabled={saving}
+              <button onClick={save} disabled={saving}
                 className="flex-1 py-2 rounded-lg bg-[#8B5CF6] hover:bg-[#A78BFA] text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                {saving ? 'A guardar...' : 'Guardar'}
+                {saving ? 'A guardar...' : editingId ? 'Atualizar' : 'Guardar'}
               </button>
             </div>
           </div>
