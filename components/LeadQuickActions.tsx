@@ -121,8 +121,11 @@ export function LeadQuickActions({
     }
   }
 
-  const iconSize = compact ? 'w-3 h-3' : 'w-3.5 h-3.5'
-  const padding = compact ? 'p-1.5' : 'p-2'
+  // Mobile-First: alvo de toque >=38px no telemóvel; compacto em sm+ (rato).
+  const iconSize = compact ? 'w-3.5 h-3.5' : 'w-4 h-4'
+  const padding = compact
+    ? 'flex items-center justify-center min-w-[38px] min-h-[38px] sm:min-w-0 sm:min-h-0 p-1.5'
+    : 'flex items-center justify-center min-w-[40px] min-h-[40px] p-2'
 
   return (
     <>

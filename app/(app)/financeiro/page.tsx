@@ -315,7 +315,9 @@ export default function FinanceiroPage() {
             </div>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          // Mobile-First: scroll horizontal em vez de cortar colunas em ecrãs estreitos
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[680px] md:min-w-0">
             <thead>
               <tr className="border-b border-[#27272A]">
                 {['Data', 'Cliente', 'Plano', 'Período', 'Método', 'Valor', 'Status', 'Ações'].map(h => (
@@ -369,6 +371,7 @@ export default function FinanceiroPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

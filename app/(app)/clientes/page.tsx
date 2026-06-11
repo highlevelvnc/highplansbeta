@@ -304,8 +304,95 @@ export default function ClientesPage() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl overflow-hidden">
+      {/* Mobile card-stack (Sprint Mobile-First) — tabela é desktop-only */}
+      <div className="md:hidden space-y-2">
+        {filtered.map(client => {
+          const planColor = PLAN_COLORS[client.planoAtual] || '#71717A'
+          const h = healthMap[client.id]
+          const hc = h ? (h.level === 'green' ? '#10B981' : h.level === 'yellow' ? '#F59E0B' : '#EF4444') : null
+          const waUrl = buildWhatsAppUrl(client)
+          const isUpsellReady = client.diasNaBase >= 45 && client.planoAtual !== 'Crescimento Local'
+          const nextPlanMap: Record<string, string> = {
+            'Presença Profissional': 'Leads & Movimento',
+            'Leads & Movimento': 'Crescimento Local',
+            'Programa Aceleração Digital': 'Leads & Movimento',
+          }
+          const upsellTo = isUpsellReady ? nextPlanMap[client.planoAtual] : undefined
+          return (
+            <div key={client.id} className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-3.5">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm flex-shrink-0">{(client.moeda || 'EUR') === 'BRL' ? '🇧🇷' : '🇵🇹'}</span>
+                    <ClientName client={client} className="font-semibold text-[#F0F0F3] truncate" />
+                  </div>
+                  {client.planoAtual && (
+                    <span className="inline-block mt-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${planColor}18`, color: planColor }}>
+                      {client.planoAtual}
+                    </span>
+                  )}
+                </div>
+                {h && hc && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                    style={{ background: `${hc}18`, color: hc }} title={h.factors.length ? h.factors.join(' · ') : 'Tudo em dia'}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: hc }} />{h.score}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div>
+                  <span className="text-base font-bold text-[#F0F0F3]">{formatCurrency(client.mrr || 0, (client.moeda || 'EUR') as Currency)}</span>
+                  <span className="text-xs text-[#71717A]">/mês</span>
+                </div>
+                <span className="text-xs text-[#71717A]">{client.diasNaBase}d na base</span>
+              </div>
+              {upsellTo && (
+                <div className="mb-3 -mt-1">
+                  <span className="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
+                    ↑ Upsell pronto → {upsellTo}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                {client.source === 'client' && (
+                  <button onClick={() => setPaymentClient(client)}
+                    className="flex-1 min-h-[40px] rounded-lg bg-[#10B981]/10 hover:bg-[#10B981]/20 text-[#10B981] text-xs font-bold transition-colors flex items-center justify-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5" /> Registar pago
+                  </button>
+                )}
+                {waUrl && (
+                  <a href={waUrl} target="_blank" rel="noopener noreferrer" title="WhatsApp"
+                    className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg border border-[#27272A] text-[#71717A] hover:text-green-400 hover:border-green-500/40 transition-colors">
+                    <Phone className="w-4 h-4" />
+                  </a>
+                )}
+                {client.email && (
+                  <a href={`mailto:${client.email}`} title="Email"
+                    className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg border border-[#27272A] text-[#71717A] hover:text-blue-400 hover:border-blue-500/40 transition-colors">
+                    <Mail className="w-4 h-4" />
+                  </a>
+                )}
+                {client.leadId && (
+                  <Link href={`/leads/${client.leadId}`} title="Abrir lead"
+                    className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg border border-[#27272A] text-[#71717A] hover:text-[#8B5CF6] hover:border-[#8B5CF6]/40 transition-colors">
+                    <ExternalLink className="w-4 h-4" />
+                  </Link>
+                )}
+              </div>
+            </div>
+          )
+        })}
+        {filtered.length === 0 && (
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl text-center py-12 text-[#71717A] text-sm">
+            {clients.length === 0
+              ? <>Sem clientes ainda. <button onClick={() => setShowNewClient(true)} className="text-[#A78BFA] underline">Criar primeiro cliente</button></>
+              : 'Nenhum resultado'}
+          </div>
+        )}
+      </div>
+
+      {/* Table (desktop-only) */}
+      <div className="hidden md:block bg-[#0F0F12] border border-[#27272A] rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#27272A]">
