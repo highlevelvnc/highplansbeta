@@ -352,7 +352,7 @@ export default function FollowUpsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Follow-ups</h1>
+          <h1 className="text-xl md:text-2xl font-black gradient-text">Follow-ups</h1>
           <p className="text-sm text-[#71717A]">{followups.length} pendentes</p>
         </div>
         <button

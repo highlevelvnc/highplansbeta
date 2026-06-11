@@ -132,7 +132,7 @@ export default function ClientesPage() {
   if (error) return (
     <div className="p-4 md:p-6">
       <div className="mb-6">
-        <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Clientes Activos</h1>
+        <h1 className="text-xl md:text-2xl font-black gradient-text">Clientes Activos</h1>
       </div>
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-3" />
@@ -150,7 +150,7 @@ export default function ClientesPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6 gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Clientes</h1>
+          <h1 className="text-xl md:text-2xl font-black gradient-text">Clientes</h1>
           <p className="text-sm text-[#71717A]">Carteira · MRR · Pagamentos</p>
         </div>
         <div className="flex items-center gap-2">

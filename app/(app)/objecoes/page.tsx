@@ -124,7 +124,7 @@ export default function ObjecoesPage() {
     <div className="p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Biblioteca de Objeções</h1>
+          <h1 className="text-xl md:text-2xl font-black gradient-text">Biblioteca de Objeções</h1>
           <p className="text-sm text-[#71717A]">
             {loading ? 'A carregar...' : `${objections?.length || 0} respostas estratégicas`}
           </p>

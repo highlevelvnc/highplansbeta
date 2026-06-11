@@ -109,7 +109,7 @@ export default function PlaybooksPage() {
     <div className="p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Playbooks</h1>
+          <h1 className="text-xl md:text-2xl font-black gradient-text">Playbooks</h1>
           <p className="text-sm text-[#71717A]">Scripts, checklists e ferramentas internas</p>
         </div>
         <button onClick={startNew} className="flex items-center gap-2 bg-[#8B5CF6] hover:bg-[#A78BFA] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">

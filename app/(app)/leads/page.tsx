@@ -865,7 +865,7 @@ export default function LeadsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Leads CRM</h1>
+          <h1 className="text-xl md:text-2xl font-black gradient-text">Leads CRM</h1>
           <p className="text-sm text-[#71717A]">
             {total} leads totais
             {filterLabel && <span className="text-[#8B5CF6]"> · {filterLabel}</span>}

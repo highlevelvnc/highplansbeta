@@ -326,7 +326,7 @@ export default function PipelinePage() {
 
   if (!loading && !error && leads.length === 0) return (
     <div className="p-4 md:p-6 h-full flex flex-col">
-      <div className="mb-5"><h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Pipeline Kanban</h1></div>
+      <div className="mb-5"><h1 className="text-xl md:text-2xl font-black gradient-text">Pipeline Kanban</h1></div>
       <EmptyState
         icon={GitBranch}
         title="Pipeline vazio"
@@ -355,7 +355,7 @@ export default function PipelinePage() {
       {/* ── Header ── */}
       <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Pipeline Kanban</h1>
+          <h1 className="text-xl md:text-2xl font-black gradient-text">Pipeline Kanban</h1>
           <p className="text-sm text-[#71717A] hidden sm:block">
             {total} leads{nichoFilter ? ` · ${nichoFilter}` : ''}{pipelineFilter ? ` · filtro ativo` : ''}{search ? ` · "${search}"` : ''} · Arraste para mover
           </p>

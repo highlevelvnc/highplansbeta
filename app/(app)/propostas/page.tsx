@@ -238,7 +238,7 @@ export default function PropostasPage() {
     <div className="p-4 md:p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Propostas</h1>
+          <h1 className="text-xl md:text-2xl font-black gradient-text">Propostas</h1>
           <p className="text-sm text-[#71717A]">
             {proposals.length} criadas{acceptanceRate !== null && ` · ${acceptanceRate}% aceitação`}
           </p>

@@ -251,7 +251,7 @@ export default function ContactosPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Central de Contactos</h1>
+          <h1 className="text-xl md:text-2xl font-black gradient-text">Central de Contactos</h1>
           <p className="text-sm text-[#71717A]">Templates de mensagens · WhatsApp · Email · Envio em massa</p>
         </div>
         <button onClick={() => setShowNewTemplate(true)}

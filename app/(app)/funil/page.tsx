@@ -127,7 +127,7 @@ export default function FunilPage() {
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-3">
               <TrendingUp className="w-8 h-8 text-[#A78BFA]" />
-              Funil de Vendas
+              <span className="gradient-text">Funil de Vendas</span>
             </h1>
             <p className="text-sm text-[#71717A] mt-1">
               Conversão completa scraping → cliente · últimos 30 dias

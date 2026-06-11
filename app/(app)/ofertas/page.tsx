@@ -20,7 +20,7 @@ export default async function OfertasPage() {
   return (
     <div className="p-4 md:p-6">
       <div className="mb-6">
-        <h1 className="text-xl md:text-2xl font-black text-[#F0F0F3]">Ofertas</h1>
+        <h1 className="text-xl md:text-2xl font-black gradient-text">Ofertas</h1>
         <p className="text-sm text-[#71717A]">Pacotes e planos disponíveis</p>
       </div>
 

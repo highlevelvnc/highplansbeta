@@ -249,7 +249,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           )}
           {/* Global payment alerts banner — overdue + dueToday + browser notifs */}
           {pathname !== '/financeiro' && <PaymentAlertsBanner />}
-          {children}
+          {/* Sprint Polish: fade-in consistente em cada navegação (key=rota → reanima).
+              h-full preserva layouts full-height como o kanban do pipeline. */}
+          <div key={pathname} className="page-fade-in h-full">{children}</div>
           {/* Sprint #55: Cmd+K command palette global */}
           <CommandPalette />
           {/* PWA install prompt (shows non-intrusively when applicable) */}
