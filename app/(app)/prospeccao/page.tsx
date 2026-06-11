@@ -153,6 +153,8 @@ export default function ProspeccaoPage() {
   const [showVoiceNote, setShowVoiceNote] = useState(false)
   // Outdoor mode (bigger fonts/buttons for prospecting on phone outside)
   const [outdoor, setOutdoor] = useState(false)
+  // Modo Zen / Foco (tecla F): esconde chrome auxiliar, deixa só cartão + ações
+  const [zen, setZen] = useState(false)
   // Time advice (recomputed every 60s for the time-aware banner)
   const [timeAdvice, setTimeAdvice] = useState(() => getTimeAdvice())
   // Upcoming callbacks (overdue + imminent) — polled every 60s
@@ -339,6 +341,7 @@ export default function ProspeccaoPage() {
       setNewestFirst(localStorage.getItem('prosp_newestFirst') === '1')
       setExcludeOffTopic(localStorage.getItem('prosp_excludeOffTopic') !== '0') // default ON
       setOutdoor(localStorage.getItem('prosp_outdoor') === '1')
+      setZen(localStorage.getItem('prosp_zen') === '1')
       setSmartBatchEnabled(localStorage.getItem('prosp_smartBatch') !== '0') // default ON
     } catch {}
   }, [])
@@ -351,6 +354,9 @@ export default function ProspeccaoPage() {
   useEffect(() => {
     try { localStorage.setItem('prosp_outdoor', outdoor ? '1' : '0') } catch {}
   }, [outdoor])
+  useEffect(() => {
+    try { localStorage.setItem('prosp_zen', zen ? '1' : '0') } catch {}
+  }, [zen])
   useEffect(() => {
     const id = setInterval(() => setTimeAdvice(getTimeAdvice()), 60_000)
     return () => clearInterval(id)
@@ -1779,6 +1785,12 @@ export default function ProspeccaoPage() {
         else if (k === 'b' || k === 'arrowleft') { e.preventDefault(); loadPrevious() }
         else if (k === 'i') { e.preventDefault(); markInvalid() }
         else if (k === 'z') { e.preventDefault(); snooze(2) }
+        else if (k === 'f') {
+          // Modo Zen / Foco: alterna chrome auxiliar + fecha painéis abertos
+          e.preventDefault()
+          setZen(z => !z)
+          setShowSession(false); setShowHistory(false); setShowHeatmap(false); setShowObjections(false); setShowHotkeys(false)
+        }
         else if (k === 'g') { e.preventDefault(); handleAiGenerate() }
         else if (k === 'o') { e.preventDefault(); setShowObjections(v => !v) }
         else if (k === '?' || k === 'h') { e.preventDefault(); setShowHotkeys(v => !v) }
@@ -1979,6 +1991,7 @@ export default function ProspeccaoPage() {
               { k: '⌘N / Ctrl+N', label: 'Nota de voz' },
               { k: 'I', label: 'Marcar inválido' },
               { k: 'Z', label: 'Snooze 2 dias' },
+              { k: 'F', label: 'Modo Foco (esconde chrome)' },
               { k: 'H / ?', label: 'Mostrar atalhos' },
               { k: 'Esc', label: 'Fechar call log' },
             ].map(h => (
@@ -2917,7 +2930,18 @@ export default function ProspeccaoPage() {
       )}
 
       {/* ── Layout responsivo: mobile = vertical · desktop (lg+) = 2 colunas ── */}
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-5">
+      {/* Modo Zen: indicador flutuante + sair (tecla F também sai) */}
+      {zen && (
+        <button
+          onClick={() => { setZen(false) }}
+          title="Sair do Modo Foco (F)"
+          className="fixed bottom-28 md:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#8B5CF6]/15 border border-[#8B5CF6]/40 text-[#A78BFA] text-xs font-bold backdrop-blur-md shadow-lg shadow-purple-500/10 hover:bg-[#8B5CF6]/25 transition-all animate-fade-in"
+        >
+          🧘 Modo Foco · <kbd className="font-mono bg-[#8B5CF6]/20 px-1 rounded">F</kbd> para sair
+        </button>
+      )}
+
+      <div className={zen ? '' : 'lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-5'}>
       {/* COLUNA PRINCIPAL — todo o conteúdo de prospect */}
       <div className="min-w-0">
 
@@ -2987,7 +3011,8 @@ export default function ProspeccaoPage() {
         </div>
       )}
 
-      {/* HUD gamificado — sempre visível, stats grandes */}
+      {/* HUD gamificado + barra de meta — escondidos em Modo Zen */}
+      {!zen && (<>
       <GamifiedHUD
         contactedSession={contactedCount}
         streak={streak}
@@ -2996,11 +3021,13 @@ export default function ProspeccaoPage() {
         dailyGoal={dailyGoal}
         totalRemaining={totalRemaining}
       />
-      {/* Daily progress bar (detalhada — complementa o HUD) */}
       <DailyGoalProgress dailyDone={dailyDone} dailyGoal={dailyGoal} onUpdateGoal={updateGoal} />
+      </>)}
       {/* Floating "+N" popups gamificados */}
       <FloatingPoints />
 
+      {/* Filtros + presets — escondidos em Modo Zen */}
+      {!zen && (<>
       <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
         <select
           value={pais}
@@ -3062,8 +3089,9 @@ export default function ProspeccaoPage() {
         onApply={applyPreset}
         onSave={saveCurrentAsPreset}
       />
+      </>)}
 
-      {/* Quick filter pills — one-click toggles for common queries */}
+      {/* ChipHealthBanner FICA visível mesmo em Zen — é a segurança anti-ban */}
       {chipHealth && (() => {
         const otherKey: NumberKey = rateState.active === 'wa1' ? 'wa2' : 'wa1'
         const otherHealthier = allNumberStates[otherKey].dayCount < allNumberStates[rateState.active].dayCount
@@ -3077,7 +3105,8 @@ export default function ProspeccaoPage() {
         )
       })()}
 
-      <QuickFilterPills
+      {/* Quick filter pills — escondidos em Modo Zen */}
+      {!zen && <QuickFilterPills
         scoreFilter={scoreFilter}
         setScoreFilter={setScoreFilter}
         minScore={minScore}
@@ -3091,7 +3120,7 @@ export default function ProspeccaoPage() {
         newestFirst={newestFirst}
         setNewestFirst={setNewestFirst}
         onSearchClick={() => setShowSearch(true)}
-      />
+      />}
 
       {/* Loading */}
       {loading && (
@@ -4178,13 +4207,13 @@ export default function ProspeccaoPage() {
       )}
 
       </div>
-      {/* SIDEBAR contextual (só desktop lg+) */}
-      <ProspectSidebar
+      {/* SIDEBAR contextual (só desktop lg+) — escondida em Modo Zen */}
+      {!zen && <ProspectSidebar
         callbacks={callbacks}
         bookmarksList={bookmarksList}
         onShowPendentes={() => { setShowPendentes(true); loadCallbacks(); loadBookmarks() }}
         onShowHotkeys={() => setShowHotkeys(true)}
-      />
+      />}
       </div>
     </div>
   )
