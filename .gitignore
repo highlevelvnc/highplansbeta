@@ -30,11 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files — NUNCA comitar
+# env files — NUNCA comitar (catch-all)
 .env
-.env.local
-.env.production
-.env.staging
+.env.*
 # Manter .env.example para documentação
 !.env.example
 
@@ -64,6 +62,19 @@ prisma/highplans.db*
 prisma/migrations/LEADS_*.csv
 prisma/migrations/*_PT.csv
 prisma/migrations/*_BR.csv
+
+# Dados / exports — defesa em profundidade: nenhum dado no repo público
+# (qualquer CSV, dump ou backup. Schemas .sql em migrations não são afetados.)
+*.csv
+*.sqlite
+*.sqlite3
+*.dump
+*.bak
+backup-*.json
+highplans-backup-*.json
+# Ferramentas locais que não devem ir para o repo
+.claude/
+scrppper/
 
 # Scripts diagnóstico ad-hoc
 scripts/check-db.ts

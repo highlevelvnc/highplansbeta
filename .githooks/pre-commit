@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# ──────────────────────────────────────────────────────────────────────
+# Pre-commit guard anti-segredos — bloqueia commits com credenciais.
+# Ativar: git config core.hooksPath .githooks
+# Contornar (falso-positivo): git commit --no-verify
+# ──────────────────────────────────────────────────────────────────────
+set -euo pipefail
+
+files=$(git diff --cached --name-only --diff-filter=ACM || true)
+[ -z "$files" ] && exit 0
+
+# 1. Bloquear ficheiros .env reais (mas permitir .env.example)
+env_leak=$(echo "$files" | grep -E '(^|/)\.env(\.[a-z]+)?$' | grep -v '\.example$' || true)
+if [ -n "$env_leak" ]; then
+  echo "🛑 Pre-commit: ficheiro .env detetado no commit:"
+  echo "$env_leak"
+  echo "   → git rm --cached <ficheiro> e confirma que está no .gitignore"
+  exit 1
+fi
+
+# 2. Padrões de segredo no conteúdo ADICIONADO (ignora o próprio hook, exemplos e docs)
+scan_files=$(echo "$files" | grep -vE '(^\.githooks/|\.env\.example$|\.md$)' || true)
+hits=""
+for f in $scan_files; do
+  [ -f "$f" ] || continue
+  added=$(git diff --cached -U0 -- "$f" | grep '^+' | grep -v '^+++' || true)
+  [ -z "$added" ] && continue
+  match=$(echo "$added" | grep -nEi \
+    -e 'AKIA[0-9A-Z]{16}' \
+    -e 'sk-[a-zA-Z0-9]{20,}' \
+    -e 'postgres(ql)?://[^ ]*:[^ @]+@' \
+    -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+    -e 'eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{10,}' \
+    -e '(AUTH_SECRET|RESEND_API_KEY|EVOLUTION_API_KEY|SEED_TOKEN|SUPABASE_SERVICE_ROLE_KEY)[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9._-]{16,}' \
+    || true)
+  if [ -n "$match" ]; then
+    hits="${hits}
+── ${f}
+${match}"
+  fi
+done
+
+if [ -n "$hits" ]; then
+  echo "🛑 Pre-commit: possível SEGREDO no conteúdo a commitar:"
+  echo "$hits"
+  echo ""
+  echo "   Falso-positivo? Contorna com: git commit --no-verify"
+  exit 1
+fi
+
+exit 0
