@@ -112,7 +112,7 @@ export function stats(): { size: number; keys: string[] } {
  */
 export type CRMScope =
   | 'leads' | 'clients' | 'dashboard' | 'pipeline' | 'funnel'
-  | 'inbox' | 'proposals' | 'tasks' | 'activity' | 'notifications'
+  | 'inbox' | 'proposals' | 'tasks' | 'activity' | 'notifications' | 'financeiro'
 
 export function crmInvalidate(scopes: CRMScope[]): void {
   for (const scope of scopes) {
@@ -127,6 +127,7 @@ export function crmInvalidate(scopes: CRMScope[]): void {
       case 'tasks':         invalidate('tasks:list'); break
       case 'activity':      invalidatePrefix('activity:'); break
       case 'notifications': invalidate('notifications:v1'); break
+      case 'financeiro':    invalidatePrefix('financeiro:'); break
     }
   }
 }

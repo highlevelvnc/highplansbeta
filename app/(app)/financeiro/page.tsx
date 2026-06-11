@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Euro, Plus, Download, AlertTriangle, CheckCircle, Clock, X, Loader2, Calendar, TrendingUp, Edit2, Trash2, Wand2 } from 'lucide-react'
+import { Euro, Plus, Download, AlertTriangle, CheckCircle, Clock, X, Loader2, Calendar, TrendingUp, Edit2, Trash2, Wand2, ArrowUpRight } from 'lucide-react'
 import { useToast } from '@/components/Toast'
 import { CURRENCY_META, formatCurrency, type Currency } from '@/lib/currency'
 import { RegisterPaymentModal } from '@/components/RegisterPaymentModal'
@@ -30,6 +30,7 @@ export default function FinanceiroPage() {
   const [editingPayment, setEditingPayment] = useState<any>(null)
   const [generating, setGenerating] = useState(false)
   const [heroRefresh, setHeroRefresh] = useState(0)
+  const [retention, setRetention] = useState<any>(null)
   const [anon, setAnon] = useClientsAnonymized()
   const { toast } = useToast()
 
@@ -60,6 +61,11 @@ export default function FinanceiroPage() {
       setPayments(pay.payments || [])
       // Only "real" clients (not lead-derived) can have payments
       setClients((Array.isArray(cs) ? cs : []).filter((c: any) => c.source === 'client'))
+      // Retenção (churn + MRR em risco) — não bloqueia o resto
+      fetch('/api/financeiro/retention')
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => d && !d.error && setRetention(d))
+        .catch(() => {})
     } catch {}
     setLoading(false)
   }, [statusFilter, moedaFilter, yearFilter])
@@ -206,6 +212,35 @@ export default function FinanceiroPage() {
             </div>
             <div className="text-[10px] text-[#52525B] mt-1">{summary.pendentesCount} pendentes · <span className="text-red-400 font-bold">{summary.atrasadosCount} atrasados</span></div>
           </div>
+        </div>
+      )}
+
+      {/* Retenção — churn + MRR em risco (Sprint #2) */}
+      {retention && (retention.churn.churnRatePct > 0 || retention.mrrEmRisco.total.EUR > 0 || retention.mrrEmRisco.total.BRL > 0) && (
+        <div className="flex flex-wrap items-center gap-3 mb-6 bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+          <div className="flex items-center gap-2 pr-4 border-r border-[#27272A]">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-[#52525B]">Retenção</span>
+          </div>
+          <div>
+            <div className="text-[10px] text-[#71717A]">% Cancelados</div>
+            <div className={`text-lg font-black ${retention.churn.churnRatePct > 5 ? 'text-red-400' : 'text-[#F0F0F3]'}`}>{retention.churn.churnRatePct}%</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-[#71717A]">MRR em risco</div>
+            <div className="text-lg font-black text-red-400">
+              {formatCurrency(retention.mrrEmRisco.total.EUR, 'EUR')}
+              {retention.mrrEmRisco.total.BRL > 0 && <span className="text-xs text-[#A1A1AA]"> · {formatCurrency(retention.mrrEmRisco.total.BRL, 'BRL')}</span>}
+            </div>
+          </div>
+          {retention.dormentes.length > 0 && (
+            <div>
+              <div className="text-[10px] text-[#71717A]">Dormentes</div>
+              <div className="text-lg font-black text-amber-400">{retention.dormentes.length}</div>
+            </div>
+          )}
+          <Link href="/clientes" className="ml-auto text-xs text-[#A78BFA] hover:underline flex items-center gap-1">
+            Ver saúde dos clientes <ArrowUpRight className="w-3 h-3" />
+          </Link>
         </div>
       )}
 

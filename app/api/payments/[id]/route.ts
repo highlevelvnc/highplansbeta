@@ -40,7 +40,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
     const updated = await prisma.payment.update({ where: { id }, data: safe })
     // Sprint #48: payment muda → dashboard receita + clients MRR + notifications (due payments)
-    crmInvalidate(['dashboard', 'clients', 'notifications'])
+    crmInvalidate(['dashboard', 'clients', 'notifications', 'financeiro'])
     return NextResponse.json(updated)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erro'
@@ -63,7 +63,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       select: { valor: true, moeda: true, status: true, clientId: true },
     })
     await prisma.payment.delete({ where: { id } })
-    crmInvalidate(['dashboard', 'clients', 'notifications'])
+    crmInvalidate(['dashboard', 'clients', 'notifications', 'financeiro'])
     logSecurityEvent({
       action: 'PAYMENT_DELETE',
       userId: session?.user?.id,

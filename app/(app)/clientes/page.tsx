@@ -34,6 +34,9 @@ export default function ClientesPage() {
   const [editingPotentialLead, setEditingPotentialLead] = useState<any>(null)
   const [convertingId, setConvertingId] = useState<string | null>(null)
   const [anon, setAnon] = useClientsAnonymized()
+  // Retenção: churn + MRR em risco + health-score por cliente (Sprint #2)
+  const [retention, setRetention] = useState<any>(null)
+  const [dormentesOnly, setDormentesOnly] = useState(false)
   const { toast } = useToast()
 
   const loadPotential = async () => {
@@ -75,6 +78,11 @@ export default function ClientesPage() {
       if (!res.ok) throw new Error(`Erro ${res.status}`)
       const json = await res.json()
       setClients(Array.isArray(json) ? json : [])
+      // Retenção em paralelo — não bloqueia a lista se falhar
+      fetch('/api/financeiro/retention')
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => d && !d.error && setRetention(d))
+        .catch(() => {})
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar clientes')
     } finally {
@@ -89,7 +97,11 @@ export default function ClientesPage() {
   const mrrBrl = clients.filter(c => c.moeda === 'BRL').reduce((s, c) => s + (c.mrr || 0), 0)
   const upsellReady = clients.filter(c => c.diasNaBase >= 45 && c.planoAtual !== 'Crescimento Local')
 
+  const healthMap: Record<string, { score: number; level: 'green' | 'yellow' | 'red'; factors: string[] }> = retention?.health || {}
+  const dormentesSet = new Set<string>((retention?.dormentes || []).map((d: any) => d.id))
+
   const filtered = clients.filter(c => {
+    if (dormentesOnly && !dormentesSet.has(c.id)) return false
     if (moedaFilter !== 'all' && (c.moeda || 'EUR') !== moedaFilter) return false
     if (!filter) return true
     return (
@@ -214,6 +226,48 @@ export default function ClientesPage() {
         </div>
       </div>
 
+      {/* Retenção — churn + MRR em risco + dormentes (Sprint #2) */}
+      {retention && (retention.churn.churnedCount > 0 || retention.mrrEmRisco.total.EUR > 0 || retention.mrrEmRisco.total.BRL > 0 || retention.dormentes.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          {/* Churn */}
+          <div className="bg-[#0F0F12] border border-[#27272A] rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <AlertTriangle className="w-4 h-4 text-[#71717A]" />
+              <span className="text-xs text-[#71717A]">% Cancelados (carteira)</span>
+            </div>
+            <div className={`text-xl font-black ${retention.churn.churnRatePct > 5 ? 'text-red-400' : 'text-[#F0F0F3]'}`}>
+              {retention.churn.churnRatePct}%
+            </div>
+            <div className="text-[10px] text-[#52525B] mt-1">
+              {retention.churn.churnedCount} cancelados
+              {retention.churn.churnedRecent30 > 0 && <span className="text-red-400/70"> · {retention.churn.churnedRecent30} nos últimos 30d (aprox.)</span>}
+            </div>
+          </div>
+          {/* MRR em risco */}
+          <div className={`rounded-xl p-4 border ${(retention.mrrEmRisco.total.EUR + retention.mrrEmRisco.total.BRL) > 0 ? 'bg-red-500/5 border-red-500/30' : 'bg-[#0F0F12] border-[#27272A]'}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="w-4 h-4 text-red-400 rotate-180" />
+              <span className="text-xs text-[#71717A]">MRR em risco</span>
+            </div>
+            <div className="text-xl font-black text-red-400">{formatCurrency(retention.mrrEmRisco.total.EUR, 'EUR')}</div>
+            {retention.mrrEmRisco.total.BRL > 0 && <div className="text-xs font-bold text-[#A1A1AA]">{formatCurrency(retention.mrrEmRisco.total.BRL, 'BRL')}</div>}
+            <div className="text-[10px] text-[#52525B] mt-1">pausados + ≥2 pagamentos em atraso</div>
+          </div>
+          {/* Dormentes (acionável → filtra a tabela) */}
+          <button
+            onClick={() => setDormentesOnly(v => !v)}
+            className={`text-left rounded-xl p-4 border transition-all ${dormentesOnly ? 'bg-amber-500/10 border-amber-500/40' : retention.dormentes.length > 0 ? 'bg-[#0F0F12] border-amber-500/25 hover:border-amber-500/40' : 'bg-[#0F0F12] border-[#27272A]'}`}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Calendar className="w-4 h-4 text-amber-400" />
+              <span className="text-xs text-[#71717A]">Dormentes</span>
+            </div>
+            <div className="text-xl font-black text-amber-400">{retention.dormentes.length}</div>
+            <div className="text-[10px] text-[#52525B] mt-1">{dormentesOnly ? 'a filtrar — clica p/ ver todos' : 'sem pagar há +45d · clica p/ filtrar'}</div>
+          </button>
+        </div>
+      )}
+
       {/* Upsell alert */}
       {upsellReady.length > 0 && (
         <div className="bg-[rgba(245,158,11,0.06)] border border-[rgba(245,158,11,0.2)] rounded-xl p-4 mb-6 flex items-center gap-3">
@@ -240,6 +294,14 @@ export default function ClientesPage() {
             {m === 'all' ? `Todos (${clients.length})` : `${CURRENCY_META[m].flag} ${m} (${clients.filter(c => (c.moeda || 'EUR') === m).length})`}
           </button>
         ))}
+        {dormentesOnly && (
+          <button
+            onClick={() => setDormentesOnly(false)}
+            className="px-3 py-1.5 rounded-full text-[11px] font-bold border bg-amber-500/15 border-amber-500/40 text-amber-400 transition-all"
+          >
+            💤 Só dormentes ✕
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -247,7 +309,7 @@ export default function ClientesPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#27272A]">
-              {['Cliente', 'País', 'Plano', 'MRR', 'Dias', 'Upsell', 'Ações'].map(h => (
+              {['Cliente', 'País', 'Plano', 'MRR', 'Dias', 'Saúde', 'Upsell', 'Ações'].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-[10px] text-[#71717A] uppercase tracking-wider font-medium">{h}</th>
               ))}
             </tr>
@@ -290,6 +352,23 @@ export default function ClientesPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
+                    {(() => {
+                      const h = healthMap[client.id]
+                      if (!h) return <span className="text-xs text-[#52525B]">—</span>
+                      const c = h.level === 'green' ? '#10B981' : h.level === 'yellow' ? '#F59E0B' : '#EF4444'
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full"
+                          style={{ background: `${c}18`, color: c }}
+                          title={h.factors.length ? h.factors.join(' · ') : 'Tudo em dia'}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: c }} />
+                          {h.score}
+                        </span>
+                      )
+                    })()}
+                  </td>
+                  <td className="px-4 py-3">
                     {isUpsellReady && nextPlan[client.planoAtual] ? (
                       <span className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
                         → {nextPlan[client.planoAtual]}
@@ -329,7 +408,7 @@ export default function ClientesPage() {
               )
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-12 text-[#71717A]">
+              <tr><td colSpan={8} className="text-center py-12 text-[#71717A]">
                 {clients.length === 0
                   ? <>Sem clientes ainda. <button onClick={() => setShowNewClient(true)} className="text-[#A78BFA] underline">Criar primeiro cliente</button></>
                   : 'Nenhum resultado'}
