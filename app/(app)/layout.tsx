@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, LogOut, Menu, X, Bell, BarChart3, Copy, Crosshair, Inbox, Tag, Activity, Euro, CalendarCheck, Sunrise } from 'lucide-react'
+import { LayoutDashboard, Users, GitBranch, Calendar, FileText, CheckSquare, Zap, BookOpen, TrendingUp, Target, MessageCircle, UserCheck, LogOut, Menu, X, Bell, BarChart3, Copy, Crosshair, Inbox, Tag, Activity, Euro, CalendarCheck, Sunrise, ChevronDown, Wrench } from 'lucide-react'
 import { ToastProvider } from '@/components/Toast'
 import { BottomNavBar } from '@/components/BottomNavBar'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -33,12 +33,7 @@ const nav = [
   { href: '/atividade', label: 'Atividade', icon: Activity },
   { href: '/duplicados', label: 'Duplicados', icon: Copy },
   { href: '/tags', label: 'Tags', icon: Tag },
-  { href: '/admin/wa-events', label: 'WhatsApp Events', icon: MessageCircle },
-  { href: '/admin/ab-test', label: 'A/B Test', icon: Zap },
-  { href: '/admin/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/admin/perf', label: 'Performance', icon: Activity },
-  { href: '/admin/auto-followup', label: 'Auto Follow-up', icon: CalendarCheck },
-  { href: '/admin/daily-plan', label: 'Plano do dia', icon: Sunrise },
+  { adminGroup: true },
   { section: 'ESTRATÉGIA' },
   { href: '/nichos', label: 'Nichos', icon: TrendingUp },
   { href: '/objecoes', label: 'Objeções', icon: Zap },
@@ -46,10 +41,22 @@ const nav = [
   { href: '/ofertas', label: 'Ofertas', icon: Target },
 ]
 
+// Ferramentas admin — agrupadas num menu colapsável (declutter da sidebar)
+const adminTools = [
+  { href: '/admin', label: 'Central Admin', icon: LayoutDashboard },
+  { href: '/admin/daily-plan', label: 'Plano do dia', icon: Sunrise },
+  { href: '/admin/wa-events', label: 'WhatsApp Events', icon: MessageCircle },
+  { href: '/admin/ab-test', label: 'A/B Test', icon: Zap },
+  { href: '/admin/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/admin/auto-followup', label: 'Auto Follow-up', icon: CalendarCheck },
+  { href: '/admin/perf', label: 'Performance', icon: Activity },
+]
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const { data: session } = useSession()
+  const [adminOpen, setAdminOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [fuDismissed, setFuDismissed] = useState(false)
 
@@ -138,6 +145,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-3 px-2">
         {nav.map((item, i) => {
+          if ('adminGroup' in item) {
+            const onAdmin = pathname.startsWith('/admin')
+            const open = adminOpen || onAdmin
+            return (
+              <div key={i}>
+                <button onClick={() => setAdminOpen(o => !o)}
+                  className="flex items-center gap-1.5 w-full px-3 pt-5 pb-1.5 group">
+                  <Wrench className="w-3 h-3 text-[#52525B] group-hover:text-[#A78BFA] transition-colors" />
+                  <div className="text-[9px] text-[#52525B] uppercase tracking-[0.2em] font-bold flex-1 text-left group-hover:text-[#71717A] transition-colors">Ferramentas</div>
+                  <ChevronDown className={`w-3 h-3 text-[#52525B] transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
+                {open && adminTools.map(t => {
+                  const Icon = t.icon
+                  const active = pathname === t.href || (t.href !== '/admin' && pathname.startsWith(t.href + '/'))
+                  return (
+                    <Link key={t.href} href={t.href} onClick={() => setMobileOpen(false)}
+                      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg mb-0.5 text-sm transition-all duration-200 ${
+                        active ? 'nav-active text-[#A78BFA] font-semibold' : 'text-[#71717A] hover:bg-[#18181B] hover:text-[#F0F0F3]'
+                      }`}>
+                      <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-[#8B5CF6]' : ''}`} />
+                      <span className="flex-1">{t.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            )
+          }
           if ('section' in item) {
             return (
               <div key={i} className="flex items-center gap-1.5 px-3 pt-5 pb-1.5">

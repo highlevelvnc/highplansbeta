@@ -41,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { type: 'nav', label: 'Atividade',       href: '/atividade',      keywords: 'atividade activity log historico', emoji: '⚡' },
   { type: 'nav', label: 'Duplicados',      href: '/duplicados',     keywords: 'duplicados duplicates limpeza',   emoji: '🔁' },
   { type: 'nav', label: 'Tags',            href: '/tags',           keywords: 'tags etiquetas',                   emoji: '🏷️' },
+  { type: 'nav', label: 'Central Admin',   href: '/admin',          keywords: 'admin central ferramentas hub', emoji: '🛠️' },
   { type: 'nav', label: 'WhatsApp Events', href: '/admin/wa-events', keywords: 'whatsapp events historico bans', emoji: '📱' },
   { type: 'nav', label: 'A/B Test',        href: '/admin/ab-test',  keywords: 'ab test variant mensagem',        emoji: '🧪' },
   { type: 'nav', label: 'Performance',     href: '/admin/perf',     keywords: 'performance cache stats egress',  emoji: '⚙️' },
